@@ -307,25 +307,31 @@ class _CharacterPageState extends State<CharacterPage> {
 
   Widget _buildCenterCharacter(Character char) {
     return SizedBox(
-      width: 200,
-      height: 400,
+      width: 220,
+      height: 440,
       child: char.avatarUrl != null
-          ? ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: CachedNetworkImage(
-                imageUrl: char.avatarUrl!,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
+          ? CachedNetworkImage(
+              imageUrl: char.avatarUrl!,
+              fit: BoxFit.contain,
+              alignment: Alignment.topCenter,
+              placeholder: (context, url) => Container(
+                decoration: BoxDecoration(
                   color: WowTheme.surfaceLight,
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      color: WowTheme.primaryGold,
-                      strokeWidth: 2,
-                    ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    color: WowTheme.primaryGold,
+                    strokeWidth: 2,
                   ),
                 ),
-                errorWidget: (context, url, error) => Container(
+              ),
+              errorWidget: (context, url, error) => Container(
+                decoration: BoxDecoration(
                   color: WowTheme.surfaceLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
                   child: ClassIcon(className: char.characterClass, size: 80),
                 ),
               ),

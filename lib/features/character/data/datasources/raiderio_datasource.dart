@@ -81,7 +81,6 @@ class RaiderIoDataSource {
       guild: data['guild'] != null
           ? (data['guild'] as Map<String, dynamic>)['name'] as String?
           : null,
-      avatarUrl: data['thumbnail_url'] as String?,
       achievementPoints: data['achievement_points'] as int?,
       averageItemLevel: (gear['item_level_equipped'] as num?)?.toInt(),
       equippedItemLevel: (gear['item_level_equipped'] as num?)?.toInt(),
@@ -89,7 +88,22 @@ class RaiderIoDataSource {
       stats: null,
       mythicPlusScore: mPlusScore,
       raidProgression: raidSummary,
+      avatarUrl: _getFullRenderUrl(data['thumbnail_url'] as String?),
     );
+  }
+
+  String? _getFullRenderUrl(String? thumbnailUrl) {
+    if (thumbnailUrl == null || thumbnailUrl.isEmpty) return null;
+
+    if (thumbnailUrl.contains('-avatar.jpg')) {
+      return thumbnailUrl.replaceAll('-avatar.jpg', '-main-raw.png');
+    }
+
+    if (thumbnailUrl.contains('avatar.jpg')) {
+      return thumbnailUrl.replaceAll('avatar.jpg', 'main-raw.png');
+    }
+
+    return thumbnailUrl;
   }
 
   List<EquippedItem> _mapEquipment(Map<String, dynamic> items) {
@@ -170,7 +184,6 @@ class RaiderIoDataSource {
   }
 
   String _mapQuality(String tier) {
-    // Raider.IO uses tier numbers or quality names
     switch (tier.toLowerCase()) {
       case '5':
       case 'legendary':
@@ -185,7 +198,7 @@ class RaiderIoDataSource {
       case 'uncommon':
         return 'UNCOMMON';
       default:
-        return 'EPIC'; // Most endgame gear is epic
+        return 'EPIC';
     }
   }
 }
