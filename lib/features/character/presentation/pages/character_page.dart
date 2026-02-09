@@ -307,12 +307,12 @@ class _CharacterPageState extends State<CharacterPage> {
 
   Widget _buildCenterCharacter(Character char) {
     return SizedBox(
-      width: 220,
+      width: 300,
       height: 440,
       child: char.avatarUrl != null
           ? CachedNetworkImage(
               imageUrl: char.avatarUrl!,
-              fit: BoxFit.contain,
+              fit: BoxFit.fitHeight,
               alignment: Alignment.topCenter,
               placeholder: (context, url) => Container(
                 decoration: BoxDecoration(
