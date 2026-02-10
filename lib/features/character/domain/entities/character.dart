@@ -17,6 +17,8 @@ class Character extends Equatable {
   final CharacterStats? stats;
   final double? mythicPlusScore;
   final String? raidProgression;
+  final MythicPlusProfile? mythicPlusProfile;
+  final List<RaidProgress> raidProgressionDetails;
 
   const Character({
     required this.name,
@@ -35,6 +37,8 @@ class Character extends Equatable {
     this.stats,
     this.mythicPlusScore,
     this.raidProgression,
+    this.mythicPlusProfile,
+    this.raidProgressionDetails = const [],
   });
 
   String get displayName => '$name - $realm ($region)';
@@ -53,6 +57,7 @@ class EquippedItem extends Equatable {
   final String? iconUrl;
   final List<String> enchantments;
   final List<String> gems;
+  final List<int> bonusIds;
 
   const EquippedItem({
     required this.slot,
@@ -63,7 +68,30 @@ class EquippedItem extends Equatable {
     this.iconUrl,
     this.enchantments = const [],
     this.gems = const [],
+    this.bonusIds = const [],
   });
+
+  /// Wowhead URL for this item (with bonus IDs for exact version)
+  String? get wowheadUrl {
+    if (itemId == null) return null;
+    final base = 'https://www.wowhead.com/item=$itemId';
+    if (bonusIds.isNotEmpty) {
+      return '$base&bonus=${bonusIds.join(':')}';
+    }
+    return base;
+  }
+
+  /// Formatted slot name: "MAIN_HAND" → "Main Hand"
+  String get displaySlot {
+    return slot
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map(
+          (w) =>
+              w.isEmpty ? w : w[0].toUpperCase() + w.substring(1).toLowerCase(),
+        )
+        .join(' ');
+  }
 
   @override
   List<Object?> get props => [slot, name, itemLevel];
@@ -101,4 +129,115 @@ class CharacterStats extends Equatable {
     mastery,
     versatility,
   ];
+}
+
+/// Detailed Mythic+ season profile
+class MythicPlusProfile extends Equatable {
+  final double scoreAll;
+  final double scoreDps;
+  final double scoreHealer;
+  final double scoreTank;
+  final List<MythicPlusRun> bestRuns;
+
+  const MythicPlusProfile({
+    required this.scoreAll,
+    this.scoreDps = 0,
+    this.scoreHealer = 0,
+    this.scoreTank = 0,
+    this.bestRuns = const [],
+  });
+
+  @override
+  List<Object?> get props => [scoreAll, bestRuns];
+}
+
+/// A single Mythic+ dungeon run
+class MythicPlusRun extends Equatable {
+  final String dungeon;
+  final String shortName;
+  final int mythicLevel;
+  final Duration completedTime;
+  final Duration parTime;
+  final int numKeystoneUpgrades; // 0, 1, 2, or 3
+  final double score;
+  final String? affixes;
+  final String? url; // Link to Raider.IO run detail
+
+  const MythicPlusRun({
+    required this.dungeon,
+    required this.shortName,
+    required this.mythicLevel,
+    required this.completedTime,
+    required this.parTime,
+    required this.numKeystoneUpgrades,
+    required this.score,
+    this.affixes,
+    this.url,
+  });
+
+  bool get inTime => numKeystoneUpgrades > 0;
+
+  String get formattedTime {
+    final minutes = completedTime.inMinutes;
+    final seconds = completedTime.inSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  String get upgradeText {
+    if (numKeystoneUpgrades <= 0) return 'Depleted';
+    return '+$numKeystoneUpgrades';
+  }
+
+  @override
+  List<Object?> get props => [dungeon, mythicLevel, score];
+}
+
+/// Raid progression for a single raid tier
+class RaidProgress extends Equatable {
+  final String raidName;
+  final String slug;
+  final String summary;
+  final int totalBosses;
+  final int normalKilled;
+  final int heroicKilled;
+  final int mythicKilled;
+
+  const RaidProgress({
+    required this.raidName,
+    required this.slug,
+    required this.summary,
+    required this.totalBosses,
+    this.normalKilled = 0,
+    this.heroicKilled = 0,
+    this.mythicKilled = 0,
+  });
+
+  /// Highest difficulty with full clear
+  String? get highestClear {
+    if (mythicKilled >= totalBosses) return 'Mythic';
+    if (heroicKilled >= totalBosses) return 'Heroic';
+    if (normalKilled >= totalBosses) return 'Normal';
+    return null;
+  }
+
+  /// Current progress tier (highest difficulty with any kill)
+  String get currentTier {
+    if (mythicKilled > 0) return 'Mythic';
+    if (heroicKilled > 0) return 'Heroic';
+    if (normalKilled > 0) return 'Normal';
+    return 'N/A';
+  }
+
+  /// Pretty name from slug: "nerubar-palace" → "Nerub'ar Palace"
+  String get displayName {
+    return raidName.isNotEmpty
+        ? raidName
+        : slug
+              .split('-')
+              .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
+              .join(' ');
+  }
+
+  @override
+  List<Object?> get props => [slug, summary];
 }

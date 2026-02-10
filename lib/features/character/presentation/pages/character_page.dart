@@ -8,6 +8,7 @@ import 'package:wow_companion/features/character/presentation/cubit/character_cu
 import 'package:wow_companion/features/favorites/domain/favorites_repository.dart';
 import 'package:wow_companion/features/favorites/presentation/favorites_cubit.dart';
 import 'package:wow_companion/shared/widgets/common_widgets.dart';
+import 'package:wow_companion/shared/widgets/item_tooltip.dart';
 
 class CharacterPage extends StatefulWidget {
   final String region;
@@ -421,14 +422,21 @@ class _CharacterPageState extends State<CharacterPage> {
       ),
     );
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: SizedBox(
-        height: 44,
-        child: Row(
-          children: alignRight
-              ? [info, const SizedBox(width: 8), icon]
-              : [icon, const SizedBox(width: 8), info],
+    return GestureDetector(
+      onTapUp: (details) =>
+          showItemTooltip(context, item, details.globalPosition),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: SizedBox(
+            height: 44,
+            child: Row(
+              children: alignRight
+                  ? [info, const SizedBox(width: 8), icon]
+                  : [icon, const SizedBox(width: 8), info],
+            ),
+          ),
         ),
       ),
     );
@@ -436,47 +444,57 @@ class _CharacterPageState extends State<CharacterPage> {
 
   /// Item row para layout móvil
   Widget _buildItemRowMobile(EquippedItem item) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          _buildItemIcon(item),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 70,
-            child: Text(
-              _formatSlotName(item.slot),
-              style: const TextStyle(
-                color: WowTheme.textSecondary,
-                fontSize: 11,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  style: TextStyle(
-                    color: WowTheme.getQualityColor(item.quality),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
+    return GestureDetector(
+      onTapUp: (details) =>
+          showItemTooltip(context, item, details.globalPosition),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(
+            children: [
+              _buildItemIcon(item),
+              const SizedBox(width: 10),
+              SizedBox(
+                width: 70,
+                child: Text(
+                  _formatSlotName(item.slot),
+                  style: const TextStyle(
+                    color: WowTheme.textSecondary,
+                    fontSize: 11,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
-                if (item.enchantments.isNotEmpty || item.gems.isNotEmpty)
-                  Text(
-                    [...item.enchantments, ...item.gems].join(' · '),
-                    style: const TextStyle(color: Colors.green, fontSize: 10),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
-            ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
+                      style: TextStyle(
+                        color: WowTheme.getQualityColor(item.quality),
+                        fontWeight: FontWeight.w500,
+                        fontSize: 13,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (item.enchantments.isNotEmpty || item.gems.isNotEmpty)
+                      Text(
+                        [...item.enchantments, ...item.gems].join(' · '),
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontSize: 10,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              QualityBadge(quality: item.quality, itemLevel: item.itemLevel),
+            ],
           ),
-          const SizedBox(width: 8),
-          QualityBadge(quality: item.quality, itemLevel: item.itemLevel),
-        ],
+        ),
       ),
     );
   }
@@ -526,80 +544,300 @@ class _CharacterPageState extends State<CharacterPage> {
       return const SizedBox.shrink();
     }
 
+    return Column(
+      children: [
+        // M+ Summary + Raid row
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                if (char.mythicPlusScore != null)
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Mythic+',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: WowTheme.primaryGold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          char.mythicPlusScore!.toStringAsFixed(1),
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: _getMythicPlusColor(char.mythicPlusScore!),
+                          ),
+                        ),
+                        const Text(
+                          'Rating',
+                          style: TextStyle(
+                            color: WowTheme.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                        // Role scores
+                        if (char.mythicPlusProfile != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: _buildRoleScores(char.mythicPlusProfile!),
+                          ),
+                      ],
+                    ),
+                  ),
+                if (char.mythicPlusScore != null &&
+                    char.raidProgression != null)
+                  Container(width: 1, height: 80, color: WowTheme.border),
+                if (char.raidProgression != null)
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Raid',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: WowTheme.primaryGold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          char.raidProgression!,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: WowTheme.textPrimary,
+                          ),
+                        ),
+                        if (char.raidProgressionDetails.isNotEmpty)
+                          Text(
+                            char.raidProgressionDetails.first.displayName,
+                            style: const TextStyle(
+                              color: WowTheme.textSecondary,
+                              fontSize: 12,
+                            ),
+                          )
+                        else
+                          const Text(
+                            'Progression',
+                            style: TextStyle(
+                              color: WowTheme.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        // Raid detail
+        if (char.raidProgressionDetails.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _buildRaidDetailCard(char.raidProgressionDetails),
+        ],
+        // Best M+ Runs
+        if (char.mythicPlusProfile != null &&
+            char.mythicPlusProfile!.bestRuns.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _buildBestRunsCard(char.mythicPlusProfile!.bestRuns),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildRoleScores(MythicPlusProfile profile) {
+    final roles = <MapEntry<String, double>>[];
+    if (profile.scoreDps > 0) {
+      roles.add(MapEntry('DPS', profile.scoreDps));
+    }
+    if (profile.scoreHealer > 0) {
+      roles.add(MapEntry('Healer', profile.scoreHealer));
+    }
+    if (profile.scoreTank > 0) {
+      roles.add(MapEntry('Tank', profile.scoreTank));
+    }
+
+    if (roles.isEmpty) return const SizedBox.shrink();
+
+    return Wrap(
+      spacing: 12,
+      children: roles.map((r) {
+        return Text(
+          '${r.key}: ${r.value.toStringAsFixed(0)}',
+          style: TextStyle(
+            color: _getMythicPlusColor(r.value),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildBestRunsCard(List<MythicPlusRun> runs) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // M+ Score
-            if (char.mythicPlusScore != null)
-              Expanded(
-                child: Column(
-                  children: [
-                    const Text(
-                      'Mythic+',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: WowTheme.primaryGold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      char.mythicPlusScore!.toStringAsFixed(1),
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: _getMythicPlusColor(char.mythicPlusScore!),
-                      ),
-                    ),
-                    const Text(
-                      'Rating',
+            const Text(
+              'Best Mythic+ Runs',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: WowTheme.primaryGold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Header
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      'Dungeon',
                       style: TextStyle(
                         color: WowTheme.textSecondary,
-                        fontSize: 12,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ],
-                ),
-              ),
-            // Divider
-            if (char.mythicPlusScore != null && char.raidProgression != null)
-              Container(width: 1, height: 60, color: WowTheme.border),
-            // Raid
-            if (char.raidProgression != null)
-              Expanded(
-                child: Column(
-                  children: [
-                    const Text(
-                      'Raid',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: WowTheme.primaryGold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      char.raidProgression!,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: WowTheme.textPrimary,
-                      ),
-                    ),
-                    const Text(
-                      'Progression',
+                  ),
+                  SizedBox(
+                    width: 40,
+                    child: Text(
+                      'Lvl',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
                         color: WowTheme.textSecondary,
-                        fontSize: 12,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  SizedBox(
+                    width: 60,
+                    child: Text(
+                      'Time',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: WowTheme.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 50,
+                    child: Text(
+                      'Score',
+                      textAlign: TextAlign.end,
+                      style: TextStyle(
+                        color: WowTheme.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
+            ),
+            const Divider(height: 1, color: WowTheme.border),
+            // Runs
+            ...runs.map((run) => _buildRunRow(run)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRunRow(MythicPlusRun run) {
+    final upgradeColor = run.inTime
+        ? const Color(0xFF1EFF00)
+        : const Color(0xFF9D9D9D);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          // Dungeon name + upgrade indicator
+          Expanded(
+            flex: 3,
+            child: Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: upgradeColor,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    run.shortName,
+                    style: const TextStyle(
+                      color: WowTheme.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Level + upgrade
+          SizedBox(
+            width: 40,
+            child: Text(
+              '+${run.mythicLevel}',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: upgradeColor,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          // Time
+          SizedBox(
+            width: 60,
+            child: Text(
+              run.formattedTime,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: run.inTime
+                    ? WowTheme.textPrimary
+                    : const Color(0xFF9D9D9D),
+                fontSize: 12,
+              ),
+            ),
+          ),
+          // Score
+          SizedBox(
+            width: 50,
+            child: Text(
+              run.score.toStringAsFixed(1),
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                color: _getMythicPlusColor(run.score * 10),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -646,5 +884,151 @@ class _CharacterPageState extends State<CharacterPage> {
     if (score >= 1500) return const Color(0xFF1EFF00);
     if (score >= 1000) return const Color(0xFFFFFFFF);
     return const Color(0xFF9D9D9D);
+  }
+
+  Widget _buildRaidDetailCard(List<RaidProgress> raids) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Raid Progression',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: WowTheme.primaryGold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...raids.map((raid) => _buildRaidRow(raid)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRaidRow(RaidProgress raid) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                raid.displayName,
+                style: const TextStyle(
+                  color: WowTheme.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                raid.summary,
+                style: TextStyle(
+                  color: _getRaidDifficultyColor(raid.currentTier),
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildDifficultyBar(
+            'Normal',
+            raid.normalKilled,
+            raid.totalBosses,
+            const Color(0xFF1EFF00),
+          ),
+          const SizedBox(height: 4),
+          _buildDifficultyBar(
+            'Heroic',
+            raid.heroicKilled,
+            raid.totalBosses,
+            const Color(0xFF0070DD),
+          ),
+          const SizedBox(height: 4),
+          _buildDifficultyBar(
+            'Mythic',
+            raid.mythicKilled,
+            raid.totalBosses,
+            const Color(0xFFA335EE),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDifficultyBar(String label, int killed, int total, Color color) {
+    final progress = total > 0 ? killed / total : 0.0;
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 50,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: killed > 0 ? color : WowTheme.textSecondary,
+              fontSize: 11,
+              fontWeight: killed > 0 ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Stack(
+            children: [
+              Container(
+                height: 14,
+                decoration: BoxDecoration(
+                  color: WowTheme.surfaceLight,
+                  borderRadius: BorderRadius.circular(7),
+                ),
+              ),
+              FractionallySizedBox(
+                widthFactor: progress,
+                child: Container(
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 35,
+          child: Text(
+            '$killed/$total',
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              color: killed > 0 ? WowTheme.textPrimary : WowTheme.textSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _getRaidDifficultyColor(String tier) {
+    switch (tier) {
+      case 'Mythic':
+        return const Color(0xFFA335EE);
+      case 'Heroic':
+        return const Color(0xFF0070DD);
+      case 'Normal':
+        return const Color(0xFF1EFF00);
+      default:
+        return WowTheme.textSecondary;
+    }
   }
 }

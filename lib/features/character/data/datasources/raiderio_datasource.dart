@@ -23,7 +23,7 @@ class RaiderIoDataSource {
           'realm': realm.toLowerCase(),
           'name': name.toLowerCase(),
           'fields':
-              'gear,mythic_plus_scores_by_season:current,raid_progression',
+              'gear,mythic_plus_scores_by_season:current,mythic_plus_best_runs,raid_progression',
         },
       );
 
@@ -59,22 +59,52 @@ class RaiderIoDataSource {
     final gearItems = gear['items'] as Map<String, dynamic>? ?? {};
     final equipment = _mapEquipment(gearItems);
 
-    // M+ Score
+    // M+ Score + Profile
     final seasons =
         data['mythic_plus_scores_by_season'] as List<dynamic>? ?? [];
     double? mPlusScore;
+    MythicPlusProfile? mPlusProfile;
+
     if (seasons.isNotEmpty) {
       final currentSeason = seasons.first as Map<String, dynamic>;
       final scores = currentSeason['scores'] as Map<String, dynamic>? ?? {};
       mPlusScore = (scores['all'] as num?)?.toDouble();
+
+      final bestRuns = _mapBestRuns(
+        data['mythic_plus_best_runs'] as List<dynamic>? ?? [],
+      );
+
+      mPlusProfile = MythicPlusProfile(
+        scoreAll: mPlusScore ?? 0,
+        scoreDps: (scores['dps'] as num?)?.toDouble() ?? 0,
+        scoreHealer: (scores['healer'] as num?)?.toDouble() ?? 0,
+        scoreTank: (scores['tank'] as num?)?.toDouble() ?? 0,
+        bestRuns: bestRuns,
+      );
     }
 
-    // Raid progression — get the latest raid
+    // Raid progression — all raids
     final raidProg = data['raid_progression'] as Map<String, dynamic>? ?? {};
     String? raidSummary;
-    if (raidProg.isNotEmpty) {
-      final latestRaid = raidProg.values.first as Map<String, dynamic>;
-      raidSummary = latestRaid['summary'] as String?;
+    final raidDetails = <RaidProgress>[];
+
+    for (final entry in raidProg.entries) {
+      final raidData = entry.value as Map<String, dynamic>;
+      final progress = RaidProgress(
+        raidName: _formatRaidName(entry.key),
+        slug: entry.key,
+        summary: raidData['summary'] as String? ?? '',
+        totalBosses: (raidData['total_bosses'] as num?)?.toInt() ?? 0,
+        normalKilled: (raidData['normal_bosses_killed'] as num?)?.toInt() ?? 0,
+        heroicKilled: (raidData['heroic_bosses_killed'] as num?)?.toInt() ?? 0,
+        mythicKilled: (raidData['mythic_bosses_killed'] as num?)?.toInt() ?? 0,
+      );
+      raidDetails.add(progress);
+    }
+
+    // Summary = first raid's summary (current tier)
+    if (raidDetails.isNotEmpty) {
+      raidSummary = raidDetails.first.summary;
     }
 
     return Character(
@@ -94,7 +124,9 @@ class RaiderIoDataSource {
       equipment: equipment,
       stats: null,
       mythicPlusScore: mPlusScore,
+      mythicPlusProfile: mPlusProfile,
       raidProgression: raidSummary,
+      raidProgressionDetails: raidDetails,
       avatarUrl: _getFullRenderUrl(data['thumbnail_url'] as String?),
     );
   }
@@ -114,6 +146,8 @@ class RaiderIoDataSource {
   }
 
   List<EquippedItem> _mapEquipment(Map<String, dynamic> items) {
+    // DEBUG: ver qué claves devuelve la API
+
     final slotMapping = {
       'head': 'HEAD',
       'neck': 'NECK',
@@ -125,8 +159,8 @@ class RaiderIoDataSource {
       'wrist': 'WRIST',
       'hands': 'HANDS',
       'back': 'BACK',
-      'mainHand': 'MAIN_HAND',
-      'offHand': 'OFF_HAND',
+      'mainhand': 'MAIN_HAND',
+      'offhand': 'OFF_HAND',
       'finger1': 'FINGER_1',
       'finger2': 'FINGER_2',
       'trinket1': 'TRINKET_1',
@@ -138,7 +172,6 @@ class RaiderIoDataSource {
     for (final entry in slotMapping.entries) {
       final item = items[entry.key] as Map<String, dynamic>?;
       if (item != null) {
-        // Build icon URL from icon name
         final iconName = item['icon'] as String?;
         String? iconUrl;
         if (iconName != null && iconName.isNotEmpty) {
@@ -146,7 +179,6 @@ class RaiderIoDataSource {
               'https://wow.zamimg.com/images/wow/icons/large/$iconName.jpg';
         }
 
-        // Extract enchant name
         final enchants = <String>[];
         final enchant = item['enchant'] as int?;
         final enchantName = item['enchant_name'] as String?;
@@ -156,7 +188,6 @@ class RaiderIoDataSource {
           enchants.add('Enchanted');
         }
 
-        // Extract gems
         final gems = <String>[];
         final gemList = item['gems'] as List<dynamic>?;
         if (gemList != null) {
@@ -167,6 +198,15 @@ class RaiderIoDataSource {
                 gems.add(gemName);
               }
             }
+          }
+        }
+
+        // Extract bonus IDs
+        final bonusIds = <int>[];
+        final bonusList = item['bonuses'] as List<dynamic>?;
+        if (bonusList != null) {
+          for (final b in bonusList) {
+            if (b is num) bonusIds.add(b.toInt());
           }
         }
 
@@ -182,6 +222,7 @@ class RaiderIoDataSource {
             iconUrl: iconUrl,
             enchantments: enchants,
             gems: gems,
+            bonusIds: bonusIds,
           ),
         );
       }
@@ -207,5 +248,54 @@ class RaiderIoDataSource {
       default:
         return 'EPIC';
     }
+  }
+
+  List<MythicPlusRun> _mapBestRuns(List<dynamic> runs) {
+    return runs.map((run) {
+      final r = run as Map<String, dynamic>;
+      final dungeon = r['dungeon'] as String? ?? 'Unknown';
+      final shortName = r['short_name'] as String? ?? dungeon;
+      final mythicLevel = (r['mythic_level'] as num?)?.toInt() ?? 0;
+      final clearTimeMs = (r['clear_time_ms'] as num?)?.toInt() ?? 0;
+      final parTimeMs = (r['par_time_ms'] as num?)?.toInt() ?? 0;
+      final numUpgrades = (r['num_keystone_upgrades'] as num?)?.toInt() ?? 0;
+      final score = (r['score'] as num?)?.toDouble() ?? 0;
+      final url = r['url'] as String?;
+
+      final affixList = r['affixes'] as List<dynamic>? ?? [];
+      final affixNames = affixList
+          .map((a) => (a as Map<String, dynamic>)['name'] as String? ?? '')
+          .where((a) => a.isNotEmpty)
+          .join(', ');
+
+      return MythicPlusRun(
+        dungeon: dungeon,
+        shortName: shortName,
+        mythicLevel: mythicLevel,
+        completedTime: Duration(milliseconds: clearTimeMs),
+        parTime: Duration(milliseconds: parTimeMs),
+        numKeystoneUpgrades: numUpgrades,
+        score: score,
+        affixes: affixNames.isNotEmpty ? affixNames : null,
+        url: url,
+      );
+    }).toList()..sort((a, b) => b.score.compareTo(a.score));
+  }
+
+  String _formatRaidName(String slug) {
+    const raidNames = {
+      'nerubar-palace': "Nerub-ar Palace",
+      'blackrock-depths': 'Blackrock Depths',
+      'amirdrassil-the-dreams-hope': "Amirdrassil",
+      'aberrus-the-shadowed-crucible': 'Aberrus',
+      'vault-of-the-incarnates': 'Vault of the Incarnates',
+      'liberation-of-undermine': 'Liberation of Undermine',
+    };
+
+    return raidNames[slug] ??
+        slug
+            .split('-')
+            .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
+            .join(' ');
   }
 }
