@@ -55,27 +55,30 @@ class _HomePageState extends State<HomePage> {
     final realmSlug = realm.toLowerCase().replaceAll(' ', '-');
 
     // Save to history
-    _historyRepo.addEntry(SearchEntry(
-      region: _selectedRegion,
-      realm: realmSlug,
-      name: name.toLowerCase(),
-    ));
+    _historyRepo.addEntry(
+      SearchEntry(
+        region: _selectedRegion,
+        realm: realmSlug,
+        name: name.toLowerCase(),
+      ),
+    );
 
-    context.push('/character/$_selectedRegion/$realmSlug/${name.toLowerCase()}')
+    context
+        .push('/character/$_selectedRegion/$realmSlug/${name.toLowerCase()}')
         .then((_) => _loadHistory());
   }
 
   void _onHistoryTap(SearchEntry entry) {
     // Update timestamp by re-adding
-    _historyRepo.addEntry(SearchEntry(
-      region: entry.region,
-      realm: entry.realm,
-      name: entry.name,
-    ));
+    _historyRepo.addEntry(
+      SearchEntry(region: entry.region, realm: entry.realm, name: entry.name),
+    );
 
-    context.push(
-      '/character/${entry.region}/${entry.realmSlug}/${entry.name.toLowerCase()}',
-    ).then((_) => _loadHistory());
+    context
+        .push(
+          '/character/${entry.region}/${entry.realmSlug}/${entry.name.toLowerCase()}',
+        )
+        .then((_) => _loadHistory());
   }
 
   Future<void> _onHistoryDismiss(SearchEntry entry) async {
@@ -195,10 +198,7 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
                 _errorMessage!,
-                style: const TextStyle(
-                  color: WowTheme.accentRed,
-                  fontSize: 13,
-                ),
+                style: const TextStyle(color: WowTheme.accentRed, fontSize: 13),
               ),
             ),
 
@@ -211,6 +211,27 @@ class _HomePageState extends State<HomePage> {
               onPressed: _onSearch,
               icon: const Icon(Icons.search),
               label: const Text('Look Up Character'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => context.push('/compare'),
+              icon: const Icon(
+                Icons.compare_arrows,
+                color: WowTheme.primaryGold,
+              ),
+              label: const Text(
+                'Compare Characters',
+                style: TextStyle(color: WowTheme.primaryGold),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: WowTheme.primaryGold),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
             ),
           ),
         ],
@@ -260,7 +281,11 @@ class _HomePageState extends State<HomePage> {
                   color: WowTheme.accentRed.withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.delete_outline, color: Colors.white, size: 20),
+                child: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
               onDismissed: (_) => _onHistoryDismiss(entry),
               child: Card(

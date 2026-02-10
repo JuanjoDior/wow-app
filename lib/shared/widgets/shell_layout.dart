@@ -54,6 +54,11 @@ class ShellLayout extends StatelessWidget {
                   selectedIcon: Icon(Icons.inventory_2),
                   label: Text('Items'),
                 ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.menu_book_outlined),
+                  selectedIcon: Icon(Icons.menu_book),
+                  label: Text('Guides'),
+                ),
               ],
             ),
           Expanded(child: navigationShell),
@@ -79,6 +84,11 @@ class ShellLayout extends StatelessWidget {
                   icon: Icon(Icons.inventory_2_outlined),
                   selectedIcon: Icon(Icons.inventory_2),
                   label: 'Items',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.menu_book_outlined),
+                  selectedIcon: Icon(Icons.menu_book),
+                  label: 'Guides',
                 ),
               ],
             ),

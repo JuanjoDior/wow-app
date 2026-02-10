@@ -12,10 +12,12 @@ import 'package:wow_companion/features/search/data/search_history_repository_imp
 import 'package:wow_companion/features/search/domain/search_history_repository.dart';
 import 'package:wow_companion/core/cache/memory_cache.dart';
 import 'package:wow_companion/features/character/domain/entities/character.dart';
+import 'package:wow_companion/features/guides/data/cheatsheet_repository.dart';
 
 final sl = GetIt.instance;
 
 Future<void> initDependencies() async {
+  sl.registerLazySingleton<CheatsheetRepository>(() => CheatsheetRepository());
   // ---- Core ----
   sl.registerLazySingleton<ApiClient>(() => ApiClient());
 
