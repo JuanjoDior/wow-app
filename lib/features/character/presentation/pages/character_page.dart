@@ -9,6 +9,7 @@ import 'package:wow_companion/features/favorites/domain/favorites_repository.dar
 import 'package:wow_companion/features/favorites/presentation/favorites_cubit.dart';
 import 'package:wow_companion/shared/widgets/common_widgets.dart';
 import 'package:wow_companion/shared/widgets/item_tooltip.dart';
+import 'package:wow_companion/core/l10n/wow_translations.dart';
 
 class CharacterPage extends StatefulWidget {
   final String region;
@@ -184,10 +185,11 @@ class _CharacterPageState extends State<CharacterPage> {
                   const SizedBox(height: 4),
                   Text(
                     [
-                      'Level ${char.level}',
-                      char.race,
-                      char.characterClass,
-                      if (char.specialization != null) char.specialization!,
+                      'Nivel ${char.level}',
+                      WowTranslations.translateRace(char.race),
+                      WowTranslations.translateClass(char.characterClass),
+                      if (char.specialization != null)
+                        WowTranslations.translateSpec(char.specialization!),
                       if (char.guild != null) '< ${char.guild} >',
                     ].join('  ·  '),
                     style: const TextStyle(

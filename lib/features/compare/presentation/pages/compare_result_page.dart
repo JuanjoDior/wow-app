@@ -4,6 +4,7 @@ import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/character/domain/entities/character.dart';
 import 'package:wow_companion/features/character/domain/repositories/character_repository.dart';
 import 'package:wow_companion/shared/widgets/common_widgets.dart';
+import 'package:wow_companion/core/l10n/wow_translations.dart';
 
 class CompareResultPage extends StatefulWidget {
   final String region1, realm1, name1;
@@ -177,7 +178,7 @@ class _CompareResultPageState extends State<CompareResultPage> {
               textAlign: TextAlign.center,
             ),
             Text(
-              '${c.specialization ?? c.characterClass} · ${c.race}',
+              '${WowTranslations.translateSpec(c.specialization ?? c.characterClass)} · ${WowTranslations.translateRace(c.race)}',
               style: const TextStyle(
                 color: WowTheme.textSecondary,
                 fontSize: 11,
