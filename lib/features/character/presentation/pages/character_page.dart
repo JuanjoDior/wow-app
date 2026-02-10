@@ -186,12 +186,13 @@ class _CharacterPageState extends State<CharacterPage> {
                     [
                       'Level ${char.level}',
                       char.race,
-                      char.specialization ?? char.characterClass,
+                      char.characterClass,
+                      if (char.specialization != null) char.specialization!,
                       if (char.guild != null) '< ${char.guild} >',
-                    ].join(' · '),
+                    ].join('  ·  '),
                     style: const TextStyle(
                       color: WowTheme.textSecondary,
-                      fontSize: 13,
+                      fontSize: 14,
                     ),
                   ),
                 ],
