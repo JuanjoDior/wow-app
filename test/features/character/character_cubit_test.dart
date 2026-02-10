@@ -72,7 +72,10 @@ void main() {
           c.fetchCharacter(region: 'eu', realm: 'sargeras', name: 'notfound'),
       expect: () => [
         const CharacterLoading(),
-        const CharacterError('Resource not found'),
+        const CharacterError(
+          'Character not found.',
+          suggestion: 'Check the region, realm, and character name.',
+        ),
       ],
     );
 
@@ -92,7 +95,33 @@ void main() {
           c.fetchCharacter(region: 'eu', realm: 'sargeras', name: 'test'),
       expect: () => [
         const CharacterLoading(),
-        const CharacterError('No internet connection'),
+        const CharacterError(
+          'Could not connect to the internet.',
+          suggestion: 'Check your connection and try again.',
+        ),
+      ],
+    );
+
+    blocTest<CharacterCubit, CharacterState>(
+      'emits [Loading, Error] when fetch fails with RateLimitFailure',
+      build: () {
+        when(
+          () => mockGetCharacter(
+            region: any(named: 'region'),
+            realm: any(named: 'realm'),
+            name: any(named: 'name'),
+          ),
+        ).thenAnswer((_) async => const Left(RateLimitFailure()));
+        return cubit;
+      },
+      act: (c) =>
+          c.fetchCharacter(region: 'eu', realm: 'sargeras', name: 'test'),
+      expect: () => [
+        const CharacterLoading(),
+        const CharacterError(
+          'Too many requests.',
+          suggestion: 'Wait a moment and try again.',
+        ),
       ],
     );
 
