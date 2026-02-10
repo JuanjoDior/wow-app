@@ -9,10 +9,4 @@ abstract class CharacterRepository {
     required String realm,
     required String name,
   });
-
-  /// Search characters by name
-  Future<Either<Failure, List<Character>>> searchCharacters({
-    required String query,
-    String region = 'eu',
-  });
 }

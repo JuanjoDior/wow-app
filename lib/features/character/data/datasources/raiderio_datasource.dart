@@ -34,9 +34,16 @@ class RaiderIoDataSource {
           message: 'Character not found. Check region, realm and name.',
         );
       }
+      if (e.response?.statusCode == 429) {
+        throw const RateLimitException();
+      }
       if (e.type == DioExceptionType.connectionTimeout ||
-          e.type == DioExceptionType.receiveTimeout ||
-          e.type == DioExceptionType.connectionError) {
+          e.type == DioExceptionType.receiveTimeout) {
+        throw const NetworkException(
+          message: 'Request timed out. The server may be slow.',
+        );
+      }
+      if (e.type == DioExceptionType.connectionError) {
         throw const NetworkException();
       }
       throw ServerException(

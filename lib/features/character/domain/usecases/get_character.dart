@@ -17,15 +17,3 @@ class GetCharacter {
   }
 }
 
-class SearchCharacters {
-  final CharacterRepository repository;
-
-  SearchCharacters(this.repository);
-
-  Future<Either<Failure, List<Character>>> call({
-    required String query,
-    String region = 'eu',
-  }) {
-    return repository.searchCharacters(query: query, region: region);
-  }
-}

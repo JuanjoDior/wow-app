@@ -7,20 +7,13 @@ import 'package:wow_companion/features/character/domain/entities/character.dart'
 import 'package:wow_companion/features/character/domain/usecases/get_character.dart';
 import 'package:wow_companion/features/character/presentation/cubit/character_cubit.dart';
 
-// Creamos mocks de los use cases
 class MockGetCharacter extends Mock implements GetCharacter {}
 
-class MockSearchCharacters extends Mock implements SearchCharacters {}
-
 void main() {
-  // ============================
-  // CharacterCubit tests
-  // ============================
   group('CharacterCubit', () {
     late CharacterCubit cubit;
     late MockGetCharacter mockGetCharacter;
 
-    // Datos de prueba
     const tCharacter = Character(
       name: 'Testpala',
       realm: 'Sargeras',
@@ -128,91 +121,6 @@ void main() {
         const CharacterLoaded(tCharacter),
         const CharacterInitial(),
       ],
-    );
-  });
-
-  // ============================
-  // CharacterSearchCubit tests
-  // ============================
-  group('CharacterSearchCubit', () {
-    late CharacterSearchCubit cubit;
-    late MockSearchCharacters mockSearch;
-
-    const tResults = [
-      Character(
-        name: 'Testpala',
-        realm: 'Sargeras',
-        region: 'EU',
-        level: 80,
-        race: 'Human',
-        characterClass: 'Paladin',
-      ),
-    ];
-
-    setUp(() {
-      mockSearch = MockSearchCharacters();
-      cubit = CharacterSearchCubit(mockSearch);
-    });
-
-    tearDown(() => cubit.close());
-
-    test('initial state is SearchInitial', () {
-      expect(cubit.state, const SearchInitial());
-    });
-
-    blocTest<CharacterSearchCubit, CharacterSearchState>(
-      'emits [Loading, Loaded] when search succeeds',
-      build: () {
-        when(
-          () => mockSearch(
-            query: any(named: 'query'),
-            region: any(named: 'region'),
-          ),
-        ).thenAnswer((_) async => const Right(tResults));
-        return cubit;
-      },
-      act: (c) => c.search(query: 'test'),
-      expect: () => [const SearchLoading(), const SearchLoaded(tResults)],
-    );
-
-    blocTest<CharacterSearchCubit, CharacterSearchState>(
-      'does not search when query is less than 2 characters',
-      build: () => cubit,
-      act: (c) => c.search(query: 'a'),
-      expect: () => [const SearchInitial()],
-      verify: (_) {
-        verifyNever(
-          () => mockSearch(
-            query: any(named: 'query'),
-            region: any(named: 'region'),
-          ),
-        );
-      },
-    );
-
-    blocTest<CharacterSearchCubit, CharacterSearchState>(
-      'emits [Loading, Error] when search fails',
-      build: () {
-        when(
-          () => mockSearch(
-            query: any(named: 'query'),
-            region: any(named: 'region'),
-          ),
-        ).thenAnswer((_) async => const Left(ServerFailure()));
-        return cubit;
-      },
-      act: (c) => c.search(query: 'test'),
-      expect: () => [
-        const SearchLoading(),
-        const SearchError('Server error occurred'),
-      ],
-    );
-
-    blocTest<CharacterSearchCubit, CharacterSearchState>(
-      'clear returns to initial state',
-      build: () => cubit,
-      act: (c) => c.clear(),
-      expect: () => [const SearchInitial()],
     );
   });
 }

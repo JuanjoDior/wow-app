@@ -30,9 +30,15 @@ class WowLoadingWidget extends StatelessWidget {
 /// Widget de error con botón de reintentar
 class WowErrorWidget extends StatelessWidget {
   final String message;
+  final String? suggestion;
   final VoidCallback? onRetry;
 
-  const WowErrorWidget({super.key, required this.message, this.onRetry});
+  const WowErrorWidget({
+    super.key,
+    required this.message,
+    this.suggestion,
+    this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -52,10 +58,22 @@ class WowErrorWidget extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: WowTheme.textSecondary,
+                color: WowTheme.textPrimary,
                 fontSize: 16,
+                fontWeight: FontWeight.w500,
               ),
             ),
+            if (suggestion != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                suggestion!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: WowTheme.textSecondary,
+                  fontSize: 14,
+                ),
+              ),
+            ],
             if (onRetry != null) ...[
               const SizedBox(height: 24),
               ElevatedButton.icon(

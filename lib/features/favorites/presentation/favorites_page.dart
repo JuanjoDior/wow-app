@@ -20,11 +20,6 @@ class _FavoritesPageState extends State<FavoritesPage> {
   void initState() {
     super.initState();
     _cubit = sl<FavoritesCubit>();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
     _cubit.loadFavorites();
   }
 

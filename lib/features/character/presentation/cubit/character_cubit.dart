@@ -4,7 +4,7 @@ import 'package:wow_companion/features/character/domain/entities/character.dart'
 import 'package:wow_companion/features/character/domain/usecases/get_character.dart';
 
 // ========================
-// CHARACTER PROFILE STATES
+// States
 // ========================
 
 abstract class CharacterState extends Equatable {
@@ -33,52 +33,16 @@ class CharacterLoaded extends CharacterState {
 
 class CharacterError extends CharacterState {
   final String message;
+  final String? suggestion;
 
-  const CharacterError(this.message);
+  const CharacterError(this.message, {this.suggestion});
 
   @override
-  List<Object?> get props => [message];
+  List<Object?> get props => [message, suggestion];
 }
 
 // ========================
-// CHARACTER SEARCH STATES
-// ========================
-
-abstract class CharacterSearchState extends Equatable {
-  const CharacterSearchState();
-
-  @override
-  List<Object?> get props => [];
-}
-
-class SearchInitial extends CharacterSearchState {
-  const SearchInitial();
-}
-
-class SearchLoading extends CharacterSearchState {
-  const SearchLoading();
-}
-
-class SearchLoaded extends CharacterSearchState {
-  final List<Character> results;
-
-  const SearchLoaded(this.results);
-
-  @override
-  List<Object?> get props => [results];
-}
-
-class SearchError extends CharacterSearchState {
-  final String message;
-
-  const SearchError(this.message);
-
-  @override
-  List<Object?> get props => [message];
-}
-
-// ========================
-// CUBITS
+// Cubit
 // ========================
 
 class CharacterCubit extends Cubit<CharacterState> {
@@ -100,34 +64,11 @@ class CharacterCubit extends Cubit<CharacterState> {
     );
 
     result.fold(
-      (failure) => emit(CharacterError(failure.message)),
+      (failure) =>
+          emit(CharacterError(failure.message, suggestion: failure.suggestion)),
       (character) => emit(CharacterLoaded(character)),
     );
   }
 
   void reset() => emit(const CharacterInitial());
-}
-
-class CharacterSearchCubit extends Cubit<CharacterSearchState> {
-  final SearchCharacters _searchCharacters;
-
-  CharacterSearchCubit(this._searchCharacters) : super(const SearchInitial());
-
-  Future<void> search({required String query, String region = 'eu'}) async {
-    if (query.trim().length < 2) {
-      emit(const SearchInitial());
-      return;
-    }
-
-    emit(const SearchLoading());
-
-    final result = await _searchCharacters(query: query.trim(), region: region);
-
-    result.fold(
-      (failure) => emit(SearchError(failure.message)),
-      (characters) => emit(SearchLoaded(characters)),
-    );
-  }
-
-  void clear() => emit(const SearchInitial());
 }

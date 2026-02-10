@@ -8,6 +8,10 @@ import 'package:wow_companion/features/character/presentation/cubit/character_cu
 import 'package:wow_companion/features/favorites/data/favorites_repository_impl.dart';
 import 'package:wow_companion/features/favorites/domain/favorites_repository.dart';
 import 'package:wow_companion/features/favorites/presentation/favorites_cubit.dart';
+import 'package:wow_companion/features/search/data/search_history_repository_impl.dart';
+import 'package:wow_companion/features/search/domain/search_history_repository.dart';
+import 'package:wow_companion/core/cache/memory_cache.dart';
+import 'package:wow_companion/features/character/domain/entities/character.dart';
 
 final sl = GetIt.instance;
 
@@ -15,18 +19,23 @@ Future<void> initDependencies() async {
   // ---- Core ----
   sl.registerLazySingleton<ApiClient>(() => ApiClient());
 
+  sl.registerLazySingleton<MemoryCache<Character>>(
+    () => MemoryCache<Character>(),
+  );
+
+  sl.registerLazySingleton<CharacterRepository>(
+    () => CharacterRepositoryImpl(
+      remoteDataSource: sl(),
+      cache: sl<MemoryCache<Character>>(),
+    ),
+  );
+
   // ---- Character Feature ----
   sl.registerLazySingleton<RaiderIoDataSource>(() => RaiderIoDataSource(sl()));
 
-  sl.registerLazySingleton<CharacterRepository>(
-    () => CharacterRepositoryImpl(remoteDataSource: sl()),
-  );
-
   sl.registerLazySingleton(() => GetCharacter(sl()));
-  sl.registerLazySingleton(() => SearchCharacters(sl()));
 
   sl.registerFactory(() => CharacterCubit(sl()));
-  sl.registerFactory(() => CharacterSearchCubit(sl()));
 
   // ---- Favorites Feature ----
   sl.registerLazySingleton<FavoritesRepository>(
@@ -34,4 +43,9 @@ Future<void> initDependencies() async {
   );
 
   sl.registerFactory(() => FavoritesCubit(sl()));
+
+  // ---- Search History ----
+  sl.registerLazySingleton<SearchHistoryRepository>(
+    () => SearchHistoryRepositoryImpl(),
+  );
 }

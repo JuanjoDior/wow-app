@@ -22,3 +22,9 @@ class NotFoundException implements Exception {
 
   const NotFoundException({this.message = 'Not found'});
 }
+
+class RateLimitException implements Exception {
+  final String message;
+
+  const RateLimitException({this.message = 'Rate limit exceeded'});
+}

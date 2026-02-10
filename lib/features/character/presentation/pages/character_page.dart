@@ -120,6 +120,7 @@ class _CharacterPageState extends State<CharacterPage> {
     if (state is CharacterError) {
       return WowErrorWidget(
         message: state.message,
+        suggestion: state.suggestion,
         onRetry: () => _cubit.fetchCharacter(
           region: widget.region,
           realm: widget.realm,
