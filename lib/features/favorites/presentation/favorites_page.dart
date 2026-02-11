@@ -5,6 +5,7 @@ import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/favorites/presentation/favorites_cubit.dart';
 import 'package:wow_companion/shared/widgets/common_widgets.dart';
+import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class FavoritesPage extends StatefulWidget {
   const FavoritesPage({super.key});
@@ -31,14 +32,15 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = S.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Favorites')),
+      appBar: AppBar(title: Text(t.favorites)),
       body: BlocBuilder<FavoritesCubit, FavoritesState>(
         bloc: _cubit,
         builder: (context, state) {
           if (state is FavoritesLoaded) {
             if (state.favorites.isEmpty) {
-              return _buildEmptyState();
+              return _buildEmptyState(t);
             }
             return _buildFavoritesList(state);
           }
@@ -48,21 +50,31 @@ class _FavoritesPageState extends State<FavoritesPage> {
     );
   }
 
-  Widget _buildEmptyState() {
-    return const Center(
+  Widget _buildEmptyState(S t) {
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.star_outline, size: 64, color: WowTheme.textSecondary),
-          SizedBox(height: 16),
-          Text(
-            'No favorites yet',
-            style: TextStyle(color: WowTheme.textSecondary, fontSize: 16),
+          const Icon(
+            Icons.star_outline,
+            size: 64,
+            color: WowTheme.textSecondary,
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 16),
           Text(
-            'Search for a character and tap ★ to save',
-            style: TextStyle(color: WowTheme.textSecondary, fontSize: 13),
+            t.noFavoritesYet,
+            style: const TextStyle(
+              color: WowTheme.textSecondary,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            t.favoritesHint,
+            style: const TextStyle(
+              color: WowTheme.textSecondary,
+              fontSize: 13,
+            ),
           ),
         ],
       ),

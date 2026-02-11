@@ -4,6 +4,7 @@ import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/guides/data/cheatsheet_repository.dart';
 import 'package:wow_companion/features/guides/domain/entities/cheatsheet.dart';
+import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class GuidesListPage extends StatefulWidget {
   const GuidesListPage({super.key});
@@ -39,6 +40,22 @@ class _GuidesListPageState extends State<GuidesListPage> {
     return _guides.where((g) => g.role == _filterRole).toList();
   }
 
+  String _translateRole(BuildContext context, String role) {
+    final t = S.of(context)!;
+    switch (role) {
+      case 'All':
+        return t.all;
+      case 'DPS':
+        return t.dps;
+      case 'Healer':
+        return t.healer;
+      case 'Tank':
+        return t.tank;
+      default:
+        return role;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -64,32 +81,35 @@ class _GuidesListPageState extends State<GuidesListPage> {
   }
 
   Widget _buildHeader() {
+    final t = S.of(context)!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '📖 Quick Cheatsheets',
-            style: TextStyle(
+          Text(
+            '📖 ${t.quickCheatsheets}',
+            style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: WowTheme.primaryGold,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Stat priorities, rotations & consumables at a glance',
-            style: TextStyle(color: WowTheme.textSecondary, fontSize: 13),
+          Text(
+            t.cheatsheetsSubtitle,
+            style: const TextStyle(
+              color: WowTheme.textSecondary,
+              fontSize: 13,
+            ),
           ),
           const SizedBox(height: 16),
-          // Role filter chips
           Wrap(
             spacing: 8,
             children: ['All', 'DPS', 'Healer', 'Tank'].map((role) {
               final selected = _filterRole == role;
               return ChoiceChip(
-                label: Text(role),
+                label: Text(_translateRole(context, role)),
                 selected: selected,
                 onSelected: (_) => setState(() => _filterRole = role),
                 selectedColor: WowTheme.primaryGold,
@@ -127,7 +147,6 @@ class _GuidesListPageState extends State<GuidesListPage> {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              // Role icon
               Container(
                 width: 44,
                 height: 44,
@@ -142,7 +161,6 @@ class _GuidesListPageState extends State<GuidesListPage> {
                 ),
               ),
               const SizedBox(width: 14),
-              // Info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -157,7 +175,7 @@ class _GuidesListPageState extends State<GuidesListPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${guide.role} · ${guide.statPriority.take(2).join(" > ")}',
+                      '${_translateRole(context, guide.role)} · ${guide.statPriority.take(2).join(" > ")}',
                       style: const TextStyle(
                         color: WowTheme.textSecondary,
                         fontSize: 12,
@@ -166,7 +184,6 @@ class _GuidesListPageState extends State<GuidesListPage> {
                   ],
                 ),
               ),
-              // Arrow
               const Icon(Icons.chevron_right, color: WowTheme.textSecondary),
             ],
           ),

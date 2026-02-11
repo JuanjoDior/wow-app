@@ -1,35 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
+import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class ItemsPage extends StatelessWidget {
   const ItemsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final t = S.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Items')),
-      body: const Center(
+      appBar: AppBar(title: Text(t.items)),
+      body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            const Icon(
               Icons.inventory_2_outlined,
               size: 64,
               color: WowTheme.textSecondary,
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
-              'Item Catalog',
-              style: TextStyle(
+              t.itemCatalog,
+              style: const TextStyle(
                 color: WowTheme.textPrimary,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
-              'Coming in Phase 2',
-              style: TextStyle(color: WowTheme.textSecondary),
+              t.comingSoon,
+              style: const TextStyle(color: WowTheme.textSecondary),
             ),
           ],
         ),

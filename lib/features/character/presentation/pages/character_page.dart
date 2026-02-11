@@ -10,6 +10,7 @@ import 'package:wow_companion/features/favorites/presentation/favorites_cubit.da
 import 'package:wow_companion/shared/widgets/common_widgets.dart';
 import 'package:wow_companion/shared/widgets/item_tooltip.dart';
 import 'package:wow_companion/core/l10n/wow_translations.dart';
+import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class CharacterPage extends StatefulWidget {
   final String region;
@@ -48,7 +49,9 @@ class _CharacterPageState extends State<CharacterPage> {
   Future<void> _checkFavorite() async {
     final key = '${widget.region}-${widget.realm}-${widget.name}'.toLowerCase();
     final isFav = await _favCubit.isFavorite(key);
-    if (mounted) setState(() => _isFavorite = isFav);
+    if (mounted) {
+      setState(() => _isFavorite = isFav);
+    }
   }
 
   @override
@@ -90,7 +93,9 @@ class _CharacterPageState extends State<CharacterPage> {
         return Scaffold(
           appBar: AppBar(
             title: Text(
-              state is CharacterLoaded ? state.character.name : 'Character',
+              state is CharacterLoaded
+                  ? state.character.name
+                  : S.of(context)!.character,
             ),
             actions: [
               if (state is CharacterLoaded)
@@ -117,7 +122,7 @@ class _CharacterPageState extends State<CharacterPage> {
 
   Widget _buildBody(CharacterState state) {
     if (state is CharacterLoading) {
-      return const WowLoadingWidget(message: 'Loading character...');
+      return WowLoadingWidget(message: S.of(context)!.loadingCharacter);
     }
     if (state is CharacterError) {
       return WowErrorWidget(
@@ -141,13 +146,10 @@ class _CharacterPageState extends State<CharacterPage> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Info del personaje (nombre, clase, guild, ilvl)
           _buildCharacterInfo(char),
           const SizedBox(height: 16),
-          // Panel de equipo con personaje en el centro
           _buildEquipmentPanel(char),
           const SizedBox(height: 16),
-          // M+ y Raid
           _buildProgressionCard(char),
           const SizedBox(height: 24),
         ],
@@ -161,10 +163,8 @@ class _CharacterPageState extends State<CharacterPage> {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            // Avatar pequeño
             _buildSmallAvatar(char),
             const SizedBox(width: 16),
-            // Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,7 +185,7 @@ class _CharacterPageState extends State<CharacterPage> {
                   const SizedBox(height: 4),
                   Text(
                     [
-                      'Nivel ${char.level}',
+                      (S.of(context)!.level(char.level)),
                       WowTranslations.translateRace(char.race),
                       WowTranslations.translateClass(char.characterClass),
                       if (char.specialization != null)
@@ -200,7 +200,6 @@ class _CharacterPageState extends State<CharacterPage> {
                 ],
               ),
             ),
-            // iLvl
             if (char.equippedItemLevel != null)
               Column(
                 children: [
@@ -212,9 +211,9 @@ class _CharacterPageState extends State<CharacterPage> {
                       color: WowTheme.primaryGold,
                     ),
                   ),
-                  const Text(
-                    'iLvl',
-                    style: TextStyle(
+                  Text(
+                    S.of(context)!.ilvl,
+                    style: const TextStyle(
                       color: WowTheme.textSecondary,
                       fontSize: 12,
                     ),
@@ -240,11 +239,9 @@ class _CharacterPageState extends State<CharacterPage> {
         final isWide = constraints.maxWidth >= 700;
 
         if (isWide) {
-          // Desktop: izquierda - centro - derecha
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Columna izquierda
               Expanded(
                 child: Column(
                   children: [
@@ -257,12 +254,10 @@ class _CharacterPageState extends State<CharacterPage> {
                   ],
                 ),
               ),
-              // Personaje central
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: _buildCenterCharacter(char),
               ),
-              // Columna derecha
               Expanded(
                 child: Column(
                   children: [
@@ -279,7 +274,7 @@ class _CharacterPageState extends State<CharacterPage> {
           );
         }
 
-        // Móvil: personaje arriba, lista debajo
+        // Móvil
         return Column(
           children: [
             _buildCenterCharacter(char),
@@ -290,9 +285,9 @@ class _CharacterPageState extends State<CharacterPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Equipment',
-                      style: TextStyle(
+                    Text(
+                      S.of(context)!.equipment,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: WowTheme.primaryGold,
@@ -353,7 +348,6 @@ class _CharacterPageState extends State<CharacterPage> {
     );
   }
 
-  /// Item row para layout desktop (izquierda o derecha)
   Widget _buildItemRow(
     EquippedItem? item,
     String slotName, {
@@ -445,7 +439,6 @@ class _CharacterPageState extends State<CharacterPage> {
     );
   }
 
-  /// Item row para layout móvil
   Widget _buildItemRowMobile(EquippedItem item) {
     return GestureDetector(
       onTapUp: (details) =>
@@ -502,7 +495,6 @@ class _CharacterPageState extends State<CharacterPage> {
     );
   }
 
-  /// Icono del item con borde de calidad
   Widget _buildItemIcon(EquippedItem item) {
     final borderColor = WowTheme.getQualityColor(item.quality);
 
@@ -547,9 +539,10 @@ class _CharacterPageState extends State<CharacterPage> {
       return const SizedBox.shrink();
     }
 
+    final t = S.of(context)!;
+
     return Column(
       children: [
-        // M+ Summary + Raid row
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -559,9 +552,9 @@ class _CharacterPageState extends State<CharacterPage> {
                   Expanded(
                     child: Column(
                       children: [
-                        const Text(
-                          'Mythic+',
-                          style: TextStyle(
+                        Text(
+                          t.mythicPlus,
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: WowTheme.primaryGold,
@@ -576,14 +569,13 @@ class _CharacterPageState extends State<CharacterPage> {
                             color: _getMythicPlusColor(char.mythicPlusScore!),
                           ),
                         ),
-                        const Text(
-                          'Rating',
-                          style: TextStyle(
+                        Text(
+                          t.rating,
+                          style: const TextStyle(
                             color: WowTheme.textSecondary,
                             fontSize: 12,
                           ),
                         ),
-                        // Role scores
                         if (char.mythicPlusProfile != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
@@ -599,9 +591,9 @@ class _CharacterPageState extends State<CharacterPage> {
                   Expanded(
                     child: Column(
                       children: [
-                        const Text(
-                          'Raid',
-                          style: TextStyle(
+                        Text(
+                          t.raid,
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: WowTheme.primaryGold,
@@ -625,9 +617,9 @@ class _CharacterPageState extends State<CharacterPage> {
                             ),
                           )
                         else
-                          const Text(
-                            'Progression',
-                            style: TextStyle(
+                          Text(
+                            t.progression,
+                            style: const TextStyle(
                               color: WowTheme.textSecondary,
                               fontSize: 12,
                             ),
@@ -639,12 +631,10 @@ class _CharacterPageState extends State<CharacterPage> {
             ),
           ),
         ),
-        // Raid detail
         if (char.raidProgressionDetails.isNotEmpty) ...[
           const SizedBox(height: 16),
           _buildRaidDetailCard(char.raidProgressionDetails),
         ],
-        // Best M+ Runs
         if (char.mythicPlusProfile != null &&
             char.mythicPlusProfile!.bestRuns.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -660,10 +650,10 @@ class _CharacterPageState extends State<CharacterPage> {
       roles.add(MapEntry('DPS', profile.scoreDps));
     }
     if (profile.scoreHealer > 0) {
-      roles.add(MapEntry('Healer', profile.scoreHealer));
+      roles.add(MapEntry(S.of(context)!.healer, profile.scoreHealer));
     }
     if (profile.scoreTank > 0) {
-      roles.add(MapEntry('Tank', profile.scoreTank));
+      roles.add(MapEntry(S.of(context)!.tank, profile.scoreTank));
     }
 
     if (roles.isEmpty) return const SizedBox.shrink();
@@ -684,31 +674,31 @@ class _CharacterPageState extends State<CharacterPage> {
   }
 
   Widget _buildBestRunsCard(List<MythicPlusRun> runs) {
+    final t = S.of(context)!;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Best Mythic+ Runs',
-              style: TextStyle(
+            Text(
+              t.bestMythicRuns,
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: WowTheme.primaryGold,
               ),
             ),
             const SizedBox(height: 12),
-            // Header
-            const Padding(
-              padding: EdgeInsets.only(bottom: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
               child: Row(
                 children: [
                   Expanded(
                     flex: 3,
                     child: Text(
-                      'Dungeon',
-                      style: TextStyle(
+                      t.dungeon,
+                      style: const TextStyle(
                         color: WowTheme.textSecondary,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -718,9 +708,9 @@ class _CharacterPageState extends State<CharacterPage> {
                   SizedBox(
                     width: 40,
                     child: Text(
-                      'Lvl',
+                      t.lvl,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: WowTheme.textSecondary,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -730,9 +720,9 @@ class _CharacterPageState extends State<CharacterPage> {
                   SizedBox(
                     width: 60,
                     child: Text(
-                      'Time',
+                      t.time,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: WowTheme.textSecondary,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -742,9 +732,9 @@ class _CharacterPageState extends State<CharacterPage> {
                   SizedBox(
                     width: 50,
                     child: Text(
-                      'Score',
+                      t.score,
                       textAlign: TextAlign.end,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: WowTheme.textSecondary,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -755,7 +745,6 @@ class _CharacterPageState extends State<CharacterPage> {
               ),
             ),
             const Divider(height: 1, color: WowTheme.border),
-            // Runs
             ...runs.map((run) => _buildRunRow(run)),
           ],
         ),
@@ -772,7 +761,6 @@ class _CharacterPageState extends State<CharacterPage> {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          // Dungeon name + upgrade indicator
           Expanded(
             flex: 3,
             child: Row(
@@ -800,7 +788,6 @@ class _CharacterPageState extends State<CharacterPage> {
               ],
             ),
           ),
-          // Level + upgrade
           SizedBox(
             width: 40,
             child: Text(
@@ -813,7 +800,6 @@ class _CharacterPageState extends State<CharacterPage> {
               ),
             ),
           ),
-          // Time
           SizedBox(
             width: 60,
             child: Text(
@@ -827,7 +813,6 @@ class _CharacterPageState extends State<CharacterPage> {
               ),
             ),
           ),
-          // Score
           SizedBox(
             width: 50,
             child: Text(
@@ -896,9 +881,9 @@ class _CharacterPageState extends State<CharacterPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Raid Progression',
-              style: TextStyle(
+            Text(
+              S.of(context)!.raidProgression,
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: WowTheme.primaryGold,
@@ -913,6 +898,7 @@ class _CharacterPageState extends State<CharacterPage> {
   }
 
   Widget _buildRaidRow(RaidProgress raid) {
+    final t = S.of(context)!;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -941,21 +927,21 @@ class _CharacterPageState extends State<CharacterPage> {
           ),
           const SizedBox(height: 8),
           _buildDifficultyBar(
-            'Normal',
+            t.normal,
             raid.normalKilled,
             raid.totalBosses,
             const Color(0xFF1EFF00),
           ),
           const SizedBox(height: 4),
           _buildDifficultyBar(
-            'Heroic',
+            t.heroic,
             raid.heroicKilled,
             raid.totalBosses,
             const Color(0xFF0070DD),
           ),
           const SizedBox(height: 4),
           _buildDifficultyBar(
-            'Mythic',
+            t.mythic,
             raid.mythicKilled,
             raid.totalBosses,
             const Color(0xFFA335EE),

@@ -4,6 +4,7 @@ import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/guides/data/cheatsheet_repository.dart';
 import 'package:wow_companion/features/guides/domain/entities/cheatsheet.dart';
 import 'package:wow_companion/shared/widgets/common_widgets.dart';
+import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class GuideDetailPage extends StatefulWidget {
   final String classSlug;
@@ -42,64 +43,60 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = S.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: Text(_guide?.displayTitle ?? 'Guide')),
+      appBar: AppBar(title: Text(_guide?.displayTitle ?? t.guides)),
       body: _loading
-          ? const WowLoadingWidget(message: 'Loading guide...')
+          ? WowLoadingWidget(message: t.loadingGuide)
           : _guide == null
-          ? const WowErrorWidget(message: 'Guide not found.')
-          : _buildContent(_guide!),
+              ? WowErrorWidget(message: t.guideNotFound)
+              : _buildContent(_guide!),
     );
   }
 
   Widget _buildContent(Cheatsheet guide) {
+    final t = S.of(context)!;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           _buildTitleSection(guide),
           const SizedBox(height: 20),
-          // Stat Priority
           _buildSection(
             icon: Icons.bar_chart,
-            title: 'Stat Priority',
+            title: t.statPriority,
             color: const Color(0xFF0070DD),
             child: _buildStatPriority(guide.statPriority),
           ),
           const SizedBox(height: 16),
-          // Rotation / Priority List
           _buildSection(
             icon: Icons.replay,
-            title: 'Rotation / Priority',
+            title: t.rotation,
             color: const Color(0xFFFF8000),
             child: _buildRotation(guide.rotation),
           ),
           const SizedBox(height: 16),
-          // Consumables
           _buildSection(
             icon: Icons.local_drink,
-            title: 'Consumables',
+            title: t.consumables,
             color: const Color(0xFFA335EE),
             child: _buildConsumables(guide.consumables),
           ),
-          // Tips
           if (guide.tips.isNotEmpty) ...[
             const SizedBox(height: 16),
             _buildSection(
               icon: Icons.lightbulb_outline,
-              title: 'Tips',
+              title: t.tips,
               color: WowTheme.primaryGold,
               child: _buildTips(guide.tips),
             ),
           ],
           const SizedBox(height: 24),
-          // Last updated
           if (guide.lastUpdated != null)
             Center(
               child: Text(
-                'Last updated: ${guide.lastUpdated}',
+                t.lastUpdated(guide.lastUpdated!),
                 style: const TextStyle(
                   color: WowTheme.textSecondary,
                   fontSize: 11,
@@ -156,7 +153,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      guide.role,
+                      _translateRole(guide.role),
                       style: TextStyle(
                         color: roleColor,
                         fontSize: 13,
@@ -171,6 +168,20 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
         ),
       ),
     );
+  }
+
+  String _translateRole(String role) {
+    final t = S.of(context)!;
+    switch (role) {
+      case 'DPS':
+        return t.dps;
+      case 'Healer':
+        return t.healer;
+      case 'Tank':
+        return t.tank;
+      default:
+        return role;
+    }
   }
 
   Widget _buildSection({

@@ -4,6 +4,7 @@ import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/search/domain/search_entry.dart';
 import 'package:wow_companion/features/search/domain/search_history_repository.dart';
+import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -93,6 +94,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = S.of(context)!;
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
@@ -101,8 +103,8 @@ class _HomePageState extends State<HomePage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // Header
-              const Text(
-                '⚔️ WoW Companion',
+              Text(
+                '⚔️ ${t.appTitle}',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -110,14 +112,14 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Look up any character by realm and name',
+              Text(
+                t.realmHint,
                 style: TextStyle(color: WowTheme.textSecondary),
               ),
               const SizedBox(height: 32),
 
               // Search form
-              _buildSearchForm(),
+              _buildSearchForm(t),
 
               // Recent searches
               if (_history.isNotEmpty) ...[
@@ -131,7 +133,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildSearchForm() {
+  Widget _buildSearchForm(S t) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 500),
       child: Column(
@@ -151,11 +153,23 @@ class _HomePageState extends State<HomePage> {
                 isExpanded: true,
                 dropdownColor: WowTheme.surfaceDark,
                 style: const TextStyle(color: WowTheme.textPrimary),
-                items: const [
-                  DropdownMenuItem(value: 'eu', child: Text('🇪🇺 Europe')),
-                  DropdownMenuItem(value: 'us', child: Text('🇺🇸 Americas')),
-                  DropdownMenuItem(value: 'kr', child: Text('🇰🇷 Korea')),
-                  DropdownMenuItem(value: 'tw', child: Text('🇹🇼 Taiwan')),
+                items: [
+                  DropdownMenuItem(
+                    value: 'eu',
+                    child: Text('🇪🇺 ${t.regionEurope}'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'us',
+                    child: Text('🇺🇸 ${t.regionAmericas}'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'kr',
+                    child: Text('🇰🇷 ${t.regionKorea}'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'tw',
+                    child: Text('🇹🇼 ${t.regionTaiwan}'),
+                  ),
                 ],
                 onChanged: (v) => setState(() => _selectedRegion = v!),
               ),
@@ -166,9 +180,9 @@ class _HomePageState extends State<HomePage> {
           // Realm field
           TextField(
             controller: _realmController,
-            decoration: const InputDecoration(
-              hintText: 'Realm (e.g. Sargeras)',
-              prefixIcon: Icon(
+            decoration: InputDecoration(
+              hintText: t.realmHint,
+              prefixIcon: const Icon(
                 Icons.dns_outlined,
                 color: WowTheme.textSecondary,
               ),
@@ -180,9 +194,9 @@ class _HomePageState extends State<HomePage> {
           // Name field
           TextField(
             controller: _nameController,
-            decoration: const InputDecoration(
-              hintText: 'Character name',
-              prefixIcon: Icon(
+            decoration: InputDecoration(
+              hintText: t.searchHint,
+              prefixIcon: const Icon(
                 Icons.person_outline,
                 color: WowTheme.textSecondary,
               ),
@@ -210,7 +224,7 @@ class _HomePageState extends State<HomePage> {
             child: ElevatedButton.icon(
               onPressed: _onSearch,
               icon: const Icon(Icons.search),
-              label: const Text('Look Up Character'),
+              label: Text(t.lookUpCharacter),
             ),
           ),
           const SizedBox(height: 10),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/character/domain/entities/character.dart';
+import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 /// A WoW-style item tooltip shown in a popup overlay.
 class ItemTooltipOverlay extends StatelessWidget {
@@ -12,6 +13,7 @@ class ItemTooltipOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final qualityColor = WowTheme.getQualityColor(item.quality);
+    final t = S.of(context)!;
 
     return Container(
       width: 280,
@@ -64,7 +66,7 @@ class ItemTooltipOverlay extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Item Level ${item.itemLevel}',
+                      t.itemLevel(item.itemLevel),
                       style: const TextStyle(
                         color: WowTheme.primaryGold,
                         fontSize: 12,
@@ -140,9 +142,9 @@ class ItemTooltipOverlay extends StatelessWidget {
 
                 // Empty state
                 if (item.enchantments.isEmpty && item.gems.isEmpty)
-                  const Text(
-                    'No enchantments or gems',
-                    style: TextStyle(
+                  Text(
+                    t.noEnchantmentsOrGems,
+                    style: const TextStyle(
                       color: WowTheme.textSecondary,
                       fontSize: 12,
                       fontStyle: FontStyle.italic,
@@ -154,18 +156,18 @@ class ItemTooltipOverlay extends StatelessWidget {
                   const Divider(color: WowTheme.border, height: 20),
                   InkWell(
                     onTap: () => _openWowhead(item.wowheadUrl!),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.open_in_new,
                           size: 14,
                           color: Color(0xFFFF8040),
                         ),
-                        SizedBox(width: 6),
+                        const SizedBox(width: 6),
                         Text(
-                          'View on Wowhead',
-                          style: TextStyle(
+                          t.viewOnWowhead,
+                          style: const TextStyle(
                             color: Color(0xFFFF8040),
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -202,7 +204,6 @@ void showItemTooltip(
 
   entry = OverlayEntry(
     builder: (context) {
-      // Position tooltip near the tap, but keep it on screen
       final screenSize = MediaQuery.of(context).size;
       const tooltipWidth = 280.0;
       const tooltipMaxHeight = 300.0;
@@ -210,13 +211,11 @@ void showItemTooltip(
       double left = tapPosition.dx - tooltipWidth / 2;
       double top = tapPosition.dy + 16;
 
-      // Keep on screen horizontally
       if (left < 8) left = 8;
       if (left + tooltipWidth > screenSize.width - 8) {
         left = screenSize.width - tooltipWidth - 8;
       }
 
-      // If tooltip would go below screen, show above tap point
       if (top + tooltipMaxHeight > screenSize.height - 8) {
         top = tapPosition.dy - tooltipMaxHeight - 16;
         if (top < 8) top = 8;
@@ -224,7 +223,6 @@ void showItemTooltip(
 
       return Stack(
         children: [
-          // Dismiss on tap anywhere
           Positioned.fill(
             child: GestureDetector(
               onTap: () => entry.remove(),
@@ -232,7 +230,6 @@ void showItemTooltip(
               child: Container(color: Colors.black26),
             ),
           ),
-          // Tooltip
           Positioned(
             left: left,
             top: top,

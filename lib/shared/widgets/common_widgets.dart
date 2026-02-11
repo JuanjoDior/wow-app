@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
+import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 /// Spinner de carga con mensaje opcional
 class WowLoadingWidget extends StatelessWidget {
@@ -79,7 +80,7 @@ class WowErrorWidget extends StatelessWidget {
               ElevatedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
+                label: Text(S.of(context)!.retry),
               ),
             ],
           ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class CompareSelectPage extends StatefulWidget {
   const CompareSelectPage({super.key});
@@ -50,14 +51,15 @@ class _CompareSelectPageState extends State<CompareSelectPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = S.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Compare Characters')),
+      appBar: AppBar(title: Text(t.compareCharacters)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             _buildCharacterForm(
-              title: 'Character 1',
+              title: t.character1,
               regionCtrl: _region1,
               realmCtrl: _realm1,
               nameCtrl: _name1,
@@ -71,7 +73,7 @@ class _CompareSelectPageState extends State<CompareSelectPage> {
             ),
             const SizedBox(height: 12),
             _buildCharacterForm(
-              title: 'Character 2',
+              title: t.character2,
               regionCtrl: _region2,
               realmCtrl: _realm2,
               nameCtrl: _name2,
@@ -84,9 +86,12 @@ class _CompareSelectPageState extends State<CompareSelectPage> {
               child: ElevatedButton.icon(
                 onPressed: _canCompare ? _startCompare : null,
                 icon: const Icon(Icons.compare_arrows),
-                label: const Text(
-                  'Compare',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                label: Text(
+                  t.compare,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: WowTheme.primaryGold,
@@ -111,6 +116,7 @@ class _CompareSelectPageState extends State<CompareSelectPage> {
     required TextEditingController nameCtrl,
     required Color color,
   }) {
+    final t = S.of(context)!;
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -132,10 +138,10 @@ class _CompareSelectPageState extends State<CompareSelectPage> {
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: regionCtrl.text,
-              decoration: const InputDecoration(
-                labelText: 'Region',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(
+              decoration: InputDecoration(
+                labelText: t.region,
+                border: const OutlineInputBorder(),
+                contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 8,
                 ),
@@ -152,11 +158,11 @@ class _CompareSelectPageState extends State<CompareSelectPage> {
             const SizedBox(height: 10),
             TextField(
               controller: realmCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Realm',
+              decoration: InputDecoration(
+                labelText: t.realm,
                 hintText: 'e.g. sanguino',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(
+                border: const OutlineInputBorder(),
+                contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 8,
                 ),
@@ -166,11 +172,11 @@ class _CompareSelectPageState extends State<CompareSelectPage> {
             const SizedBox(height: 10),
             TextField(
               controller: nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Character Name',
+              decoration: InputDecoration(
+                labelText: t.characterName,
                 hintText: 'e.g. iidrexii',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(
+                border: const OutlineInputBorder(),
+                contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 8,
                 ),

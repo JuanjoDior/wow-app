@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
+import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class ShellLayout extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
@@ -9,6 +10,7 @@ class ShellLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = S.of(context)!;
     final isWide = MediaQuery.sizeOf(context).width >= 800;
 
     return Scaffold(
@@ -38,26 +40,26 @@ class ShellLayout extends StatelessWidget {
                 padding: EdgeInsets.all(16),
                 child: Text('⚔️', style: TextStyle(fontSize: 28)),
               ),
-              destinations: const [
+              destinations: [
                 NavigationRailDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
-                  label: Text('Home'),
+                  icon: const Icon(Icons.home_outlined),
+                  selectedIcon: const Icon(Icons.home),
+                  label: Text(t.home),
                 ),
                 NavigationRailDestination(
-                  icon: Icon(Icons.star_outline),
-                  selectedIcon: Icon(Icons.star),
-                  label: Text('Favorites'),
+                  icon: const Icon(Icons.star_outline),
+                  selectedIcon: const Icon(Icons.star),
+                  label: Text(t.favorites),
                 ),
                 NavigationRailDestination(
-                  icon: Icon(Icons.inventory_2_outlined),
-                  selectedIcon: Icon(Icons.inventory_2),
-                  label: Text('Items'),
+                  icon: const Icon(Icons.inventory_2_outlined),
+                  selectedIcon: const Icon(Icons.inventory_2),
+                  label: Text(t.items),
                 ),
                 NavigationRailDestination(
-                  icon: Icon(Icons.menu_book_outlined),
-                  selectedIcon: Icon(Icons.menu_book),
-                  label: Text('Guides'),
+                  icon: const Icon(Icons.menu_book_outlined),
+                  selectedIcon: const Icon(Icons.menu_book),
+                  label: Text(t.guides),
                 ),
               ],
             ),
@@ -69,26 +71,26 @@ class ShellLayout extends StatelessWidget {
           : NavigationBar(
               selectedIndex: navigationShell.currentIndex,
               onDestinationSelected: _onTap,
-              destinations: const [
+              destinations: [
                 NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
-                  label: 'Home',
+                  icon: const Icon(Icons.home_outlined),
+                  selectedIcon: const Icon(Icons.home),
+                  label: t.home,
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.star_outline),
-                  selectedIcon: Icon(Icons.star),
-                  label: 'Favorites',
+                  icon: const Icon(Icons.star_outline),
+                  selectedIcon: const Icon(Icons.star),
+                  label: t.favorites,
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.inventory_2_outlined),
-                  selectedIcon: Icon(Icons.inventory_2),
-                  label: 'Items',
+                  icon: const Icon(Icons.inventory_2_outlined),
+                  selectedIcon: const Icon(Icons.inventory_2),
+                  label: t.items,
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.menu_book_outlined),
-                  selectedIcon: Icon(Icons.menu_book),
-                  label: 'Guides',
+                  icon: const Icon(Icons.menu_book_outlined),
+                  selectedIcon: const Icon(Icons.menu_book),
+                  label: t.guides,
                 ),
               ],
             ),

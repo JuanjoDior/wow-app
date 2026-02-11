@@ -4,6 +4,7 @@ import 'package:wow_companion/core/router/app_router.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/core/utils/url_strategy_stub.dart'
     if (dart.library.html) 'package:wow_companion/core/utils/url_strategy_web.dart';
+import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 void main() async {
   configureUrlStrategy();
@@ -22,6 +23,9 @@ class MainApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: WowTheme.darkTheme,
       routerConfig: appRouter,
+      locale: const Locale('es'),
+      supportedLocales: S.supportedLocales,
+      localizationsDelegates: S.localizationsDelegates,
     );
   }
 }
