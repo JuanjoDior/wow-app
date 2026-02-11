@@ -13,6 +13,7 @@ import 'package:wow_companion/features/search/domain/search_history_repository.d
 import 'package:wow_companion/core/cache/memory_cache.dart';
 import 'package:wow_companion/features/character/domain/entities/character.dart';
 import 'package:wow_companion/features/guides/data/cheatsheet_repository.dart';
+import 'package:wow_companion/core/l10n/locale_notifier.dart';
 
 final sl = GetIt.instance;
 
@@ -50,4 +51,6 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<SearchHistoryRepository>(
     () => SearchHistoryRepositoryImpl(),
   );
+  sl.registerLazySingleton<LocaleNotifier>(() => LocaleNotifier());
+  await sl<LocaleNotifier>().load();
 }

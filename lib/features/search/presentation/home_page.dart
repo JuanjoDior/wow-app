@@ -5,6 +5,7 @@ import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/search/domain/search_entry.dart';
 import 'package:wow_companion/features/search/domain/search_history_repository.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
+import 'package:wow_companion/core/l10n/locale_notifier.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -45,9 +46,7 @@ class _HomePageState extends State<HomePage> {
     final name = _nameController.text.trim();
 
     if (realm.isEmpty || name.isEmpty) {
-      setState(
-        () => _errorMessage = 'Please enter both realm and character name',
-      );
+      setState(() => _errorMessage = S.of(context)!.enterRealmAndName);
       return;
     }
 
@@ -114,7 +113,24 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 8),
               Text(
                 t.realmHint,
-                style: TextStyle(color: WowTheme.textSecondary),
+                style: const TextStyle(color: WowTheme.textSecondary),
+              ),
+              const SizedBox(height: 12),
+
+              TextButton.icon(
+                onPressed: () => sl<LocaleNotifier>().toggleLocale(),
+                icon: Text(
+                  sl<LocaleNotifier>().locale.languageCode == 'es'
+                      ? '🇬🇧'
+                      : '🇪🇸',
+                  style: const TextStyle(fontSize: 18),
+                ),
+                label: Text(
+                  sl<LocaleNotifier>().locale.languageCode == 'es'
+                      ? 'English'
+                      : 'Español',
+                  style: TextStyle(color: WowTheme.textSecondary, fontSize: 13),
+                ),
               ),
               const SizedBox(height: 32),
 
@@ -124,7 +140,7 @@ class _HomePageState extends State<HomePage> {
               // Recent searches
               if (_history.isNotEmpty) ...[
                 const SizedBox(height: 32),
-                _buildHistorySection(),
+                _buildHistorySection(t),
               ],
             ],
           ),
@@ -142,7 +158,7 @@ class _HomePageState extends State<HomePage> {
           Container(
             width: double.infinity,
             decoration: BoxDecoration(
-              color: WowTheme.surfaceDark,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: WowTheme.border),
             ),
@@ -236,9 +252,9 @@ class _HomePageState extends State<HomePage> {
                 Icons.compare_arrows,
                 color: WowTheme.primaryGold,
               ),
-              label: const Text(
-                'Compare Characters',
-                style: TextStyle(color: WowTheme.primaryGold),
+              label: Text(
+                t.compareCharacters,
+                style: const TextStyle(color: WowTheme.primaryGold),
               ),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: WowTheme.primaryGold),
@@ -253,7 +269,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildHistorySection() {
+  Widget _buildHistorySection(S t) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 500),
       child: Column(
@@ -263,8 +279,8 @@ class _HomePageState extends State<HomePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Recent Searches',
+              Text(
+                t.recentSearches,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -273,8 +289,8 @@ class _HomePageState extends State<HomePage> {
               ),
               TextButton(
                 onPressed: _onClearHistory,
-                child: const Text(
-                  'Clear all',
+                child: Text(
+                  t.clearAll,
                   style: TextStyle(color: WowTheme.textSecondary, fontSize: 13),
                 ),
               ),
@@ -321,7 +337,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   title: Text(
                     _capitalize(entry.name),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: WowTheme.textPrimary,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:wow_companion/core/theme/wow_theme.dart';
+
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
+import 'package:wow_companion/core/di/injection.dart';
+import 'package:wow_companion/core/l10n/locale_notifier.dart';
+import 'package:wow_companion/core/theme/wow_theme.dart';
 
 class ShellLayout extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
@@ -40,6 +43,23 @@ class ShellLayout extends StatelessWidget {
                 padding: EdgeInsets.all(16),
                 child: Text('⚔️', style: TextStyle(fontSize: 28)),
               ),
+
+              trailing: Padding(
+                padding: const EdgeInsets.only(top: 32),
+                child: IconButton(
+                  tooltip: sl<LocaleNotifier>().locale.languageCode == 'es'
+                      ? 'English'
+                      : 'Español',
+                  icon: Text(
+                    sl<LocaleNotifier>().locale.languageCode == 'es'
+                        ? '🇬🇧'
+                        : '🇪🇸',
+                    style: const TextStyle(fontSize: 22),
+                  ),
+                  onPressed: () => sl<LocaleNotifier>().toggleLocale(),
+                ),
+              ),
+
               destinations: [
                 NavigationRailDestination(
                   icon: const Icon(Icons.home_outlined),
