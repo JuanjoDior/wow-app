@@ -45,7 +45,7 @@ Future<void> initDependencies() async {
     () => FavoritesRepositoryImpl(),
   );
 
-  sl.registerFactory(() => FavoritesCubit(sl()));
+  sl.registerLazySingleton(() => FavoritesCubit(sl()));
 
   // ---- Search History ----
   sl.registerLazySingleton<SearchHistoryRepository>(

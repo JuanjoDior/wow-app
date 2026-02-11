@@ -57,7 +57,6 @@ class _CharacterPageState extends State<CharacterPage> {
   @override
   void dispose() {
     _cubit.close();
-    _favCubit.close();
     super.dispose();
   }
 
@@ -310,29 +309,38 @@ class _CharacterPageState extends State<CharacterPage> {
       width: 300,
       height: 440,
       child: char.avatarUrl != null
-          ? CachedNetworkImage(
-              imageUrl: char.avatarUrl!,
-              fit: BoxFit.fitHeight,
-              alignment: Alignment.topCenter,
-              placeholder: (context, url) => Container(
-                decoration: BoxDecoration(
-                  color: WowTheme.surfaceLight,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: CircularProgressIndicator(
-                    color: WowTheme.primaryGold,
-                    strokeWidth: 2,
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Transform.scale(
+                scale: 1.25, //Zoom al personaje no al contenedor
+                child: CachedNetworkImage(
+                  imageUrl: char.avatarUrl!,
+                  fit: BoxFit.fitHeight,
+                  alignment: Alignment.topCenter,
+                  placeholder: (context, url) => Container(
+                    decoration: BoxDecoration(
+                      color: WowTheme.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: WowTheme.primaryGold,
+                        strokeWidth: 2,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              errorWidget: (context, url, error) => Container(
-                decoration: BoxDecoration(
-                  color: WowTheme.surfaceLight,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(
-                  child: ClassIcon(className: char.characterClass, size: 80),
+                  errorWidget: (context, url, error) => Container(
+                    decoration: BoxDecoration(
+                      color: WowTheme.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: ClassIcon(
+                        className: char.characterClass,
+                        size: 80,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             )

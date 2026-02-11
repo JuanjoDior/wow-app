@@ -137,7 +137,7 @@ class _CompareSelectPageState extends State<CompareSelectPage> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: regionCtrl.text,
+              initialValue: regionCtrl.text,
               decoration: InputDecoration(
                 labelText: t.region,
                 border: const OutlineInputBorder(),

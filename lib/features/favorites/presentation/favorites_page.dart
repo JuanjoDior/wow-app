@@ -26,7 +26,6 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   @override
   void dispose() {
-    _cubit.close();
     super.dispose();
   }
 
@@ -63,18 +62,12 @@ class _FavoritesPageState extends State<FavoritesPage> {
           const SizedBox(height: 16),
           Text(
             t.noFavoritesYet,
-            style: const TextStyle(
-              color: WowTheme.textSecondary,
-              fontSize: 16,
-            ),
+            style: const TextStyle(color: WowTheme.textSecondary, fontSize: 16),
           ),
           const SizedBox(height: 8),
           Text(
             t.favoritesHint,
-            style: const TextStyle(
-              color: WowTheme.textSecondary,
-              fontSize: 13,
-            ),
+            style: const TextStyle(color: WowTheme.textSecondary, fontSize: 13),
           ),
         ],
       ),

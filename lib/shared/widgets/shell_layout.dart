@@ -52,9 +52,13 @@ class ShellLayout extends StatelessWidget {
                       : 'Español',
                   icon: Text(
                     sl<LocaleNotifier>().locale.languageCode == 'es'
-                        ? '🇬🇧'
-                        : '🇪🇸',
-                    style: const TextStyle(fontSize: 22),
+                        ? 'EN'
+                        : 'ES',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: WowTheme.primaryGold,
+                    ),
                   ),
                   onPressed: () => sl<LocaleNotifier>().toggleLocale(),
                 ),

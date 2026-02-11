@@ -121,15 +121,22 @@ class _HomePageState extends State<HomePage> {
                 onPressed: () => sl<LocaleNotifier>().toggleLocale(),
                 icon: Text(
                   sl<LocaleNotifier>().locale.languageCode == 'es'
-                      ? '🇬🇧'
-                      : '🇪🇸',
-                  style: const TextStyle(fontSize: 18),
+                      ? 'EN'
+                      : 'ES',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: WowTheme.primaryGold,
+                  ),
                 ),
                 label: Text(
                   sl<LocaleNotifier>().locale.languageCode == 'es'
                       ? 'English'
                       : 'Español',
-                  style: TextStyle(color: WowTheme.textSecondary, fontSize: 13),
+                  style: const TextStyle(
+                    color: WowTheme.textSecondary,
+                    fontSize: 13,
+                  ),
                 ),
               ),
               const SizedBox(height: 32),
@@ -158,7 +165,7 @@ class _HomePageState extends State<HomePage> {
           Container(
             width: double.infinity,
             decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
+              color: WowTheme.surfaceDark,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: WowTheme.border),
             ),
