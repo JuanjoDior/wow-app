@@ -38,7 +38,6 @@ class _MainAppState extends State<MainApp> {
   }
 
   void _onLocaleChanged() => setState(() {});
-  void _onThemeChanged() => setState(() {});
 
   @override
   Widget build(BuildContext context) {
