@@ -62,9 +62,13 @@ class _CompareResultPageState extends State<CompareResultPage> {
       Character? c2;
       String? err;
 
-      results[0].fold((f) => err = '${S.of(context)!.character1}: ${f.message}', (c) => c1 = c);
+      results[0].fold(
+        (f) => err = '${S.of(context)!.character1}: ${f.message}',
+        (c) => c1 = c,
+      );
       results[1].fold(
-        (f) => err = '${err != null ? "$err\n" : ""}${S.of(context)!.character2}: ${f.message}',
+        (f) => err =
+            '${err != null ? "$err\n" : ""}${S.of(context)!.character2}: ${f.message}',
         (c) => c2 = c,
       );
 
@@ -114,16 +118,21 @@ class _CompareResultPageState extends State<CompareResultPage> {
   }
 
   Widget _buildComparison(Character c1, Character c2) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          _buildHeader(c1, c2),
-          const SizedBox(height: 16),
-          _buildStatCard(c1, c2),
-          const SizedBox(height: 16),
-          _buildEquipmentCompare(c1, c2),
-        ],
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            children: [
+              _buildHeader(c1, c2),
+              const SizedBox(height: 16),
+              _buildStatCard(c1, c2),
+              const SizedBox(height: 16),
+              _buildEquipmentCompare(c1, c2),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -290,10 +299,7 @@ class _CompareResultPageState extends State<CompareResultPage> {
           child: Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: WowTheme.textSecondary,
-              fontSize: 13,
-            ),
+            style: const TextStyle(color: WowTheme.textSecondary, fontSize: 13),
           ),
         ),
         SizedBox(
@@ -361,10 +367,22 @@ class _CompareResultPageState extends State<CompareResultPage> {
   Widget _buildEquipmentCompare(Character c1, Character c2) {
     final t = S.of(context)!;
     final allSlots = [
-      'HEAD', 'NECK', 'SHOULDER', 'BACK', 'CHEST', 'WRIST',
-      'HANDS', 'WAIST', 'LEGS', 'FEET',
-      'FINGER_1', 'FINGER_2', 'TRINKET_1', 'TRINKET_2',
-      'MAIN_HAND', 'OFF_HAND',
+      'HEAD',
+      'NECK',
+      'SHOULDER',
+      'BACK',
+      'CHEST',
+      'WRIST',
+      'HANDS',
+      'WAIST',
+      'LEGS',
+      'FEET',
+      'FINGER_1',
+      'FINGER_2',
+      'TRINKET_1',
+      'TRINKET_2',
+      'MAIN_HAND',
+      'OFF_HAND',
     ];
 
     return Card(
@@ -421,10 +439,12 @@ class _CompareResultPageState extends State<CompareResultPage> {
             ),
             const Divider(height: 16, color: WowTheme.border),
             ...allSlots.map((slot) {
-              final item1 =
-                  c1.equipment.where((e) => e.slot == slot).firstOrNull;
-              final item2 =
-                  c2.equipment.where((e) => e.slot == slot).firstOrNull;
+              final item1 = c1.equipment
+                  .where((e) => e.slot == slot)
+                  .firstOrNull;
+              final item2 = c2.equipment
+                  .where((e) => e.slot == slot)
+                  .firstOrNull;
               return _buildEquipRow(slot, item1, item2);
             }),
           ],
@@ -433,18 +453,19 @@ class _CompareResultPageState extends State<CompareResultPage> {
     );
   }
 
-  Widget _buildEquipRow(
-      String slot, EquippedItem? item1, EquippedItem? item2) {
+  Widget _buildEquipRow(String slot, EquippedItem? item1, EquippedItem? item2) {
     final ilvl1 = item1?.itemLevel ?? 0;
     final ilvl2 = item2?.itemLevel ?? 0;
 
     Color ilvlColor1 = WowTheme.textPrimary;
     Color ilvlColor2 = WowTheme.textPrimary;
     if (ilvl1 != ilvl2 && (item1 != null || item2 != null)) {
-      ilvlColor1 =
-          ilvl1 > ilvl2 ? const Color(0xFF1EFF00) : const Color(0xFFFF4444);
-      ilvlColor2 =
-          ilvl2 > ilvl1 ? const Color(0xFF1EFF00) : const Color(0xFFFF4444);
+      ilvlColor1 = ilvl1 > ilvl2
+          ? const Color(0xFF1EFF00)
+          : const Color(0xFFFF4444);
+      ilvlColor2 = ilvl2 > ilvl1
+          ? const Color(0xFF1EFF00)
+          : const Color(0xFFFF4444);
     }
 
     String slotLabel = slot

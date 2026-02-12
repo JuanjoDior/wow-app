@@ -54,56 +54,61 @@ class _CompareSelectPageState extends State<CompareSelectPage> {
     final t = S.of(context)!;
     return Scaffold(
       appBar: AppBar(title: Text(t.compareCharacters)),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildCharacterForm(
-              title: t.character1,
-              regionCtrl: _region1,
-              realmCtrl: _realm1,
-              nameCtrl: _name1,
-              color: const Color(0xFF0070DD),
-            ),
-            const SizedBox(height: 12),
-            const Icon(
-              Icons.compare_arrows,
-              color: WowTheme.primaryGold,
-              size: 36,
-            ),
-            const SizedBox(height: 12),
-            _buildCharacterForm(
-              title: t.character2,
-              regionCtrl: _region2,
-              realmCtrl: _realm2,
-              nameCtrl: _name2,
-              color: const Color(0xFFA335EE),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: _canCompare ? _startCompare : null,
-                icon: const Icon(Icons.compare_arrows),
-                label: Text(
-                  t.compare,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: Column(
+              children: [
+                _buildCharacterForm(
+                  title: t.character1,
+                  regionCtrl: _region1,
+                  realmCtrl: _realm1,
+                  nameCtrl: _name1,
+                  color: const Color(0xFF0070DD),
+                ),
+                const SizedBox(height: 12),
+                const Icon(
+                  Icons.compare_arrows,
+                  color: WowTheme.primaryGold,
+                  size: 36,
+                ),
+                const SizedBox(height: 12),
+                _buildCharacterForm(
+                  title: t.character2,
+                  regionCtrl: _region2,
+                  realmCtrl: _realm2,
+                  nameCtrl: _name2,
+                  color: const Color(0xFFA335EE),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _canCompare ? _startCompare : null,
+                    icon: const Icon(Icons.compare_arrows),
+                    label: Text(
+                      t.compare,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: WowTheme.primaryGold,
+                      foregroundColor: Colors.black,
+                      disabledBackgroundColor: WowTheme.surfaceLight,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: WowTheme.primaryGold,
-                  foregroundColor: Colors.black,
-                  disabledBackgroundColor: WowTheme.surfaceLight,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

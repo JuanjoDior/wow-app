@@ -65,12 +65,24 @@ class _GuidesListPageState extends State<GuidesListPage> {
             )
           : CustomScrollView(
               slivers: [
-                SliverToBoxAdapter(child: _buildHeader()),
+                SliverToBoxAdapter(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 700),
+                      child: _buildHeader(),
+                    ),
+                  ),
+                ),
                 SliverPadding(
                   padding: const EdgeInsets.all(16),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) => _buildGuideCard(_filtered[index]),
+                      (context, index) => Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 700),
+                          child: _buildGuideCard(_filtered[index]),
+                        ),
+                      ),
                       childCount: _filtered.length,
                     ),
                   ),
@@ -98,10 +110,7 @@ class _GuidesListPageState extends State<GuidesListPage> {
           const SizedBox(height: 4),
           Text(
             t.cheatsheetsSubtitle,
-            style: const TextStyle(
-              color: WowTheme.textSecondary,
-              fontSize: 13,
-            ),
+            style: const TextStyle(color: WowTheme.textSecondary, fontSize: 13),
           ),
           const SizedBox(height: 16),
           Wrap(

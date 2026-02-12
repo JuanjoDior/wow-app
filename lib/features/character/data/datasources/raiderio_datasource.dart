@@ -146,8 +146,6 @@ class RaiderIoDataSource {
   }
 
   List<EquippedItem> _mapEquipment(Map<String, dynamic> items) {
-    // DEBUG: ver qué claves devuelve la API
-
     final slotMapping = {
       'head': 'HEAD',
       'neck': 'NECK',

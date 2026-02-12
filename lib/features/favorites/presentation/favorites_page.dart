@@ -75,52 +75,60 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   Widget _buildFavoritesList(FavoritesLoaded state) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: state.favorites.length,
-      itemBuilder: (context, index) {
-        final fav = state.favorites[index];
-        return Dismissible(
-          key: ValueKey(fav.key),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 24),
-            decoration: BoxDecoration(
-              color: WowTheme.accentRed,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.delete, color: Colors.white),
-          ),
-          onDismissed: (_) => _cubit.toggleFavorite(fav),
-          child: Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: ListTile(
-              leading: ClassIcon(className: fav.characterClass),
-              title: Text(
-                fav.name,
-                style: TextStyle(
-                  color: WowTheme.getClassColor(fav.characterClass),
-                  fontWeight: FontWeight.w600,
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600),
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: state.favorites.length,
+          itemBuilder: (context, index) {
+            final fav = state.favorites[index];
+            return Dismissible(
+              key: ValueKey(fav.key),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 24),
+                decoration: BoxDecoration(
+                  color: WowTheme.accentRed,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.delete, color: Colors.white),
+              ),
+              onDismissed: (_) => _cubit.toggleFavorite(fav),
+              child: Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: ClassIcon(className: fav.characterClass),
+                  title: Text(
+                    fav.name,
+                    style: TextStyle(
+                      color: WowTheme.getClassColor(fav.characterClass),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${fav.realm} · ${fav.specialization ?? fav.characterClass}',
+                    style: const TextStyle(color: WowTheme.textSecondary),
+                  ),
+                  trailing: fav.itemLevel != null
+                      ? QualityBadge(quality: 'EPIC', itemLevel: fav.itemLevel!)
+                      : null,
+                  onTap: () {
+                    final realmSlug = fav.realm.toLowerCase().replaceAll(
+                      ' ',
+                      '-',
+                    );
+                    context.push(
+                      '/character/${fav.region.toLowerCase()}/$realmSlug/${fav.name.toLowerCase()}',
+                    );
+                  },
                 ),
               ),
-              subtitle: Text(
-                '${fav.realm} · ${fav.specialization ?? fav.characterClass}',
-                style: const TextStyle(color: WowTheme.textSecondary),
-              ),
-              trailing: fav.itemLevel != null
-                  ? QualityBadge(quality: 'EPIC', itemLevel: fav.itemLevel!)
-                  : null,
-              onTap: () {
-                final realmSlug = fav.realm.toLowerCase().replaceAll(' ', '-');
-                context.push(
-                  '/character/${fav.region.toLowerCase()}/$realmSlug/${fav.name.toLowerCase()}',
-                );
-              },
-            ),
-          ),
-        );
-      },
+            );
+          },
+        ),
+      ),
     );
   }
 }
