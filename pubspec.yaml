@@ -38,6 +38,11 @@ dependencies:
   # Images
   cached_network_image: ^3.4.1
 
+  # Browser
+  url_launcher: ^6.3.1
+
+  logger: ^2.5.0
+
   flutter_localizations:
     sdk: flutter
   intl: ^0.20.2
