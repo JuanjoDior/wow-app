@@ -14,6 +14,13 @@ import 'package:wow_companion/core/cache/memory_cache.dart';
 import 'package:wow_companion/features/character/domain/entities/character.dart';
 import 'package:wow_companion/features/guides/data/cheatsheet_repository.dart';
 import 'package:wow_companion/core/l10n/locale_notifier.dart';
+import 'package:wow_companion/features/items/data/datasources/blizzard_items_datasource.dart';
+import 'package:wow_companion/features/items/data/repositories/items_repository_impl.dart';
+import 'package:wow_companion/features/items/domain/repositories/items_repository.dart';
+import 'package:wow_companion/features/items/domain/usecases/search_items.dart';
+import 'package:wow_companion/features/items/presentation/cubit/items_cubit.dart';
+import 'package:wow_companion/features/builds/data/repositories/builds_repository_impl.dart';
+import 'package:wow_companion/features/builds/domain/repositories/builds_repository.dart';
 
 final sl = GetIt.instance;
 
@@ -53,4 +60,17 @@ Future<void> initDependencies() async {
   );
   sl.registerLazySingleton<LocaleNotifier>(() => LocaleNotifier());
   await sl<LocaleNotifier>().load();
+
+  // ---- Items Feature ----
+  sl.registerLazySingleton<BlizzardItemsDataSource>(
+    () => BlizzardItemsDataSource(sl()),
+  );
+  sl.registerLazySingleton<ItemsRepository>(
+    () => ItemsRepositoryImpl(remoteDataSource: sl()),
+  );
+  sl.registerLazySingleton(() => SearchItems(sl()));
+  sl.registerFactory(() => ItemsCubit(sl()));
+
+  // ---- Builds Feature ----
+  sl.registerLazySingleton<BuildsRepository>(() => BuildsRepositoryImpl());
 }
