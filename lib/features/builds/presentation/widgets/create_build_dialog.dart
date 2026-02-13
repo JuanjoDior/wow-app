@@ -5,7 +5,6 @@ import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/builds_cubit.dart';
 import 'package:wow_companion/features/favorites/domain/favorites_repository.dart';
-import 'package:wow_companion/features/favorites/presentation/favorites_cubit.dart';
 
 class CreateBuildDialog extends StatefulWidget {
   const CreateBuildDialog({super.key});
