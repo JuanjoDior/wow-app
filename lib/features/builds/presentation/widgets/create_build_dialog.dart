@@ -91,7 +91,7 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
             )
           else
             DropdownButtonFormField<FavoriteCharacter>(
-              value: _selectedCharacter,
+              initialValue: _selectedCharacter,
               dropdownColor: WowTheme.surfaceDark,
               decoration: const InputDecoration(
                 hintText: 'Link to character (optional)',
