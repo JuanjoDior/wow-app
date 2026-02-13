@@ -9,6 +9,7 @@ import 'package:wow_companion/features/search/presentation/home_page.dart';
 import 'package:wow_companion/shared/widgets/shell_layout.dart';
 import 'package:wow_companion/features/guides/presentation/pages/guides_list_page.dart';
 import 'package:wow_companion/features/guides/presentation/pages/guide_detail_page.dart';
+import 'package:wow_companion/features/builds/presentation/pages/builds_list_page.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -45,6 +46,15 @@ final GoRouter appRouter = GoRouter(
               path: '/items',
               pageBuilder: (context, state) =>
                   const NoTransitionPage(child: ItemsPage()),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/builds',
+              pageBuilder: (context, state) =>
+                  const NoTransitionPage(child: BuildsListPage()),
             ),
           ],
         ),

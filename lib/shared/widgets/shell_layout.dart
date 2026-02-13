@@ -43,7 +43,6 @@ class ShellLayout extends StatelessWidget {
                 padding: EdgeInsets.all(16),
                 child: Text('⚔️', style: TextStyle(fontSize: 28)),
               ),
-
               trailing: Padding(
                 padding: const EdgeInsets.only(top: 32),
                 child: IconButton(
@@ -63,7 +62,6 @@ class ShellLayout extends StatelessWidget {
                   onPressed: () => sl<LocaleNotifier>().toggleLocale(),
                 ),
               ),
-
               destinations: [
                 NavigationRailDestination(
                   icon: const Icon(Icons.home_outlined),
@@ -79,6 +77,11 @@ class ShellLayout extends StatelessWidget {
                   icon: const Icon(Icons.inventory_2_outlined),
                   selectedIcon: const Icon(Icons.inventory_2),
                   label: Text(t.items),
+                ),
+                NavigationRailDestination(
+                  icon: const Icon(Icons.construction_outlined),
+                  selectedIcon: const Icon(Icons.construction),
+                  label: Text(t.builds),
                 ),
                 NavigationRailDestination(
                   icon: const Icon(Icons.menu_book_outlined),
@@ -110,6 +113,11 @@ class ShellLayout extends StatelessWidget {
                   icon: const Icon(Icons.inventory_2_outlined),
                   selectedIcon: const Icon(Icons.inventory_2),
                   label: t.items,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.construction_outlined),
+                  selectedIcon: const Icon(Icons.construction),
+                  label: t.builds,
                 ),
                 NavigationDestination(
                   icon: const Icon(Icons.menu_book_outlined),

@@ -21,6 +21,7 @@ import 'package:wow_companion/features/items/domain/usecases/search_items.dart';
 import 'package:wow_companion/features/items/presentation/cubit/items_cubit.dart';
 import 'package:wow_companion/features/builds/data/repositories/builds_repository_impl.dart';
 import 'package:wow_companion/features/builds/domain/repositories/builds_repository.dart';
+import 'package:wow_companion/features/builds/presentation/cubit/builds_cubit.dart';
 
 final sl = GetIt.instance;
 
@@ -73,4 +74,6 @@ Future<void> initDependencies() async {
 
   // ---- Builds Feature ----
   sl.registerLazySingleton<BuildsRepository>(() => BuildsRepositoryImpl());
+
+  sl.registerFactory(() => BuildsCubit(sl()));
 }

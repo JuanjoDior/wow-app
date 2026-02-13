@@ -517,6 +517,12 @@ abstract class S {
   /// **'Slot'**
   String get slot;
 
+  /// No description provided for @builds.
+  ///
+  /// In en, this message translates to:
+  /// **'Builds'**
+  String get builds;
+
   /// No description provided for @vs.
   ///
   /// In en, this message translates to:

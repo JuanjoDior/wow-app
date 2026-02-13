@@ -228,5 +228,8 @@ class SEs extends S {
   String get slot => 'Slot';
 
   @override
+  String get builds => 'Builds';
+
+  @override
   String get vs => 'VS';
 }
