@@ -7,6 +7,7 @@ import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/builds_cubit.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/builds_state.dart';
 import 'package:wow_companion/features/builds/presentation/widgets/create_build_dialog.dart';
+import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class BuildsListPage extends StatelessWidget {
   const BuildsListPage({super.key});
@@ -25,8 +26,9 @@ class _BuildsListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = S.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Builds')),
+      appBar: AppBar(title: Text(t.builds)),
       floatingActionButton: FloatingActionButton(
         backgroundColor: WowTheme.primaryGold,
         foregroundColor: WowTheme.darkBackground,
@@ -47,7 +49,7 @@ class _BuildsListView extends StatelessWidget {
             );
           }
           if (state is BuildsLoaded) {
-            if (state.builds.isEmpty) return _buildEmpty();
+            if (state.builds.isEmpty) return _buildEmpty(t);
             return _buildList(context, state.builds);
           }
           return const SizedBox.shrink();
@@ -56,17 +58,20 @@ class _BuildsListView extends StatelessWidget {
     );
   }
 
-  Widget _buildEmpty() => const Center(
+  Widget _buildEmpty(S t) => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.construction, size: 64, color: WowTheme.textSecondary),
-            SizedBox(height: 12),
-            Text('No builds yet',
-                style: TextStyle(color: WowTheme.textSecondary, fontSize: 16)),
-            SizedBox(height: 4),
-            Text('Tap + to create your first build',
-                style: TextStyle(color: WowTheme.textSecondary, fontSize: 13)),
+            const Icon(Icons.construction,
+                size: 64, color: WowTheme.textSecondary),
+            const SizedBox(height: 12),
+            Text(t.buildsNoBuildsYet,
+                style: const TextStyle(
+                    color: WowTheme.textSecondary, fontSize: 16)),
+            const SizedBox(height: 4),
+            Text(t.buildsNoBuildsHint,
+                style: const TextStyle(
+                    color: WowTheme.textSecondary, fontSize: 13)),
           ],
         ),
       );
@@ -96,6 +101,7 @@ class _BuildCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = S.of(context)!;
     return Card(
       color: WowTheme.surfaceDark,
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -105,7 +111,10 @@ class _BuildCard extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => context.push('/builds/${buildData.id}'),
+        onTap: () async {
+          await context.push('/builds/${buildData.id}');
+          if (context.mounted) context.read<BuildsCubit>().loadBuilds();
+        },
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -126,7 +135,7 @@ class _BuildCard extends StatelessWidget {
                   IconButton(
                     icon: const Icon(Icons.delete_outline,
                         color: WowTheme.textSecondary, size: 20),
-                    onPressed: () => _confirmDelete(context),
+                    onPressed: () => _confirmDelete(context, t),
                   ),
                 ],
               ),
@@ -158,9 +167,12 @@ class _BuildCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text('${buildData.obtainedSlots}/${buildData.totalSlots}',
-                      style: const TextStyle(
-                          color: WowTheme.textSecondary, fontSize: 12)),
+                  Text(
+                    t.buildsSlots(
+                        buildData.obtainedSlots, buildData.totalSlots),
+                    style: const TextStyle(
+                        color: WowTheme.textSecondary, fontSize: 12),
+                  ),
                 ],
               ),
             ],
@@ -170,29 +182,29 @@ class _BuildCard extends StatelessWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context) {
+  void _confirmDelete(BuildContext context, S t) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: WowTheme.surfaceDark,
-        title: const Text('Delete build',
-            style: TextStyle(color: WowTheme.textPrimary)),
-        content: Text('Delete "${buildData.name}"?',
+        title: Text(t.buildsDeleteTitle,
+            style: const TextStyle(color: WowTheme.textPrimary)),
+        content: Text(t.buildsDeleteConfirm(buildData.name),
             style: const TextStyle(color: WowTheme.textSecondary)),
         actions: [
           TextButton(
             onPressed: () =>
                 Navigator.of(context, rootNavigator: true).pop(),
-            child: const Text('Cancel',
-                style: TextStyle(color: WowTheme.textSecondary)),
+            child: Text(t.buildsCancel,
+                style: const TextStyle(color: WowTheme.textSecondary)),
           ),
           TextButton(
             onPressed: () {
               context.read<BuildsCubit>().deleteBuild(buildData.id);
               Navigator.of(context, rootNavigator: true).pop();
             },
-            child: const Text('Delete',
-                style: TextStyle(color: WowTheme.accentRed)),
+            child: Text(t.buildsDelete,
+                style: const TextStyle(color: WowTheme.accentRed)),
           ),
         ],
       ),

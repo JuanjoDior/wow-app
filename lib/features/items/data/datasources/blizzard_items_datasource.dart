@@ -46,4 +46,24 @@ class BlizzardItemsDataSource {
       );
     }
   }
+
+  Future<ItemModel> getItemById(int id) async {
+    try {
+      final data = await _client.get('$_workerUrl/api/items/$id');
+      return ItemModel.fromJson(data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 429) throw const RateLimitException();
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        throw const NetworkException(message: 'Request timed out.');
+      }
+      if (e.type == DioExceptionType.connectionError) {
+        throw const NetworkException();
+      }
+      throw ServerException(
+        message: e.message ?? 'Unknown error',
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
 }

@@ -70,7 +70,7 @@ class _ItemsViewState extends State<_ItemsView> {
                 ),
                 suffixIcon: ValueListenableBuilder<TextEditingValue>(
                   valueListenable: _controller,
-                  builder: (_, value, __) => value.text.isNotEmpty
+                  builder: (_, value, _) => value.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(
                             Icons.clear,
@@ -176,7 +176,7 @@ class _ItemCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: qualityColor.withOpacity(0.4), width: 1),
+        side: BorderSide(color: qualityColor.withValues(alpha: 0.4), width: 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(10),
@@ -196,12 +196,12 @@ class _ItemCard extends StatelessWidget {
                       child: CachedNetworkImage(
                         imageUrl: item.iconUrl!,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => const Icon(
+                        placeholder: (_, _) => const Icon(
                           Icons.inventory_2,
                           color: WowTheme.textSecondary,
                           size: 28,
                         ),
-                        errorWidget: (_, __, ___) => const Icon(
+                        errorWidget: (_, _, _) => const Icon(
                           Icons.inventory_2,
                           color: WowTheme.textSecondary,
                           size: 28,

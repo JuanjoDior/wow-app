@@ -80,5 +80,48 @@
   "character2": "Character 2",
   "slot": "Slot",
   "builds": "Builds",
-  "vs": "VS"
+  "vs": "VS",
+
+  "buildsNoBuildsYet": "No builds yet",
+  "buildsNoBuildsHint": "Tap + to create your first build",
+  "buildsNewBuild": "New Build",
+  "buildsBuildName": "Build name (e.g. Rogue M+ Assassination)",
+  "buildsGenericBuild": "Generic build (no character)",
+  "buildsNoFavoritesYet": "No favorites saved yet",
+  "buildsLinkCharacter": "Link to character (optional)",
+  "buildsCreate": "Create",
+  "buildsCancel": "Cancel",
+  "buildsDeleteTitle": "Delete build",
+  "buildsDeleteConfirm": "Delete \"{name}\"?",
+  "@buildsDeleteConfirm": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "buildsDelete": "Delete",
+  "buildsSlots": "{obtained}/{total} slots",
+  "@buildsSlots": {
+    "placeholders": {
+      "obtained": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+
+  "slotAssignItem": "Assign item",
+  "slotClearSlot": "Clear slot",
+  "slotAddEnchantment": "Add enchantment",
+  "slotRemoveEnchantment": "Remove enchantment",
+  "slotAddGem": "+ Gem",
+  "slotSearchItem": "Search {slot}",
+  "@slotSearchItem": {
+    "placeholders": { "slot": { "type": "String" } }
+  },
+  "slotSearchEnchantment": "Search Enchantment",
+  "slotSearchGem": "Search Gem",
+
+  "searchTypeAtLeast": "Type at least 2 characters...",
+  "searchNoResults": "No results",
+  "searchLoading": "Searching...",
+
+  "tooltipItemLevel": "Item Level",
+  "tooltipRequiredLevel": "Required Level",
+  "tooltipType": "Type"
 }

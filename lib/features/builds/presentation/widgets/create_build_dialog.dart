@@ -5,6 +5,7 @@ import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/builds_cubit.dart';
 import 'package:wow_companion/features/favorites/domain/favorites_repository.dart';
+import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class CreateBuildDialog extends StatefulWidget {
   const CreateBuildDialog({super.key});
@@ -57,17 +58,16 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
     );
 
     context.read<BuildsCubit>().saveBuild(build);
-    Navigator.pop(context);
+    Navigator.of(context, rootNavigator: true).pop();
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = S.of(context)!;
     return AlertDialog(
       backgroundColor: WowTheme.surfaceDark,
-      title: const Text(
-        'New Build',
-        style: TextStyle(color: WowTheme.primaryGold),
-      ),
+      title: Text(t.buildsNewBuild,
+          style: const TextStyle(color: WowTheme.primaryGold)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -75,64 +75,57 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
             controller: _nameController,
             autofocus: true,
             style: const TextStyle(color: WowTheme.textPrimary),
-            decoration: const InputDecoration(
-              hintText: 'Build name (e.g. Rogue M+ Assassination)',
-              hintStyle: TextStyle(color: WowTheme.textSecondary),
+            decoration: InputDecoration(
+              hintText: t.buildsBuildName,
+              hintStyle: const TextStyle(color: WowTheme.textSecondary),
             ),
           ),
           const SizedBox(height: 16),
           if (_loadingFavorites)
             const CircularProgressIndicator(color: WowTheme.primaryGold)
           else if (_favorites.isEmpty)
-            const Text(
-              'No favorites saved yet',
-              style: TextStyle(color: WowTheme.textSecondary, fontSize: 13),
-            )
+            Text(t.buildsNoFavoritesYet,
+                style: const TextStyle(
+                    color: WowTheme.textSecondary, fontSize: 13))
           else
             DropdownButtonFormField<FavoriteCharacter>(
-              initialValue: _selectedCharacter,
+              value: _selectedCharacter,
               dropdownColor: WowTheme.surfaceDark,
-              decoration: const InputDecoration(
-                hintText: 'Link to character (optional)',
-                hintStyle: TextStyle(color: WowTheme.textSecondary),
+              decoration: InputDecoration(
+                hintText: t.buildsLinkCharacter,
+                hintStyle: const TextStyle(color: WowTheme.textSecondary),
               ),
               style: const TextStyle(color: WowTheme.textPrimary),
               items: [
-                const DropdownMenuItem(
+                DropdownMenuItem(
                   value: null,
-                  child: Text(
-                    'Generic build (no character)',
-                    style: TextStyle(color: WowTheme.textSecondary),
-                  ),
+                  child: Text(t.buildsGenericBuild,
+                      style:
+                          const TextStyle(color: WowTheme.textSecondary)),
                 ),
-                ..._favorites.map(
-                  (f) => DropdownMenuItem(
-                    value: f,
-                    child: Text(
-                      '${f.name} - ${f.realm}',
-                      style: const TextStyle(color: WowTheme.textPrimary),
-                    ),
-                  ),
-                ),
+                ..._favorites.map((f) => DropdownMenuItem(
+                      value: f,
+                      child: Text('${f.name} - ${f.realm}',
+                          style: const TextStyle(
+                              color: WowTheme.textPrimary)),
+                    )),
               ],
-              onChanged: (value) => setState(() => _selectedCharacter = value),
+              onChanged: (value) =>
+                  setState(() => _selectedCharacter = value),
             ),
         ],
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text(
-            'Cancel',
-            style: TextStyle(color: WowTheme.textSecondary),
-          ),
+          onPressed: () =>
+              Navigator.of(context, rootNavigator: true).pop(),
+          child: Text(t.buildsCancel,
+              style: const TextStyle(color: WowTheme.textSecondary)),
         ),
         TextButton(
           onPressed: _submit,
-          child: const Text(
-            'Create',
-            style: TextStyle(color: WowTheme.primaryGold),
-          ),
+          child: Text(t.buildsCreate,
+              style: const TextStyle(color: WowTheme.primaryGold)),
         ),
       ],
     );

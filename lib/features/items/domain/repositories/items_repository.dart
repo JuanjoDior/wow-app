@@ -8,4 +8,8 @@ abstract class ItemsRepository {
     String? inventoryType,
     String locale,
   });
+  Future<Either<Failure, Item>> getItemDetail(
+    int id, {
+    String locale = 'en_GB',
+  });
 }

@@ -232,4 +232,91 @@ class SEn extends S {
 
   @override
   String get vs => 'VS';
+
+  @override
+  String get buildsNoBuildsYet => 'No builds yet';
+
+  @override
+  String get buildsNoBuildsHint => 'Tap + to create your first build';
+
+  @override
+  String get buildsNewBuild => 'New Build';
+
+  @override
+  String get buildsBuildName => 'Build name (e.g. Rogue M+ Assassination)';
+
+  @override
+  String get buildsGenericBuild => 'Generic build (no character)';
+
+  @override
+  String get buildsNoFavoritesYet => 'No favorites saved yet';
+
+  @override
+  String get buildsLinkCharacter => 'Link to character (optional)';
+
+  @override
+  String get buildsCreate => 'Create';
+
+  @override
+  String get buildsCancel => 'Cancel';
+
+  @override
+  String get buildsDeleteTitle => 'Delete build';
+
+  @override
+  String buildsDeleteConfirm(String name) {
+    return 'Delete \"$name\"?';
+  }
+
+  @override
+  String get buildsDelete => 'Delete';
+
+  @override
+  String buildsSlots(int obtained, int total) {
+    return '$obtained/$total slots';
+  }
+
+  @override
+  String get slotAssignItem => 'Assign item';
+
+  @override
+  String get slotClearSlot => 'Clear slot';
+
+  @override
+  String get slotAddEnchantment => 'Add enchantment';
+
+  @override
+  String get slotRemoveEnchantment => 'Remove enchantment';
+
+  @override
+  String get slotAddGem => '+ Gem';
+
+  @override
+  String slotSearchItem(String slot) {
+    return 'Search $slot';
+  }
+
+  @override
+  String get slotSearchEnchantment => 'Search Enchantment';
+
+  @override
+  String get slotSearchGem => 'Search Gem';
+
+  @override
+  String get searchTypeAtLeast => 'Type at least 2 characters...';
+
+  @override
+  String get searchNoResults => 'No results';
+
+  @override
+  String get searchLoading => 'Searching...';
+
+  @override
+  String get tooltipItemLevel => 'Item Level';
+
+  @override
+  String get tooltipRequiredLevel => 'Required Level';
+
+  @override
+  String get tooltipType => 'Type';
 }

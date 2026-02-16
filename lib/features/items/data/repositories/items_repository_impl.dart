@@ -33,4 +33,23 @@ class ItemsRepositoryImpl implements ItemsRepository {
       return Left(ServerFailure(message: e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, Item>> getItemDetail(
+    int id, {
+    String locale = 'en_GB',
+  }) async {
+    try {
+      final item = await remoteDataSource.getItemById(id);
+      return Right(item);
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(message: e.message));
+    } on RateLimitException {
+      return const Left(RateLimitFailure());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
 }

@@ -80,5 +80,48 @@
   "character2": "Personaje 2",
   "slot": "Slot",
   "builds": "Builds",
-  "vs": "VS"
+  "vs": "VS",
+
+  "buildsNoBuildsYet": "Aún no hay builds",
+  "buildsNoBuildsHint": "Pulsa + para crear tu primera build",
+  "buildsNewBuild": "Nueva Build",
+  "buildsBuildName": "Nombre de la build (ej: Pícaro M+ Asesinato)",
+  "buildsGenericBuild": "Build genérica (sin personaje)",
+  "buildsNoFavoritesYet": "Aún no hay favoritos guardados",
+  "buildsLinkCharacter": "Vincular a personaje (opcional)",
+  "buildsCreate": "Crear",
+  "buildsCancel": "Cancelar",
+  "buildsDeleteTitle": "Eliminar build",
+  "buildsDeleteConfirm": "¿Eliminar \"{name}\"?",
+  "@buildsDeleteConfirm": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "buildsDelete": "Eliminar",
+  "buildsSlots": "{obtained}/{total} slots",
+  "@buildsSlots": {
+    "placeholders": {
+      "obtained": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+
+  "slotAssignItem": "Asignar objeto",
+  "slotClearSlot": "Limpiar slot",
+  "slotAddEnchantment": "Añadir encantamiento",
+  "slotRemoveEnchantment": "Eliminar encantamiento",
+  "slotAddGem": "+ Gema",
+  "slotSearchItem": "Buscar {slot}",
+  "@slotSearchItem": {
+    "placeholders": { "slot": { "type": "String" } }
+  },
+  "slotSearchEnchantment": "Buscar Encantamiento",
+  "slotSearchGem": "Buscar Gema",
+
+  "searchTypeAtLeast": "Escribe al menos 2 caracteres...",
+  "searchNoResults": "Sin resultados",
+  "searchLoading": "Buscando...",
+
+  "tooltipItemLevel": "Nivel de Objeto",
+  "tooltipRequiredLevel": "Nivel Requerido",
+  "tooltipType": "Tipo"
 }

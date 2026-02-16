@@ -232,4 +232,91 @@ class SEs extends S {
 
   @override
   String get vs => 'VS';
+
+  @override
+  String get buildsNoBuildsYet => 'Aún no hay builds';
+
+  @override
+  String get buildsNoBuildsHint => 'Pulsa + para crear tu primera build';
+
+  @override
+  String get buildsNewBuild => 'Nueva Build';
+
+  @override
+  String get buildsBuildName => 'Nombre de la build (ej: Pícaro M+ Asesinato)';
+
+  @override
+  String get buildsGenericBuild => 'Build genérica (sin personaje)';
+
+  @override
+  String get buildsNoFavoritesYet => 'Aún no hay favoritos guardados';
+
+  @override
+  String get buildsLinkCharacter => 'Vincular a personaje (opcional)';
+
+  @override
+  String get buildsCreate => 'Crear';
+
+  @override
+  String get buildsCancel => 'Cancelar';
+
+  @override
+  String get buildsDeleteTitle => 'Eliminar build';
+
+  @override
+  String buildsDeleteConfirm(String name) {
+    return '¿Eliminar \"$name\"?';
+  }
+
+  @override
+  String get buildsDelete => 'Eliminar';
+
+  @override
+  String buildsSlots(int obtained, int total) {
+    return '$obtained/$total slots';
+  }
+
+  @override
+  String get slotAssignItem => 'Asignar objeto';
+
+  @override
+  String get slotClearSlot => 'Limpiar slot';
+
+  @override
+  String get slotAddEnchantment => 'Añadir encantamiento';
+
+  @override
+  String get slotRemoveEnchantment => 'Eliminar encantamiento';
+
+  @override
+  String get slotAddGem => '+ Gema';
+
+  @override
+  String slotSearchItem(String slot) {
+    return 'Buscar $slot';
+  }
+
+  @override
+  String get slotSearchEnchantment => 'Buscar Encantamiento';
+
+  @override
+  String get slotSearchGem => 'Buscar Gema';
+
+  @override
+  String get searchTypeAtLeast => 'Escribe al menos 2 caracteres...';
+
+  @override
+  String get searchNoResults => 'Sin resultados';
+
+  @override
+  String get searchLoading => 'Buscando...';
+
+  @override
+  String get tooltipItemLevel => 'Nivel de Objeto';
+
+  @override
+  String get tooltipRequiredLevel => 'Nivel Requerido';
+
+  @override
+  String get tooltipType => 'Tipo';
 }

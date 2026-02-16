@@ -528,6 +528,168 @@ abstract class S {
   /// In en, this message translates to:
   /// **'VS'**
   String get vs;
+
+  /// No description provided for @buildsNoBuildsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No builds yet'**
+  String get buildsNoBuildsYet;
+
+  /// No description provided for @buildsNoBuildsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap + to create your first build'**
+  String get buildsNoBuildsHint;
+
+  /// No description provided for @buildsNewBuild.
+  ///
+  /// In en, this message translates to:
+  /// **'New Build'**
+  String get buildsNewBuild;
+
+  /// No description provided for @buildsBuildName.
+  ///
+  /// In en, this message translates to:
+  /// **'Build name (e.g. Rogue M+ Assassination)'**
+  String get buildsBuildName;
+
+  /// No description provided for @buildsGenericBuild.
+  ///
+  /// In en, this message translates to:
+  /// **'Generic build (no character)'**
+  String get buildsGenericBuild;
+
+  /// No description provided for @buildsNoFavoritesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No favorites saved yet'**
+  String get buildsNoFavoritesYet;
+
+  /// No description provided for @buildsLinkCharacter.
+  ///
+  /// In en, this message translates to:
+  /// **'Link to character (optional)'**
+  String get buildsLinkCharacter;
+
+  /// No description provided for @buildsCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get buildsCreate;
+
+  /// No description provided for @buildsCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get buildsCancel;
+
+  /// No description provided for @buildsDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete build'**
+  String get buildsDeleteTitle;
+
+  /// No description provided for @buildsDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{name}\"?'**
+  String buildsDeleteConfirm(String name);
+
+  /// No description provided for @buildsDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get buildsDelete;
+
+  /// No description provided for @buildsSlots.
+  ///
+  /// In en, this message translates to:
+  /// **'{obtained}/{total} slots'**
+  String buildsSlots(int obtained, int total);
+
+  /// No description provided for @slotAssignItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign item'**
+  String get slotAssignItem;
+
+  /// No description provided for @slotClearSlot.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear slot'**
+  String get slotClearSlot;
+
+  /// No description provided for @slotAddEnchantment.
+  ///
+  /// In en, this message translates to:
+  /// **'Add enchantment'**
+  String get slotAddEnchantment;
+
+  /// No description provided for @slotRemoveEnchantment.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove enchantment'**
+  String get slotRemoveEnchantment;
+
+  /// No description provided for @slotAddGem.
+  ///
+  /// In en, this message translates to:
+  /// **'+ Gem'**
+  String get slotAddGem;
+
+  /// No description provided for @slotSearchItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Search {slot}'**
+  String slotSearchItem(String slot);
+
+  /// No description provided for @slotSearchEnchantment.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Enchantment'**
+  String get slotSearchEnchantment;
+
+  /// No description provided for @slotSearchGem.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Gem'**
+  String get slotSearchGem;
+
+  /// No description provided for @searchTypeAtLeast.
+  ///
+  /// In en, this message translates to:
+  /// **'Type at least 2 characters...'**
+  String get searchTypeAtLeast;
+
+  /// No description provided for @searchNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No results'**
+  String get searchNoResults;
+
+  /// No description provided for @searchLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching...'**
+  String get searchLoading;
+
+  /// No description provided for @tooltipItemLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Item Level'**
+  String get tooltipItemLevel;
+
+  /// No description provided for @tooltipRequiredLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Required Level'**
+  String get tooltipRequiredLevel;
+
+  /// No description provided for @tooltipType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get tooltipType;
 }
 
 class _SDelegate extends LocalizationsDelegate<S> {

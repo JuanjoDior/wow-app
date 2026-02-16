@@ -4,10 +4,9 @@ import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
 import 'package:wow_companion/features/items/domain/usecases/search_items.dart';
+import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class ItemSearchDialog extends StatefulWidget {
-  /// El slot determina el filtro de inventoryType.
-  /// Si es null, busca encantamientos (sin filtro de slot).
   final WowSlot? slot;
   final String title;
 
@@ -68,6 +67,7 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final t = S.of(context)!;
     return Dialog(
       backgroundColor: WowTheme.surfaceDark,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -88,16 +88,16 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
                 controller: _controller,
                 autofocus: true,
                 style: const TextStyle(color: WowTheme.textPrimary),
-                decoration: const InputDecoration(
-                  hintText: 'Type at least 2 characters...',
-                  hintStyle: TextStyle(color: WowTheme.textSecondary),
-                  prefixIcon:
-                      Icon(Icons.search, color: WowTheme.textSecondary),
+                decoration: InputDecoration(
+                  hintText: t.searchTypeAtLeast,
+                  hintStyle: const TextStyle(color: WowTheme.textSecondary),
+                  prefixIcon: const Icon(Icons.search,
+                      color: WowTheme.textSecondary),
                 ),
                 onChanged: _search,
               ),
               const SizedBox(height: 12),
-              Expanded(child: _buildBody()),
+              Expanded(child: _buildBody(t)),
             ],
           ),
         ),
@@ -105,7 +105,7 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(S t) {
     if (_loading) {
       return const Center(
           child: CircularProgressIndicator(color: WowTheme.primaryGold));
@@ -116,9 +116,9 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
               style: const TextStyle(color: WowTheme.textSecondary)));
     }
     if (_results.isEmpty) {
-      return const Center(
-          child: Text('No results',
-              style: TextStyle(color: WowTheme.textSecondary)));
+      return Center(
+          child: Text(t.searchNoResults,
+              style: const TextStyle(color: WowTheme.textSecondary)));
     }
 
     return ListView.builder(
@@ -128,7 +128,8 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
         final color = WowTheme.getQualityColor(item.quality);
         return ListTile(
           title: Text(item.name,
-              style: TextStyle(color: color, fontWeight: FontWeight.w500)),
+              style:
+                  TextStyle(color: color, fontWeight: FontWeight.w500)),
           subtitle: Text(
             [
               if (item.level != null) 'iLvl ${item.level}',
@@ -137,7 +138,7 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
             style: const TextStyle(
                 color: WowTheme.textSecondary, fontSize: 12),
           ),
-          onTap: () => Navigator.of(context, rootNavigator: true).pop(item),
+          onTap: () => Navigator.of(context).pop(item),
         );
       },
     );
