@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
@@ -41,10 +42,8 @@ class _BuildsListView extends StatelessWidget {
           }
           if (state is BuildsError) {
             return Center(
-              child: Text(
-                state.message,
-                style: const TextStyle(color: WowTheme.textSecondary),
-              ),
+              child: Text(state.message,
+                  style: const TextStyle(color: WowTheme.textSecondary)),
             );
           }
           if (state is BuildsLoaded) {
@@ -58,23 +57,19 @@ class _BuildsListView extends StatelessWidget {
   }
 
   Widget _buildEmpty() => const Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.construction, size: 64, color: WowTheme.textSecondary),
-        SizedBox(height: 12),
-        Text(
-          'No builds yet',
-          style: TextStyle(color: WowTheme.textSecondary, fontSize: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.construction, size: 64, color: WowTheme.textSecondary),
+            SizedBox(height: 12),
+            Text('No builds yet',
+                style: TextStyle(color: WowTheme.textSecondary, fontSize: 16)),
+            SizedBox(height: 4),
+            Text('Tap + to create your first build',
+                style: TextStyle(color: WowTheme.textSecondary, fontSize: 13)),
+          ],
         ),
-        SizedBox(height: 4),
-        Text(
-          'Tap + to create your first build',
-          style: TextStyle(color: WowTheme.textSecondary, fontSize: 13),
-        ),
-      ],
-    ),
-  );
+      );
 
   Widget _buildList(BuildContext context, List<Build> builds) {
     return ListView.builder(
@@ -110,7 +105,7 @@ class _BuildCard extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {},
+        onTap: () => context.push('/builds/${buildData.id}'),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -129,11 +124,8 @@ class _BuildCard extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(
-                      Icons.delete_outline,
-                      color: WowTheme.textSecondary,
-                      size: 20,
-                    ),
+                    icon: const Icon(Icons.delete_outline,
+                        color: WowTheme.textSecondary, size: 20),
                     onPressed: () => _confirmDelete(context),
                   ),
                 ],
@@ -142,19 +134,12 @@ class _BuildCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(
-                      Icons.person_outline,
-                      size: 14,
-                      color: WowTheme.textSecondary,
-                    ),
+                    const Icon(Icons.person_outline,
+                        size: 14, color: WowTheme.textSecondary),
                     const SizedBox(width: 4),
-                    Text(
-                      buildData.characterRefDisplay!,
-                      style: const TextStyle(
-                        color: WowTheme.textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
+                    Text(buildData.characterRefDisplay!,
+                        style: const TextStyle(
+                            color: WowTheme.textSecondary, fontSize: 13)),
                   ],
                 ),
               ],
@@ -173,13 +158,9 @@ class _BuildCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    '${buildData.obtainedSlots}/${buildData.totalSlots}',
-                    style: const TextStyle(
-                      color: WowTheme.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
+                  Text('${buildData.obtainedSlots}/${buildData.totalSlots}',
+                      style: const TextStyle(
+                          color: WowTheme.textSecondary, fontSize: 12)),
                 ],
               ),
             ],
@@ -194,31 +175,24 @@ class _BuildCard extends StatelessWidget {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: WowTheme.surfaceDark,
-        title: const Text(
-          'Delete build',
-          style: TextStyle(color: WowTheme.textPrimary),
-        ),
-        content: Text(
-          'Delete "${buildData.name}"?',
-          style: const TextStyle(color: WowTheme.textSecondary),
-        ),
+        title: const Text('Delete build',
+            style: TextStyle(color: WowTheme.textPrimary)),
+        content: Text('Delete "${buildData.name}"?',
+            style: const TextStyle(color: WowTheme.textSecondary)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: WowTheme.textSecondary),
-            ),
+            onPressed: () =>
+                Navigator.of(context, rootNavigator: true).pop(),
+            child: const Text('Cancel',
+                style: TextStyle(color: WowTheme.textSecondary)),
           ),
           TextButton(
             onPressed: () {
               context.read<BuildsCubit>().deleteBuild(buildData.id);
               Navigator.of(context, rootNavigator: true).pop();
             },
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: WowTheme.accentRed),
-            ),
+            child: const Text('Delete',
+                style: TextStyle(color: WowTheme.accentRed)),
           ),
         ],
       ),

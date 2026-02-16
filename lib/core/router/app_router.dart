@@ -10,6 +10,7 @@ import 'package:wow_companion/shared/widgets/shell_layout.dart';
 import 'package:wow_companion/features/guides/presentation/pages/guides_list_page.dart';
 import 'package:wow_companion/features/guides/presentation/pages/guide_detail_page.dart';
 import 'package:wow_companion/features/builds/presentation/pages/builds_list_page.dart';
+import 'package:wow_companion/features/builds/presentation/pages/build_detail_page.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -87,7 +88,7 @@ final GoRouter appRouter = GoRouter(
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const CompareSelectPage(),
     ),
-
+    // Guide detail
     GoRoute(
       path: '/guides/:classSlug/:specSlug',
       parentNavigatorKey: _rootNavigatorKey,
@@ -112,6 +113,14 @@ final GoRouter appRouter = GoRouter(
           name2: state.pathParameters['name2']!,
         );
       },
+    ),
+    // Build detail — full screen
+    GoRoute(
+      path: '/builds/:id',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => BuildDetailPage(
+        buildId: state.pathParameters['id']!,
+      ),
     ),
   ],
 );
