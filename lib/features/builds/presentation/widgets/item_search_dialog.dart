@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:wow_companion/core/di/injection.dart';
+import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
@@ -10,11 +11,7 @@ class ItemSearchDialog extends StatefulWidget {
   final WowSlot? slot;
   final String title;
 
-  const ItemSearchDialog({
-    super.key,
-    this.slot,
-    required this.title,
-  });
+  const ItemSearchDialog({super.key, this.slot, required this.title});
 
   @override
   State<ItemSearchDialog> createState() => _ItemSearchDialogState();
@@ -48,6 +45,7 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
       final result = await searchItems(
         query.trim(),
         inventoryType: widget.slot?.inventoryType,
+        locale: sl<LocaleNotifier>().blizzardLocale,
       );
 
       result.fold(
@@ -78,11 +76,14 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(widget.title,
-                  style: const TextStyle(
-                      color: WowTheme.primaryGold,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold)),
+              Text(
+                widget.title,
+                style: const TextStyle(
+                  color: WowTheme.primaryGold,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 12),
               TextField(
                 controller: _controller,
@@ -91,8 +92,10 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
                 decoration: InputDecoration(
                   hintText: t.searchTypeAtLeast,
                   hintStyle: const TextStyle(color: WowTheme.textSecondary),
-                  prefixIcon: const Icon(Icons.search,
-                      color: WowTheme.textSecondary),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: WowTheme.textSecondary,
+                  ),
                 ),
                 onChanged: _search,
               ),
@@ -108,17 +111,24 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
   Widget _buildBody(S t) {
     if (_loading) {
       return const Center(
-          child: CircularProgressIndicator(color: WowTheme.primaryGold));
+        child: CircularProgressIndicator(color: WowTheme.primaryGold),
+      );
     }
     if (_error != null) {
       return Center(
-          child: Text(_error!,
-              style: const TextStyle(color: WowTheme.textSecondary)));
+        child: Text(
+          _error!,
+          style: const TextStyle(color: WowTheme.textSecondary),
+        ),
+      );
     }
     if (_results.isEmpty) {
       return Center(
-          child: Text(t.searchNoResults,
-              style: const TextStyle(color: WowTheme.textSecondary)));
+        child: Text(
+          t.searchNoResults,
+          style: const TextStyle(color: WowTheme.textSecondary),
+        ),
+      );
     }
 
     return ListView.builder(
@@ -127,16 +137,16 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
         final item = _results[i];
         final color = WowTheme.getQualityColor(item.quality);
         return ListTile(
-          title: Text(item.name,
-              style:
-                  TextStyle(color: color, fontWeight: FontWeight.w500)),
+          title: Text(
+            item.name,
+            style: TextStyle(color: color, fontWeight: FontWeight.w500),
+          ),
           subtitle: Text(
             [
               if (item.level != null) 'iLvl ${item.level}',
               if (item.inventoryName != null) item.inventoryName!,
             ].join(' · '),
-            style: const TextStyle(
-                color: WowTheme.textSecondary, fontSize: 12),
+            style: const TextStyle(color: WowTheme.textSecondary, fontSize: 12),
           ),
           onTap: () => Navigator.of(context).pop(item),
         );

@@ -7,6 +7,17 @@ class LocaleNotifier extends ChangeNotifier {
 
   Locale get locale => _locale;
 
+  /// Convierte el locale de la app al formato que usa la API de Blizzard
+  String get blizzardLocale {
+    switch (_locale.languageCode) {
+      case 'es':
+        return 'es_ES';
+      case 'en':
+      default:
+        return 'en_GB';
+    }
+  }
+
   /// Carga el idioma guardado o usa 'es' por defecto
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();

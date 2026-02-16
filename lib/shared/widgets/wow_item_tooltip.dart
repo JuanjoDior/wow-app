@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:wow_companion/core/di/injection.dart';
+import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
 import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dart';
@@ -9,11 +10,7 @@ class WowItemTooltip extends StatefulWidget {
   final int itemId;
   final Widget child;
 
-  const WowItemTooltip({
-    super.key,
-    required this.itemId,
-    required this.child,
-  });
+  const WowItemTooltip({super.key, required this.itemId, required this.child});
 
   @override
   State<WowItemTooltip> createState() => _WowItemTooltipState();
@@ -34,7 +31,10 @@ class _WowItemTooltipState extends State<WowItemTooltip> {
   Future<void> _fetchItem() async {
     if (_cachedItem != null || _loading) return;
     _loading = true;
-    final result = await sl<GetItemDetail>()(widget.itemId);
+    final result = await sl<GetItemDetail>()(
+      widget.itemId,
+      locale: sl<LocaleNotifier>().blizzardLocale,
+    );
     result.fold((_) {}, (item) {
       if (mounted) setState(() => _cachedItem = item);
     });
@@ -128,8 +128,7 @@ class _TooltipCard extends StatelessWidget {
                     errorBuilder: (_, __, ___) => const SizedBox(
                       width: 40,
                       height: 40,
-                      child: Icon(Icons.shield,
-                          color: WowTheme.textSecondary),
+                      child: Icon(Icons.shield, color: WowTheme.textSecondary),
                     ),
                   ),
                 ),
@@ -150,12 +149,10 @@ class _TooltipCard extends StatelessWidget {
           const SizedBox(height: 8),
           const Divider(color: WowTheme.border, height: 1),
           const SizedBox(height: 8),
-          if (item.level != null)
-            _statRow(t.tooltipItemLevel, '${item.level}'),
+          if (item.level != null) _statRow(t.tooltipItemLevel, '${item.level}'),
           if (item.requiredLevel != null)
             _statRow(t.tooltipRequiredLevel, '${item.requiredLevel}'),
-          if (item.inventoryName != null)
-            _statRow(t.slot, item.inventoryName!),
+          if (item.inventoryName != null) _statRow(t.slot, item.inventoryName!),
           if (item.itemSubclass != null)
             _statRow(t.tooltipType, item.itemSubclass!),
         ],
@@ -169,12 +166,14 @@ class _TooltipCard extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: const TextStyle(
-                  color: WowTheme.textSecondary, fontSize: 12)),
-          Text(value,
-              style: const TextStyle(
-                  color: WowTheme.textPrimary, fontSize: 12)),
+          Text(
+            label,
+            style: const TextStyle(color: WowTheme.textSecondary, fontSize: 12),
+          ),
+          Text(
+            value,
+            style: const TextStyle(color: WowTheme.textPrimary, fontSize: 12),
+          ),
         ],
       ),
     );

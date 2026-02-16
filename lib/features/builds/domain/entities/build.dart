@@ -21,22 +21,22 @@ enum WowSlot {
   offHand;
 
   String get displayName => switch (this) {
-    WowSlot.head => 'Head',
+    WowSlot.head => 'Helm',
     WowSlot.neck => 'Neck',
     WowSlot.shoulder => 'Shoulder',
-    WowSlot.back => 'Back',
+    WowSlot.back => 'Cloak',
     WowSlot.chest => 'Chest',
-    WowSlot.wrist => 'Wrist',
-    WowSlot.hands => 'Hands',
-    WowSlot.waist => 'Waist',
+    WowSlot.wrist => 'Bracers',
+    WowSlot.hands => 'Gloves',
+    WowSlot.waist => 'Belt',
     WowSlot.legs => 'Legs',
-    WowSlot.feet => 'Feet',
-    WowSlot.finger1 => 'Ring 1',
-    WowSlot.finger2 => 'Ring 2',
-    WowSlot.trinket1 => 'Trinket 1',
-    WowSlot.trinket2 => 'Trinket 2',
-    WowSlot.mainHand => 'Main Hand',
-    WowSlot.offHand => 'Off Hand',
+    WowSlot.feet => 'Boots',
+    WowSlot.finger1 => 'Ring #1',
+    WowSlot.finger2 => 'Ring #2',
+    WowSlot.trinket1 => 'Trinket #1',
+    WowSlot.trinket2 => 'Trinket #2',
+    WowSlot.mainHand => 'Weapon Main-Hand',
+    WowSlot.offHand => 'Weapon Off-Hand',
   };
 
   /// Valor inventoryType que usamos en la API de Blizzard
@@ -44,7 +44,7 @@ enum WowSlot {
     WowSlot.head => 'HEAD',
     WowSlot.neck => 'NECK',
     WowSlot.shoulder => 'SHOULDER',
-    WowSlot.back => 'BACK',
+    WowSlot.back => 'CLOAK',
     WowSlot.chest => 'CHEST',
     WowSlot.wrist => 'WRIST',
     WowSlot.hands => 'HANDS',
@@ -55,8 +55,8 @@ enum WowSlot {
     WowSlot.finger2 => 'FINGER',
     WowSlot.trinket1 => 'TRINKET',
     WowSlot.trinket2 => 'TRINKET',
-    WowSlot.mainHand => 'MAIN_HAND',
-    WowSlot.offHand => 'OFFHAND',
+    WowSlot.mainHand => '',
+    WowSlot.offHand => '',
   };
 }
 

@@ -18,7 +18,7 @@ class BlizzardItemsDataSource {
   }) async {
     try {
       final queryParams = <String, dynamic>{'name': name, 'locale': locale};
-      if (inventoryType != null) {
+      if (inventoryType != null && inventoryType.isNotEmpty) {
         queryParams['inventoryType'] = inventoryType;
       }
 
