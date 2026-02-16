@@ -50,7 +50,7 @@ class BlizzardItemsDataSource {
   Future<ItemModel> getItemById(int id) async {
     try {
       final data = await _client.get('$_workerUrl/api/items/$id');
-      return ItemModel.fromJson(data as Map<String, dynamic>);
+      return ItemModel.fromJson(data);
     } on DioException catch (e) {
       if (e.response?.statusCode == 429) throw const RateLimitException();
       if (e.type == DioExceptionType.connectionTimeout ||
