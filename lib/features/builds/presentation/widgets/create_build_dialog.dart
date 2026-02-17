@@ -66,8 +66,10 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
     final t = S.of(context)!;
     return AlertDialog(
       backgroundColor: WowTheme.surfaceDark,
-      title: Text(t.buildsNewBuild,
-          style: const TextStyle(color: WowTheme.primaryGold)),
+      title: Text(
+        t.buildsNewBuild,
+        style: const TextStyle(color: WowTheme.primaryGold),
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -84,12 +86,16 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
           if (_loadingFavorites)
             const CircularProgressIndicator(color: WowTheme.primaryGold)
           else if (_favorites.isEmpty)
-            Text(t.buildsNoFavoritesYet,
-                style: const TextStyle(
-                    color: WowTheme.textSecondary, fontSize: 13))
+            Text(
+              t.buildsNoFavoritesYet,
+              style: const TextStyle(
+                color: WowTheme.textSecondary,
+                fontSize: 13,
+              ),
+            )
           else
             DropdownButtonFormField<FavoriteCharacter>(
-              value: _selectedCharacter,
+              initialValue: _selectedCharacter,
               dropdownColor: WowTheme.surfaceDark,
               decoration: InputDecoration(
                 hintText: t.buildsLinkCharacter,
@@ -99,33 +105,39 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
               items: [
                 DropdownMenuItem(
                   value: null,
-                  child: Text(t.buildsGenericBuild,
-                      style:
-                          const TextStyle(color: WowTheme.textSecondary)),
+                  child: Text(
+                    t.buildsGenericBuild,
+                    style: const TextStyle(color: WowTheme.textSecondary),
+                  ),
                 ),
-                ..._favorites.map((f) => DropdownMenuItem(
-                      value: f,
-                      child: Text('${f.name} - ${f.realm}',
-                          style: const TextStyle(
-                              color: WowTheme.textPrimary)),
-                    )),
+                ..._favorites.map(
+                  (f) => DropdownMenuItem(
+                    value: f,
+                    child: Text(
+                      '${f.name} - ${f.realm}',
+                      style: const TextStyle(color: WowTheme.textPrimary),
+                    ),
+                  ),
+                ),
               ],
-              onChanged: (value) =>
-                  setState(() => _selectedCharacter = value),
+              onChanged: (value) => setState(() => _selectedCharacter = value),
             ),
         ],
       ),
       actions: [
         TextButton(
-          onPressed: () =>
-              Navigator.of(context, rootNavigator: true).pop(),
-          child: Text(t.buildsCancel,
-              style: const TextStyle(color: WowTheme.textSecondary)),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+          child: Text(
+            t.buildsCancel,
+            style: const TextStyle(color: WowTheme.textSecondary),
+          ),
         ),
         TextButton(
           onPressed: _submit,
-          child: Text(t.buildsCreate,
-              style: const TextStyle(color: WowTheme.primaryGold)),
+          child: Text(
+            t.buildsCreate,
+            style: const TextStyle(color: WowTheme.primaryGold),
+          ),
         ),
       ],
     );

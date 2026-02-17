@@ -47,7 +47,7 @@ enum WowSlot {
     WowSlot.back => 'CLOAK',
     WowSlot.chest => 'CHEST',
     WowSlot.wrist => 'WRIST',
-    WowSlot.hands => 'HANDS',
+    WowSlot.hands => 'HAND',
     WowSlot.waist => 'WAIST',
     WowSlot.legs => 'LEGS',
     WowSlot.feet => 'FEET',
@@ -66,6 +66,8 @@ class BuildSlot extends Equatable {
   final Item? enchantment;
   final List<Item> gems;
   final bool obtained;
+  final bool enchantmentObtained;
+  final List<bool> gemsObtained;
 
   const BuildSlot({
     required this.slot,
@@ -73,6 +75,8 @@ class BuildSlot extends Equatable {
     this.enchantment,
     this.gems = const [],
     this.obtained = false,
+    this.enchantmentObtained = false,
+    this.gemsObtained = const [],
   });
 
   BuildSlot copyWith({
@@ -80,6 +84,8 @@ class BuildSlot extends Equatable {
     Item? enchantment,
     List<Item>? gems,
     bool? obtained,
+    bool? enchantmentObtained,
+    List<bool>? gemsObtained,
     bool clearItem = false,
     bool clearEnchantment = false,
   }) {
@@ -89,6 +95,8 @@ class BuildSlot extends Equatable {
       enchantment: clearEnchantment ? null : (enchantment ?? this.enchantment),
       gems: gems ?? this.gems,
       obtained: obtained ?? this.obtained,
+      enchantmentObtained: clearEnchantment ? false : (enchantmentObtained ?? this.enchantmentObtained),
+      gemsObtained: gemsObtained ?? this.gemsObtained,
     );
   }
 
@@ -98,6 +106,8 @@ class BuildSlot extends Equatable {
     'enchantment': enchantment != null ? _itemToJson(enchantment!) : null,
     'gems': gems.map(_itemToJson).toList(),
     'obtained': obtained,
+    'enchantmentObtained': enchantmentObtained,
+    'gemsObtained': gemsObtained,
   };
 
   factory BuildSlot.fromJson(Map<String, dynamic> json) {
@@ -113,11 +123,15 @@ class BuildSlot extends Equatable {
           .map((e) => _itemFromJson(e as Map<String, dynamic>))
           .toList(),
       obtained: json['obtained'] as bool? ?? false,
+      enchantmentObtained: json['enchantmentObtained'] as bool? ?? false,
+      gemsObtained: (json['gemsObtained'] as List<dynamic>? ?? [])
+          .map((e) => e as bool)
+          .toList(),
     );
   }
 
   @override
-  List<Object?> get props => [slot, item, enchantment, gems, obtained];
+  List<Object?> get props => [slot, item, enchantment, gems, obtained, enchantmentObtained, gemsObtained];
 }
 
 class Build extends Equatable {

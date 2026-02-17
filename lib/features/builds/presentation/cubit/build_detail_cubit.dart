@@ -1,8 +1,12 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/builds/domain/repositories/builds_repository.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/build_detail_state.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dart';
 
 class BuildDetailCubit extends Cubit<BuildDetailState> {
   final BuildsRepository _repository;
@@ -23,8 +27,15 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     final current = _currentBuild;
     if (current == null) return;
 
+    // Enriquecer con iconUrl si no lo tiene
+    Item enrichedItem = item;
+    if (item.iconUrl == null) {
+      final result = await sl<GetItemDetail>()(item.id);
+      result.fold((_) {}, (detail) => enrichedItem = detail);
+    }
+
     final updatedSlots = current.slots.map((s) {
-      if (s.slot == slot) return s.copyWith(item: item);
+      if (s.slot == slot) return s.copyWith(item: enrichedItem);
       return s;
     }).toList();
 
@@ -73,7 +84,13 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
 
     final updatedSlots = current.slots.map((s) {
       if (s.slot == slot) {
-        return s.copyWith(gems: [...s.gems, gem]);
+        // Sincronizar gemsObtained al añadir
+        final syncedObtained = List<bool>.from(
+          s.gemsObtained.length == s.gems.length
+              ? s.gemsObtained
+              : List.filled(s.gems.length, false),
+        )..add(false);
+        return s.copyWith(gems: [...s.gems, gem], gemsObtained: syncedObtained);
       }
       return s;
     }).toList();
@@ -89,7 +106,47 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
       if (s.slot == slot) {
         if (gemIndex < 0 || gemIndex >= s.gems.length) return s;
         final newGems = [...s.gems]..removeAt(gemIndex);
-        return s.copyWith(gems: newGems);
+        // Sincronizar gemsObtained al eliminar
+        final syncedObtained = List<bool>.from(
+          s.gemsObtained.length == s.gems.length
+              ? s.gemsObtained
+              : List.filled(s.gems.length, false),
+        )..removeAt(gemIndex);
+        return s.copyWith(gems: newGems, gemsObtained: syncedObtained);
+      }
+      return s;
+    }).toList();
+
+    await _save(current.copyWith(slots: updatedSlots));
+  }
+
+  Future<void> toggleEnchantmentObtained(WowSlot slot) async {
+    final current = _currentBuild;
+    if (current == null) return;
+
+    final updatedSlots = current.slots.map((s) {
+      if (s.slot == slot) return s.copyWith(enchantmentObtained: !s.enchantmentObtained);
+      return s;
+    }).toList();
+
+    await _save(current.copyWith(slots: updatedSlots));
+  }
+
+  Future<void> toggleGemObtained(WowSlot slot, int gemIndex) async {
+    final current = _currentBuild;
+    if (current == null) return;
+
+    final updatedSlots = current.slots.map((s) {
+      if (s.slot == slot) {
+        final newGemsObtained = List<bool>.from(
+          s.gemsObtained.length == s.gems.length
+              ? s.gemsObtained
+              : List.filled(s.gems.length, false),
+        );
+        if (gemIndex < newGemsObtained.length) {
+          newGemsObtained[gemIndex] = !newGemsObtained[gemIndex];
+        }
+        return s.copyWith(gemsObtained: newGemsObtained);
       }
       return s;
     }).toList();
@@ -132,5 +189,31 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     final s = state;
     if (s is BuildDetailLoaded) return s.build;
     return null;
+  }
+
+  Future<String?> fetchCharacterRenderUrl() async {
+    final current = _currentBuild;
+    if (current?.characterRefKey == null) return null;
+
+    final parts = current!.characterRefKey!.split('-');
+    if (parts.length < 3) return null;
+
+    final region = parts[0];
+    final realm = parts[1];
+    final name = parts.sublist(2).join('-');
+
+    try {
+      final client = http.Client();
+      final uri = Uri.parse(
+        'https://wow-companion-api.wow-comp-app.workers.dev/api/character/$region/$realm/$name/media',
+      );
+      final response = await client.get(uri);
+      client.close();
+      if (response.statusCode != 200) return null;
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      return json['renderUrl'] as String? ?? json['avatarUrl'] as String?;
+    } catch (_) {
+      return null;
+    }
   }
 }
