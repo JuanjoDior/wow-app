@@ -290,7 +290,7 @@ class _CharacterImage extends StatelessWidget {
         renderUrl!,
         fit: BoxFit.cover,
         alignment: Alignment.topCenter,
-        errorBuilder: (_, __, ___) => _silhouette(),
+        errorBuilder: (_, _, _) => _silhouette(),
       );
     } else {
       content = _silhouette();
@@ -366,7 +366,7 @@ class _SlotButtonState extends State<_SlotButton> {
               width: 28,
               height: 28,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
+              errorBuilder: (_, _, _) =>
                   Icon(_slotIcon(slot.slot), size: 18, color: qualityColor),
             ),
           )
@@ -422,8 +422,9 @@ class _SlotButtonState extends State<_SlotButton> {
         activeColor: color,
         checkColor: WowTheme.darkBackground,
         side: BorderSide(
-            color: (borderColor ?? color).withValues(alpha: 0.8),
-            width: 1.2),
+          color: (borderColor ?? color).withValues(alpha: 0.8),
+          width: 1.2,
+        ),
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         onChanged: (_) {
           _checkboxJustTapped = true; // bloquea el GestureDetector padre
@@ -433,29 +434,48 @@ class _SlotButtonState extends State<_SlotButton> {
     );
   }
 
-  Widget _leftContent(Widget icon, bool hasItem, Color qualityColor, BuildDetailCubit cubit) {
+  Widget _leftContent(
+    Widget icon,
+    bool hasItem,
+    Color qualityColor,
+    BuildDetailCubit cubit,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         icon,
         const SizedBox(width: 6),
-        Expanded(child: _slotText(hasItem, qualityColor, TextAlign.left, cubit)),
+        Expanded(
+          child: _slotText(hasItem, qualityColor, TextAlign.left, cubit),
+        ),
       ],
     );
   }
 
-  Widget _rightContent(Widget icon, bool hasItem, Color qualityColor, BuildDetailCubit cubit) {
+  Widget _rightContent(
+    Widget icon,
+    bool hasItem,
+    Color qualityColor,
+    BuildDetailCubit cubit,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: _slotText(hasItem, qualityColor, TextAlign.right, cubit)),
+        Expanded(
+          child: _slotText(hasItem, qualityColor, TextAlign.right, cubit),
+        ),
         const SizedBox(width: 6),
         icon,
       ],
     );
   }
 
-  Widget _slotText(bool hasItem, Color qualityColor, TextAlign align, BuildDetailCubit cubit) {
+  Widget _slotText(
+    bool hasItem,
+    Color qualityColor,
+    TextAlign align,
+    BuildDetailCubit cubit,
+  ) {
     if (!hasItem) {
       return Text(
         slot.slot.displayName,
@@ -489,7 +509,7 @@ class _SlotButtonState extends State<_SlotButton> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            if (align == TextAlign.right) ...[  
+            if (align == TextAlign.right) ...[
               _miniCheckbox(
                 value: slot.obtained,
                 color: WowTheme.primaryGold,
@@ -511,7 +531,7 @@ class _SlotButtonState extends State<_SlotButton> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (align == TextAlign.left) ...[  
+            if (align == TextAlign.left) ...[
               const SizedBox(width: 4),
               _miniCheckbox(
                 value: slot.obtained,
@@ -542,7 +562,8 @@ class _SlotButtonState extends State<_SlotButton> {
           ),
         ...slot.gems.asMap().entries.map((e) {
           final gemObtained = e.key < slot.gemsObtained.length
-              ? slot.gemsObtained[e.key] : false;
+              ? slot.gemsObtained[e.key]
+              : false;
           return _inlineLabel(
             icon: '◆',
             label: e.value.name,
@@ -612,7 +633,6 @@ class _SlotSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = S.of(context)!;
     final cubit = context.read<BuildDetailCubit>();
 
     return BlocBuilder<BuildDetailCubit, BuildDetailState>(
@@ -714,7 +734,7 @@ class _SlotSheetContent extends StatelessWidget {
                       slot.item!.iconUrl!,
                       width: 44,
                       height: 44,
-                      errorBuilder: (_, __, ___) => Icon(
+                      errorBuilder: (_, _, _) => Icon(
                         _slotIcon(slot.slot),
                         size: 44,
                         color: WowTheme.textSecondary,
