@@ -11,6 +11,10 @@ import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dar
 class BuildDetailCubit extends Cubit<BuildDetailState> {
   final BuildsRepository _repository;
 
+  /// Caché en memoria: characterRefKey → renderUrl (null = sin render)
+  static final Map<String, String?> _renderCache = {};
+  static final Map<String, String?> _avatarCache = {};
+
   BuildDetailCubit(this._repository) : super(const BuildDetailLoading());
 
   Future<void> loadBuild(String id) async {
@@ -55,18 +59,6 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
   }
 
   Future<void> removeEnchantment(WowSlot slot) async {
-    final current = _currentBuild;
-    if (current == null) return;
-
-    final updatedSlots = current.slots.map((s) {
-      if (s.slot == slot) return s.copyWith(clearEnchantment: true);
-      return s;
-    }).toList();
-
-    await _save(current.copyWith(slots: updatedSlots));
-  }
-
-  Future<void> clearEnchantment(WowSlot slot) async {
     final current = _currentBuild;
     if (current == null) return;
 
@@ -125,7 +117,8 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     if (current == null) return;
 
     final updatedSlots = current.slots.map((s) {
-      if (s.slot == slot) return s.copyWith(enchantmentObtained: !s.enchantmentObtained);
+      if (s.slot == slot)
+        return s.copyWith(enchantmentObtained: !s.enchantmentObtained);
       return s;
     }).toList();
 
@@ -195,7 +188,12 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     final current = _currentBuild;
     if (current?.characterRefKey == null) return null;
 
-    final parts = current!.characterRefKey!.split('-');
+    final key = current!.characterRefKey!;
+
+    // Devolver desde caché si ya se obtuvo (incluso si fue null = sin render)
+    if (_renderCache.containsKey(key)) return _renderCache[key];
+
+    final parts = key.split('-');
     if (parts.length < 3) return null;
 
     final region = parts[0];
@@ -209,11 +207,29 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
       );
       final response = await client.get(uri);
       client.close();
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) {
+        _renderCache[key] = null;
+        return null;
+      }
       final json = jsonDecode(response.body) as Map<String, dynamic>;
-      return json['renderUrl'] as String? ?? json['avatarUrl'] as String?;
+      final url = json['renderUrl'] as String?;
+      final avatar = json['avatarUrl'] as String?;
+      _renderCache[key] = url ?? avatar;
+      _avatarCache[key] = avatar;
+      return url ?? avatar;
     } catch (_) {
+      _renderCache[key] = null;
       return null;
     }
+  }
+
+  Future<String?> fetchCharacterAvatarUrl() async {
+    final current = _currentBuild;
+    if (current?.characterRefKey == null) return null;
+    final key = current!.characterRefKey!;
+    // Reutiliza la misma llamada HTTP si ya se hizo
+    if (_avatarCache.containsKey(key)) return _avatarCache[key];
+    await fetchCharacterRenderUrl(); // dispara la llamada y puebla _avatarCache
+    return _avatarCache[key];
   }
 }

@@ -283,6 +283,12 @@ class SEs extends S {
   String get slotClearSlot => 'Limpiar slot';
 
   @override
+  String get slotEnchantmentLabel => 'Encantamiento';
+
+  @override
+  String get slotGemsLabel => 'Gemas';
+
+  @override
   String get slotAddEnchantment => 'Añadir encantamiento';
 
   @override

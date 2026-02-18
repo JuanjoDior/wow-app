@@ -283,6 +283,12 @@ class SEn extends S {
   String get slotClearSlot => 'Clear slot';
 
   @override
+  String get slotEnchantmentLabel => 'Enchantment';
+
+  @override
+  String get slotGemsLabel => 'Gems';
+
+  @override
   String get slotAddEnchantment => 'Add enchantment';
 
   @override

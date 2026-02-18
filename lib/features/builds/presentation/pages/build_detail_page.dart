@@ -70,7 +70,6 @@ class _BuildDetailView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = S.of(context)!;
     return BlocBuilder<BuildDetailCubit, BuildDetailState>(
       builder: (context, state) {
         if (state is BuildDetailLoading) {
@@ -81,8 +80,10 @@ class _BuildDetailView extends StatelessWidget {
           );
         }
         if (state is BuildDetailError) {
+          // S.of(context) puede ser null en tests sin delegates, se protege
+          final t = S.of(context);
           return Scaffold(
-            appBar: AppBar(title: Text(t.builds)),
+            appBar: AppBar(title: Text(t?.builds ?? 'Builds')),
             body: Center(
               child: Text(
                 state.message,
@@ -111,32 +112,44 @@ class _BuildDetailContent extends StatefulWidget {
 
 class _BuildDetailContentState extends State<_BuildDetailContent> {
   String? _renderUrl;
+  String? _avatarUrl;
   bool _loadingImage = true;
+  late Map<WowSlot, BuildSlot> _slotMap;
 
   @override
   void initState() {
     super.initState();
+    _slotMap = _buildSlotMap(widget.buildData);
     _loadImage();
   }
 
   @override
   void didUpdateWidget(_BuildDetailContent oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Solo recalcular el mapa si los slots cambiaron
+    if (oldWidget.buildData.slots != widget.buildData.slots) {
+      _slotMap = _buildSlotMap(widget.buildData);
+    }
     if (oldWidget.buildData.characterRefKey !=
         widget.buildData.characterRefKey) {
       _loadImage();
     }
   }
 
+  Map<WowSlot, BuildSlot> _buildSlotMap(Build build) => {
+    for (final s in build.slots) s.slot: s,
+  };
+
   Future<void> _loadImage() async {
     if (!mounted) return;
     setState(() => _loadingImage = true);
-    final url = await context
-        .read<BuildDetailCubit>()
-        .fetchCharacterRenderUrl();
+    final cubit = context.read<BuildDetailCubit>();
+    final render = await cubit.fetchCharacterRenderUrl();
+    final avatar = await cubit.fetchCharacterAvatarUrl();
     if (mounted) {
       setState(() {
-        _renderUrl = url;
+        _renderUrl = render;
+        _avatarUrl = avatar;
         _loadingImage = false;
       });
     }
@@ -145,7 +158,6 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
   @override
   Widget build(BuildContext context) {
     final build = widget.buildData;
-    final slotMap = {for (final s in build.slots) s.slot: s};
 
     return Scaffold(
       appBar: AppBar(
@@ -155,6 +167,8 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
             Text(
               build.name,
               style: const TextStyle(color: WowTheme.primaryGold, fontSize: 16),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             if (build.characterRefDisplay != null)
               Text(
@@ -163,6 +177,8 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
                   color: WowTheme.textSecondary,
                   fontSize: 12,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
           ],
         ),
@@ -171,15 +187,121 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
         children: [
           _ProgressHeader(buildData: build),
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
-              child: _PaperdollLayout(
-                slotMap: slotMap,
-                renderUrl: _renderUrl,
-                loadingImage: _loadingImage,
-                hasCharacter: build.characterRefKey != null,
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isMobile = constraints.maxWidth < 600;
+                if (isMobile) {
+                  return _MobileLayout(
+                    slotMap: _slotMap,
+                    avatarUrl: _avatarUrl, // ← nueva línea
+                    loadingImage: _loadingImage,
+                    hasCharacter: build.characterRefKey != null,
+                  );
+                }
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 16,
+                    horizontal: 0,
+                  ),
+                  child: _PaperdollLayout(
+                    slotMap: _slotMap,
+                    renderUrl: _renderUrl,
+                    loadingImage: _loadingImage,
+                    hasCharacter: build.characterRefKey != null,
+                  ),
+                );
+              },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Mobile layout ────────────────────────────────────────────────────────────
+class _MobileLayout extends StatelessWidget {
+  final Map<WowSlot, BuildSlot> slotMap;
+  final String? avatarUrl;
+  final bool loadingImage;
+  final bool hasCharacter;
+
+  // Orden de los 16 slots en la cuadrícula móvil
+  static const _allSlots = [
+    WowSlot.head,
+    WowSlot.neck,
+    WowSlot.shoulder,
+    WowSlot.back,
+    WowSlot.chest,
+    WowSlot.wrist,
+    WowSlot.hands,
+    WowSlot.waist,
+    WowSlot.legs,
+    WowSlot.feet,
+    WowSlot.finger1,
+    WowSlot.finger2,
+    WowSlot.trinket1,
+    WowSlot.trinket2,
+    WowSlot.mainHand,
+    WowSlot.offHand,
+  ];
+
+  const _MobileLayout({
+    required this.slotMap,
+    required this.avatarUrl,
+    required this.loadingImage,
+    required this.hasCharacter,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      child: Column(
+        children: [
+          // Imagen del personaje arriba, más pequeña y horizontal
+          _AvatarImage(
+            avatarUrl: avatarUrl,
+            loading: loadingImage,
+            hasCharacter: hasCharacter,
+          ),
+          const SizedBox(height: 12),
+          // Filas de 2 slots con altura igualada
+          Column(
+            children: List.generate((_allSlots.length / 2).ceil(), (rowIndex) {
+              final leftSlot = _allSlots[rowIndex * 2];
+              final rightIndex = rowIndex * 2 + 1;
+              final hasRight = rightIndex < _allSlots.length;
+              final rightSlot = hasRight ? _allSlots[rightIndex] : null;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: _SlotButton(
+                          slot: slotMap[leftSlot] ?? BuildSlot(slot: leftSlot),
+                          align: SlotAlign.left,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: rightSlot != null
+                            ? _SlotButton(
+                                slot:
+                                    slotMap[rightSlot] ??
+                                    BuildSlot(slot: rightSlot),
+                                align: SlotAlign.right,
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
           ),
         ],
       ),
@@ -224,7 +346,9 @@ class _PaperdollLayout extends StatelessWidget {
                   children: _leftSlots
                       .map(
                         (s) => _SlotButton(
-                          slot: slotMap[s]!,
+                          slot:
+                              slotMap[s] ??
+                              BuildSlot(slot: s), // ← slot vacío como fallback
                           align: SlotAlign.left,
                         ),
                       )
@@ -247,7 +371,9 @@ class _PaperdollLayout extends StatelessWidget {
                   children: _rightSlots
                       .map(
                         (s) => _SlotButton(
-                          slot: slotMap[s]!,
+                          slot:
+                              slotMap[s] ??
+                              BuildSlot(slot: s), // ← slot vacío como fallback
                           align: SlotAlign.right,
                         ),
                       )
@@ -260,6 +386,56 @@ class _PaperdollLayout extends StatelessWidget {
       },
     );
   }
+}
+
+// ─── Avatar image (móvil) ─────────────────────────────────────────────────────
+class _AvatarImage extends StatelessWidget {
+  final String? avatarUrl;
+  final bool loading;
+  final bool hasCharacter;
+
+  const _AvatarImage({
+    required this.avatarUrl,
+    required this.loading,
+    required this.hasCharacter,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 80,
+        height: 80,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: WowTheme.primaryGold, width: 2),
+          color: WowTheme.surfaceDark,
+        ),
+        child: ClipOval(
+          child: loading
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: WowTheme.primaryGold,
+                    strokeWidth: 2,
+                  ),
+                )
+              : avatarUrl != null
+              ? Image.network(
+                  avatarUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _fallback(),
+                )
+              : _fallback(),
+        ),
+      ),
+    );
+  }
+
+  Widget _fallback() => Icon(
+    Icons.person_outline,
+    size: 40,
+    color: WowTheme.textSecondary.withValues(alpha: 0.5),
+  );
 }
 
 // ─── Character image ──────────────────────────────────────────────────────────
@@ -290,7 +466,7 @@ class _CharacterImage extends StatelessWidget {
         renderUrl!,
         fit: BoxFit.cover,
         alignment: Alignment.topCenter,
-        errorBuilder: (_, _, _) => _silhouette(),
+        errorBuilder: (_, __, ___) => _silhouette(),
       );
     } else {
       content = _silhouette();
@@ -366,7 +542,7 @@ class _SlotButtonState extends State<_SlotButton> {
               width: 28,
               height: 28,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) =>
+              errorBuilder: (_, __, ___) =>
                   Icon(_slotIcon(slot.slot), size: 18, color: qualityColor),
             ),
           )
@@ -390,7 +566,9 @@ class _SlotButtonState extends State<_SlotButton> {
         },
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 62),
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
             decoration: BoxDecoration(
               color: slot.obtained
                   ? WowTheme.surfaceDark.withValues(alpha: 0.4)
@@ -428,6 +606,9 @@ class _SlotButtonState extends State<_SlotButton> {
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         onChanged: (_) {
           _checkboxJustTapped = true; // bloquea el GestureDetector padre
+          // Auto-reset: si el GestureDetector no llega a dispararse (ej. navegación),
+          // el flag se limpia en el siguiente microtask para no quedar atrapado.
+          Future.microtask(() => _checkboxJustTapped = false);
           onToggle();
         },
       ),
@@ -638,8 +819,12 @@ class _SlotSheet extends StatelessWidget {
     return BlocBuilder<BuildDetailCubit, BuildDetailState>(
       builder: (context, state) {
         final build = state is BuildDetailLoaded ? state.build : null;
+        // Fix #10: orElse evita StateError si el slot no existe en la lista
         final slot =
-            build?.slots.firstWhere((s) => s.slot == wowSlot) ??
+            build?.slots.firstWhere(
+              (s) => s.slot == wowSlot,
+              orElse: () => BuildSlot(slot: wowSlot),
+            ) ??
             BuildSlot(slot: wowSlot);
         return _SlotSheetContent(slot: slot, cubit: cubit);
       },
@@ -654,7 +839,9 @@ class _SlotSheetContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = S.of(context)!;
+    final t = S.of(
+      context,
+    )!; // seguro aquí: el sheet solo se abre desde pantalla ya localizada
     final hasItem = slot.item != null;
     final qualityColor = hasItem
         ? WowTheme.getQualityColor(slot.item!.quality)
@@ -693,24 +880,21 @@ class _SlotSheetContent extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              // Fix #1: solo onChanged, sin GestureDetector redundante
               if (hasItem)
-                GestureDetector(
-                  onTap: () => cubit.toggleObtained(slot.slot),
-                  behavior: HitTestBehavior.opaque,
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: Checkbox(
-                      value: slot.obtained,
-                      activeColor: WowTheme.primaryGold,
-                      checkColor: WowTheme.darkBackground,
-                      side: const BorderSide(
-                        color: WowTheme.textSecondary,
-                        width: 1.5,
-                      ),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      onChanged: (_) => cubit.toggleObtained(slot.slot),
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Checkbox(
+                    value: slot.obtained,
+                    activeColor: WowTheme.primaryGold,
+                    checkColor: WowTheme.darkBackground,
+                    side: const BorderSide(
+                      color: WowTheme.textSecondary,
+                      width: 1.5,
                     ),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onChanged: (_) => cubit.toggleObtained(slot.slot),
                   ),
                 ),
             ],
@@ -734,7 +918,7 @@ class _SlotSheetContent extends StatelessWidget {
                       slot.item!.iconUrl!,
                       width: 44,
                       height: 44,
-                      errorBuilder: (_, _, _) => Icon(
+                      errorBuilder: (_, __, ___) => Icon(
                         _slotIcon(slot.slot),
                         size: 44,
                         color: WowTheme.textSecondary,
@@ -793,9 +977,9 @@ class _SlotSheetContent extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Enchantment',
-              style: TextStyle(
+            Text(
+              t.slotEnchantmentLabel,
+              style: const TextStyle(
                 color: WowTheme.textSecondary,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -838,9 +1022,9 @@ class _SlotSheetContent extends StatelessWidget {
                 ],
               ),
             const SizedBox(height: 16),
-            const Text(
-              'Gems',
-              style: TextStyle(
+            Text(
+              t.slotGemsLabel,
+              style: const TextStyle(
                 color: WowTheme.textSecondary,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -964,26 +1148,67 @@ class _ProgressHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = S.of(context)!;
-    return Container(
+    final progress = buildData.progress;
+
+    // Color dinámico según progreso
+    final barColor = progress < 0.33
+        ? const Color(0xFFE74C3C) // rojo
+        : progress < 0.66
+        ? const Color(0xFFF39C12) // naranja
+        : progress < 1.0
+        ? WowTheme
+              .primaryGold // dorado
+        : const Color(0xFF2ECC71); // verde completo
+
+    final percent = '${(progress * 100).toInt()}%';
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 400),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       color: WowTheme.surfaceDark,
       child: Row(
         children: [
           Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: buildData.progress,
-                backgroundColor: WowTheme.border,
-                color: WowTheme.primaryGold,
-                minHeight: 8,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: progress),
+                    duration: const Duration(milliseconds: 600),
+                    curve: Curves.easeOut,
+                    builder: (_, value, __) => LinearProgressIndicator(
+                      value: value,
+                      backgroundColor: WowTheme.border,
+                      color: barColor,
+                      minHeight: 8,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            t.buildsSlots(buildData.obtainedSlots, buildData.totalSlots),
-            style: const TextStyle(color: WowTheme.textSecondary, fontSize: 13),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                t.buildsSlots(buildData.obtainedSlots, buildData.totalSlots),
+                style: const TextStyle(
+                  color: WowTheme.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+              Text(
+                percent,
+                style: TextStyle(
+                  color: barColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -153,28 +153,38 @@ class _BuildCard extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: buildData.progress,
-                        backgroundColor: WowTheme.border,
-                        color: WowTheme.primaryGold,
-                        minHeight: 6,
+              Builder(builder: (context) {
+                final progress = buildData.progress;
+                final barColor = progress < 0.33
+                    ? const Color(0xFFE74C3C)
+                    : progress < 0.66
+                        ? const Color(0xFFF39C12)
+                        : progress < 1.0
+                            ? WowTheme.primaryGold
+                            : const Color(0xFF2ECC71);
+                return Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          backgroundColor: WowTheme.border,
+                          color: barColor,
+                          minHeight: 6,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    t.buildsSlots(
-                        buildData.obtainedSlots, buildData.totalSlots),
-                    style: const TextStyle(
-                        color: WowTheme.textSecondary, fontSize: 12),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 12),
+                    Text(
+                      t.buildsSlots(
+                          buildData.obtainedSlots, buildData.totalSlots),
+                      style: TextStyle(
+                          color: barColor, fontSize: 12),
+                    ),
+                  ],
+                );
+              }),
             ],
           ),
         ),

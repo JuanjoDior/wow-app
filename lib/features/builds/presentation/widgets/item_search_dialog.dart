@@ -6,6 +6,7 @@ import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
 import 'package:wow_companion/features/items/domain/usecases/search_items.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
+import 'dart:async';
 
 class ItemSearchDialog extends StatefulWidget {
   final WowSlot? slot;
@@ -19,17 +20,37 @@ class ItemSearchDialog extends StatefulWidget {
 
 class _ItemSearchDialogState extends State<ItemSearchDialog> {
   final _controller = TextEditingController();
+  Timer? _debounce;
   List<Item> _results = [];
   bool _loading = false;
+  bool _hasSearched = false; // ← nueva línea
   String? _error;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
-  Future<void> _search(String query) async {
+  void _onQueryChanged(String query) {
+    _debounce?.cancel();
+    if (query.trim().length < 2) {
+      setState(() {
+        _results = [];
+        _loading = false;
+        _hasSearched = false;
+      });
+      return;
+    }
+    setState(() => _loading = true);
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      _hasSearched = true; // ← nueva línea
+      _doSearch(query);
+    });
+  }
+
+  Future<void> _doSearch(String query) async {
     if (query.trim().length < 2) {
       setState(() => _results = []);
       return;
@@ -97,9 +118,17 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
                     color: WowTheme.textSecondary,
                   ),
                 ),
-                onChanged: _search,
+                onChanged: _onQueryChanged,
               ),
-              const SizedBox(height: 12),
+              if (_loading)
+                const LinearProgressIndicator(
+                  color: WowTheme.primaryGold,
+                  backgroundColor: Colors.transparent,
+                  minHeight: 2,
+                )
+              else
+                const SizedBox(height: 2),
+              const SizedBox(height: 10),
               Expanded(child: _buildBody(t)),
             ],
           ),
@@ -122,6 +151,14 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
         ),
       );
     }
+    if (!_hasSearched) {
+      return Center(
+        child: Text(
+          t.searchTypeAtLeast,
+          style: const TextStyle(color: WowTheme.textSecondary),
+        ),
+      );
+    }
     if (_results.isEmpty) {
       return Center(
         child: Text(
@@ -137,6 +174,18 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
         final item = _results[i];
         final color = WowTheme.getQualityColor(item.quality);
         return ListTile(
+          leading: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: item.iconUrl != null
+                ? Image.network(
+                    item.iconUrl!,
+                    width: 36,
+                    height: 36,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _fallbackIcon(color),
+                  )
+                : _fallbackIcon(color),
+          ),
           title: Text(
             item.name,
             style: TextStyle(color: color, fontWeight: FontWeight.w500),
@@ -151,6 +200,18 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
           onTap: () => Navigator.of(context).pop(item),
         );
       },
+    );
+  }
+
+  Widget _fallbackIcon(Color color) {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: WowTheme.border,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Icon(Icons.inventory_2_outlined, size: 20, color: color),
     );
   }
 }

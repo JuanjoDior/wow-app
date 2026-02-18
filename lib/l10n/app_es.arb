@@ -107,6 +107,8 @@
 
   "slotAssignItem": "Asignar objeto",
   "slotClearSlot": "Limpiar slot",
+  "slotEnchantmentLabel": "Encantamiento",
+  "slotGemsLabel": "Gemas",
   "slotAddEnchantment": "Añadir encantamiento",
   "slotRemoveEnchantment": "Eliminar encantamiento",
   "slotAddGem": "+ Gema",

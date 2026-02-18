@@ -619,6 +619,18 @@ abstract class S {
   /// **'Clear slot'**
   String get slotClearSlot;
 
+  /// No description provided for @slotEnchantmentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Enchantment'**
+  String get slotEnchantmentLabel;
+
+  /// No description provided for @slotGemsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Gems'**
+  String get slotGemsLabel;
+
   /// No description provided for @slotAddEnchantment.
   ///
   /// In en, this message translates to:

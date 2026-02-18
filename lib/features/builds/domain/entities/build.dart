@@ -207,7 +207,7 @@ class Build extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, name, characterRefKey, slots];
+  List<Object?> get props => [id, name, characterRefKey, characterRefDisplay, createdAt, slots];
 }
 
 // Helpers de serialización de Item (versión reducida para guardado)

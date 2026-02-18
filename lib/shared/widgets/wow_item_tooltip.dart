@@ -58,19 +58,32 @@ class _WowItemTooltipState extends State<WowItemTooltip> {
   OverlayEntry _buildOverlayEntry(BuildContext context, Item item) {
     final t = S.of(context)!;
     return OverlayEntry(
-      builder: (_) => Positioned(
-        width: 280,
-        child: CompositedTransformFollower(
-          link: _link,
-          showWhenUnlinked: false,
-          offset: const Offset(0, -8),
-          targetAnchor: Alignment.topCenter,
-          followerAnchor: Alignment.bottomCenter,
-          child: Material(
-            color: Colors.transparent,
-            child: _TooltipCard(item: item, t: t),
+      builder: (_) => Stack(
+        children: [
+          // Backdrop opaque: captura cualquier tap fuera y cierra el tooltip
+          // sin dejar pasar el tap a los widgets de debajo
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: _removeOverlay,
+              behavior: HitTestBehavior.opaque,
+            ),
           ),
-        ),
+          // El tooltip posicionado sobre el elemento
+          Positioned(
+            width: 280,
+            child: CompositedTransformFollower(
+              link: _link,
+              showWhenUnlinked: false,
+              offset: const Offset(0, -8),
+              targetAnchor: Alignment.topCenter,
+              followerAnchor: Alignment.bottomCenter,
+              child: Material(
+                color: Colors.transparent,
+                child: _TooltipCard(item: item, t: t),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -79,9 +92,14 @@ class _WowItemTooltipState extends State<WowItemTooltip> {
   Widget build(BuildContext context) {
     return CompositedTransformTarget(
       link: _link,
-      child: MouseRegion(
-        onEnter: (_) => _showOverlay(context),
-        onExit: (_) => _removeOverlay(),
+      child: GestureDetector(
+        onTap: () {
+          if (_overlayEntry != null) {
+            _removeOverlay();
+          } else {
+            _showOverlay(context);
+          }
+        },
         child: widget.child,
       ),
     );

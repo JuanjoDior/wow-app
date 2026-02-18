@@ -107,6 +107,8 @@
 
   "slotAssignItem": "Assign item",
   "slotClearSlot": "Clear slot",
+  "slotEnchantmentLabel": "Enchantment",
+  "slotGemsLabel": "Gems",
   "slotAddEnchantment": "Add enchantment",
   "slotRemoveEnchantment": "Remove enchantment",
   "slotAddGem": "+ Gem",
