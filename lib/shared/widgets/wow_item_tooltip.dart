@@ -42,12 +42,16 @@ class _WowItemTooltipState extends State<WowItemTooltip> {
   }
 
   void _showOverlay(BuildContext context) async {
+    // Capturar referencias al contexto ANTES del await para evitar
+    // uso de BuildContext a través de gaps asíncronos
+    final overlay = Overlay.of(context);
+    final t = S.of(context)!;
     await _fetchItem();
     if (!mounted || _cachedItem == null) return;
 
     _removeOverlay();
-    _overlayEntry = _buildOverlayEntry(context, _cachedItem!);
-    Overlay.of(context).insert(_overlayEntry!);
+    _overlayEntry = _buildOverlayEntry(t, _cachedItem!);
+    overlay.insert(_overlayEntry!);
   }
 
   void _removeOverlay() {
@@ -55,8 +59,7 @@ class _WowItemTooltipState extends State<WowItemTooltip> {
     _overlayEntry = null;
   }
 
-  OverlayEntry _buildOverlayEntry(BuildContext context, Item item) {
-    final t = S.of(context)!;
+  OverlayEntry _buildOverlayEntry(S t, Item item) {
     return OverlayEntry(
       builder: (_) => Stack(
         children: [
@@ -143,7 +146,7 @@ class _TooltipCard extends StatelessWidget {
                     item.iconUrl!,
                     width: 40,
                     height: 40,
-                    errorBuilder: (_, __, ___) => const SizedBox(
+                    errorBuilder: (context, error, stack) => const SizedBox(
                       width: 40,
                       height: 40,
                       child: Icon(Icons.shield, color: WowTheme.textSecondary),

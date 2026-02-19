@@ -9,6 +9,8 @@ import 'package:wow_companion/features/builds/presentation/widgets/item_search_d
 import 'package:wow_companion/features/items/domain/entities/item.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
 import 'package:wow_companion/shared/widgets/wow_item_tooltip.dart';
+import 'package:wow_companion/features/builds/presentation/widgets/build_guide_section.dart';
+import 'package:wow_companion/core/l10n/wow_translations.dart';
 
 // ─── Slot icon mapping ────────────────────────────────────────────────────────
 IconData _slotIcon(WowSlot slot) => switch (slot) {
@@ -27,6 +29,28 @@ IconData _slotIcon(WowSlot slot) => switch (slot) {
   WowSlot.mainHand => Icons.hardware_outlined,
   WowSlot.offHand => Icons.shield_outlined,
 };
+
+// ─── Slot name localización ───────────────────────────────────────────────────
+extension WowSlotL10n on WowSlot {
+  String localizedName(S t) => switch (this) {
+    WowSlot.head => t.wowSlotHead,
+    WowSlot.neck => t.wowSlotNeck,
+    WowSlot.shoulder => t.wowSlotShoulder,
+    WowSlot.back => t.wowSlotBack,
+    WowSlot.chest => t.wowSlotChest,
+    WowSlot.wrist => t.wowSlotWrist,
+    WowSlot.hands => t.wowSlotHands,
+    WowSlot.waist => t.wowSlotWaist,
+    WowSlot.legs => t.wowSlotLegs,
+    WowSlot.feet => t.wowSlotFeet,
+    WowSlot.finger1 => t.wowSlotFinger1,
+    WowSlot.finger2 => t.wowSlotFinger2,
+    WowSlot.trinket1 => t.wowSlotTrinket1,
+    WowSlot.trinket2 => t.wowSlotTrinket2,
+    WowSlot.mainHand => t.wowSlotMainHand,
+    WowSlot.offHand => t.wowSlotOffHand,
+  };
+}
 
 // ─── Slot columns ─────────────────────────────────────────────────────────────
 const _leftSlots = [
@@ -86,7 +110,7 @@ class _BuildDetailView extends StatelessWidget {
             appBar: AppBar(title: Text(t?.builds ?? 'Builds')),
             body: Center(
               child: Text(
-                state.message,
+                t?.buildNotFound ?? state.message,
                 style: const TextStyle(color: WowTheme.textSecondary),
               ),
             ),
@@ -114,31 +138,21 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
   String? _renderUrl;
   String? _avatarUrl;
   bool _loadingImage = true;
-  late Map<WowSlot, BuildSlot> _slotMap;
 
   @override
   void initState() {
     super.initState();
-    _slotMap = _buildSlotMap(widget.buildData);
     _loadImage();
   }
 
   @override
   void didUpdateWidget(_BuildDetailContent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Solo recalcular el mapa si los slots cambiaron
-    if (oldWidget.buildData.slots != widget.buildData.slots) {
-      _slotMap = _buildSlotMap(widget.buildData);
-    }
     if (oldWidget.buildData.characterRefKey !=
         widget.buildData.characterRefKey) {
       _loadImage();
     }
   }
-
-  Map<WowSlot, BuildSlot> _buildSlotMap(Build build) => {
-    for (final s in build.slots) s.slot: s,
-  };
 
   Future<void> _loadImage() async {
     if (!mounted) return;
@@ -161,30 +175,19 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              build.name,
-              style: const TextStyle(color: WowTheme.primaryGold, fontSize: 16),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (build.characterRefDisplay != null)
-              Text(
-                build.characterRefDisplay!,
-                style: const TextStyle(
-                  color: WowTheme.textSecondary,
-                  fontSize: 12,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-          ],
+        title: Text(
+          build.name,
+          style: const TextStyle(color: WowTheme.primaryGold),
         ),
       ),
       body: Column(
         children: [
+          if (build.characterClass != null)
+            _BuildCharacterHeader(
+              buildData: build,
+              avatarUrl: _avatarUrl,
+              loadingAvatar: _loadingImage,
+            ),
           _ProgressHeader(buildData: build),
           Expanded(
             child: LayoutBuilder(
@@ -192,10 +195,10 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
                 final isMobile = constraints.maxWidth < 600;
                 if (isMobile) {
                   return _MobileLayout(
-                    slotMap: _slotMap,
-                    avatarUrl: _avatarUrl, // ← nueva línea
+                    avatarUrl: _avatarUrl,
                     loadingImage: _loadingImage,
                     hasCharacter: build.characterRefKey != null,
+                    guide: build.guide,
                   );
                 }
                 return SingleChildScrollView(
@@ -203,11 +206,15 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
                     vertical: 16,
                     horizontal: 0,
                   ),
-                  child: _PaperdollLayout(
-                    slotMap: _slotMap,
-                    renderUrl: _renderUrl,
-                    loadingImage: _loadingImage,
-                    hasCharacter: build.characterRefKey != null,
+                  child: Column(
+                    children: [
+                      _PaperdollLayout(
+                        renderUrl: _renderUrl,
+                        loadingImage: _loadingImage,
+                        hasCharacter: build.characterRefKey != null,
+                      ),
+                      BuildGuideSection(guide: build.guide),
+                    ],
                   ),
                 );
               },
@@ -219,12 +226,138 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
   }
 }
 
+// ─── Build character header ─────────────────────────────────────────────────
+class _BuildCharacterHeader extends StatelessWidget {
+  final Build buildData;
+  final String? avatarUrl;
+  final bool loadingAvatar;
+
+  const _BuildCharacterHeader({
+    required this.buildData,
+    required this.avatarUrl,
+    required this.loadingAvatar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final classColor = WowTheme.getClassColor(buildData.characterClass!);
+
+    // Parsear nombre y realm desde characterRefDisplay: "Nombre - Realm"
+    final displayParts = buildData.characterRefDisplay?.split(' - ') ?? [];
+    final charName = displayParts.isNotEmpty ? displayParts[0] : '';
+    final charRealm = displayParts.length >= 2 ? displayParts[1] : '';
+
+    // Parsear región desde characterRefKey: "eu-sanguino-nombre"
+    final region = buildData.characterRefKey?.split('-').firstOrNull?.toUpperCase() ?? '';
+
+    // Línea de detalle: Raza · Clase · Espec
+    final detailParts = <String>[
+      if (buildData.characterRace != null)
+        WowTranslations.translateRace(buildData.characterRace!),
+      WowTranslations.translateClass(buildData.characterClass!),
+      if (buildData.characterSpec != null)
+        WowTranslations.translateSpec(buildData.characterSpec!),
+    ];
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+      shape: const RoundedRectangleBorder(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            // Avatar circular con borde del color de clase
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: classColor, width: 2),
+              ),
+              child: ClipOval(
+                child: loadingAvatar
+                    ? Container(
+                        color: WowTheme.surfaceLight,
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: WowTheme.primaryGold,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      )
+                    : avatarUrl != null
+                        ? Image.network(
+                            avatarUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stack) =>
+                                _ClassFallback(classColor: classColor),
+                          )
+                        : _ClassFallback(classColor: classColor),
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Textos
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    charName,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: classColor,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (charRealm.isNotEmpty || region.isNotEmpty)
+                    Text(
+                      [charRealm, region]
+                          .where((s) => s.isNotEmpty)
+                          .join(' · '),
+                      style: const TextStyle(
+                        color: WowTheme.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  if (detailParts.isNotEmpty)
+                    Text(
+                      detailParts.join('  ·  '),
+                      style: const TextStyle(
+                        color: WowTheme.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ClassFallback extends StatelessWidget {
+  final Color classColor;
+  const _ClassFallback({required this.classColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: WowTheme.surfaceLight,
+      child: Icon(Icons.person_outline, color: classColor, size: 32),
+    );
+  }
+}
+
 // ─── Mobile layout ────────────────────────────────────────────────────────────
 class _MobileLayout extends StatelessWidget {
-  final Map<WowSlot, BuildSlot> slotMap;
   final String? avatarUrl;
   final bool loadingImage;
   final bool hasCharacter;
+  final BuildGuide guide;
 
   // Orden de los 16 slots en la cuadrícula móvil
   static const _allSlots = [
@@ -247,10 +380,10 @@ class _MobileLayout extends StatelessWidget {
   ];
 
   const _MobileLayout({
-    required this.slotMap,
     required this.avatarUrl,
     required this.loadingImage,
     required this.hasCharacter,
+    required this.guide,
   });
 
   @override
@@ -282,7 +415,7 @@ class _MobileLayout extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _SlotButton(
-                          slot: slotMap[leftSlot] ?? BuildSlot(slot: leftSlot),
+                          wowSlot: leftSlot,
                           align: SlotAlign.left,
                         ),
                       ),
@@ -290,9 +423,7 @@ class _MobileLayout extends StatelessWidget {
                       Expanded(
                         child: rightSlot != null
                             ? _SlotButton(
-                                slot:
-                                    slotMap[rightSlot] ??
-                                    BuildSlot(slot: rightSlot),
+                                wowSlot: rightSlot,
                                 align: SlotAlign.right,
                               )
                             : const SizedBox.shrink(),
@@ -303,6 +434,7 @@ class _MobileLayout extends StatelessWidget {
               );
             }),
           ),
+          BuildGuideSection(guide: guide),
         ],
       ),
     );
@@ -311,13 +443,11 @@ class _MobileLayout extends StatelessWidget {
 
 // ─── Paperdoll layout ─────────────────────────────────────────────────────────
 class _PaperdollLayout extends StatelessWidget {
-  final Map<WowSlot, BuildSlot> slotMap;
   final String? renderUrl;
   final bool loadingImage;
   final bool hasCharacter;
 
   const _PaperdollLayout({
-    required this.slotMap,
     required this.renderUrl,
     required this.loadingImage,
     required this.hasCharacter,
@@ -345,12 +475,7 @@ class _PaperdollLayout extends StatelessWidget {
                 child: Column(
                   children: _leftSlots
                       .map(
-                        (s) => _SlotButton(
-                          slot:
-                              slotMap[s] ??
-                              BuildSlot(slot: s), // ← slot vacío como fallback
-                          align: SlotAlign.left,
-                        ),
+                        (s) => _SlotButton(wowSlot: s, align: SlotAlign.left),
                       )
                       .toList(),
                 ),
@@ -370,12 +495,7 @@ class _PaperdollLayout extends StatelessWidget {
                 child: Column(
                   children: _rightSlots
                       .map(
-                        (s) => _SlotButton(
-                          slot:
-                              slotMap[s] ??
-                              BuildSlot(slot: s), // ← slot vacío como fallback
-                          align: SlotAlign.right,
-                        ),
+                        (s) => _SlotButton(wowSlot: s, align: SlotAlign.right),
                       )
                       .toList(),
                 ),
@@ -423,7 +543,7 @@ class _AvatarImage extends StatelessWidget {
               ? Image.network(
                   avatarUrl!,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _fallback(),
+                  errorBuilder: (context, error, stack) => _fallback(),
                 )
               : _fallback(),
         ),
@@ -466,7 +586,7 @@ class _CharacterImage extends StatelessWidget {
         renderUrl!,
         fit: BoxFit.cover,
         alignment: Alignment.topCenter,
-        errorBuilder: (_, __, ___) => _silhouette(),
+        errorBuilder: (_, _, _) => _silhouette(),
       );
     } else {
       content = _silhouette();
@@ -508,10 +628,10 @@ class _CharacterImage extends StatelessWidget {
 enum SlotAlign { left, right }
 
 class _SlotButton extends StatefulWidget {
-  final BuildSlot slot;
+  final WowSlot wowSlot;
   final SlotAlign align;
 
-  const _SlotButton({required this.slot, required this.align});
+  const _SlotButton({required this.wowSlot, required this.align});
 
   @override
   State<_SlotButton> createState() => _SlotButtonState();
@@ -520,69 +640,100 @@ class _SlotButton extends StatefulWidget {
 class _SlotButtonState extends State<_SlotButton> {
   bool _checkboxJustTapped = false;
 
-  BuildSlot get slot => widget.slot;
   SlotAlign get align => widget.align;
 
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<BuildDetailCubit>();
-    final hasItem = slot.item != null;
-    final qualityColor = hasItem
-        ? WowTheme.getQualityColor(slot.item!.quality)
-        : WowTheme.border;
-    final borderColor = slot.obtained
-        ? WowTheme.primaryGold.withValues(alpha: 0.6)
-        : qualityColor;
+    return BlocSelector<BuildDetailCubit, BuildDetailState, BuildSlot>(
+      selector: (state) => state is BuildDetailLoaded
+          ? state.build.slots.firstWhere(
+              (s) => s.slot == widget.wowSlot,
+              orElse: () => BuildSlot(slot: widget.wowSlot),
+            )
+          : BuildSlot(slot: widget.wowSlot),
+      builder: (context, slot) {
+        final hasItem = slot.item != null;
+        final qualityColor = hasItem
+            ? WowTheme.getQualityColor(slot.item!.quality)
+            : WowTheme.border;
+        final borderColor = slot.obtained
+            ? WowTheme.primaryGold.withValues(alpha: 0.6)
+            : qualityColor;
 
-    final Widget icon = hasItem && slot.item!.iconUrl != null
-        ? ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: Image.network(
-              slot.item!.iconUrl!,
-              width: 28,
-              height: 28,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
-                  Icon(_slotIcon(slot.slot), size: 18, color: qualityColor),
-            ),
-          )
-        : Icon(
-            _slotIcon(slot.slot),
-            size: 18,
-            color: hasItem
-                ? qualityColor
-                : WowTheme.textSecondary.withValues(alpha: 0.5),
-          );
+        final Widget icon = hasItem && slot.item!.iconUrl != null
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: Image.network(
+                  slot.item!.iconUrl!,
+                  width: 28,
+                  height: 28,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) =>
+                      Icon(_slotIcon(slot.slot), size: 18, color: qualityColor),
+                ),
+              )
+            : Icon(
+                _slotIcon(slot.slot),
+                size: 18,
+                color: hasItem
+                    ? qualityColor
+                    : WowTheme.textSecondary.withValues(alpha: 0.5),
+              );
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: GestureDetector(
-        onTap: () {
-          if (_checkboxJustTapped) {
-            _checkboxJustTapped = false;
-            return;
-          }
-          _openSlotSheet(context, cubit);
-        },
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 62),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeInOut,
-            decoration: BoxDecoration(
-              color: slot.obtained
-                  ? WowTheme.surfaceDark.withValues(alpha: 0.4)
-                  : WowTheme.surfaceDark,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: borderColor, width: hasItem ? 1.5 : 1),
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: GestureDetector(
+            onTap: () {
+              if (_checkboxJustTapped) {
+                _checkboxJustTapped = false;
+                return;
+              }
+              _openSlotSheet(context, cubit, slot);
+            },
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 62),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                decoration: BoxDecoration(
+                  color: slot.obtained
+                      ? WowTheme.surfaceDark.withValues(alpha: 0.4)
+                      : WowTheme.surfaceDark,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: borderColor,
+                    width: hasItem ? 1.5 : 1,
+                  ),
+                ),
+                padding: const EdgeInsets.fromLTRB(5, 6, 5, 6),
+                child: Builder(
+                  builder: (context) {
+                    final t = S.of(context)!;
+                    return align == SlotAlign.left
+                        ? _leftContent(
+                            icon,
+                            hasItem,
+                            qualityColor,
+                            cubit,
+                            t,
+                            slot,
+                          )
+                        : _rightContent(
+                            icon,
+                            hasItem,
+                            qualityColor,
+                            cubit,
+                            t,
+                            slot,
+                          );
+                  },
+                ),
+              ),
             ),
-            padding: const EdgeInsets.fromLTRB(5, 6, 5, 6),
-            child: align == SlotAlign.left
-                ? _leftContent(icon, hasItem, qualityColor, cubit)
-                : _rightContent(icon, hasItem, qualityColor, cubit),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -620,6 +771,8 @@ class _SlotButtonState extends State<_SlotButton> {
     bool hasItem,
     Color qualityColor,
     BuildDetailCubit cubit,
+    S t,
+    BuildSlot slot,
   ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -627,7 +780,14 @@ class _SlotButtonState extends State<_SlotButton> {
         icon,
         const SizedBox(width: 6),
         Expanded(
-          child: _slotText(hasItem, qualityColor, TextAlign.left, cubit),
+          child: _slotText(
+            hasItem,
+            qualityColor,
+            TextAlign.left,
+            cubit,
+            t,
+            slot,
+          ),
         ),
       ],
     );
@@ -638,12 +798,21 @@ class _SlotButtonState extends State<_SlotButton> {
     bool hasItem,
     Color qualityColor,
     BuildDetailCubit cubit,
+    S t,
+    BuildSlot slot,
   ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: _slotText(hasItem, qualityColor, TextAlign.right, cubit),
+          child: _slotText(
+            hasItem,
+            qualityColor,
+            TextAlign.right,
+            cubit,
+            t,
+            slot,
+          ),
         ),
         const SizedBox(width: 6),
         icon,
@@ -656,10 +825,12 @@ class _SlotButtonState extends State<_SlotButton> {
     Color qualityColor,
     TextAlign align,
     BuildDetailCubit cubit,
+    S t,
+    BuildSlot slot,
   ) {
     if (!hasItem) {
       return Text(
-        slot.slot.displayName,
+        slot.slot.localizedName(t),
         textAlign: align,
         style: TextStyle(
           color: WowTheme.textSecondary.withValues(alpha: 0.7),
@@ -677,7 +848,7 @@ class _SlotButtonState extends State<_SlotButton> {
           : CrossAxisAlignment.end,
       children: [
         Text(
-          slot.slot.displayName,
+          slot.slot.localizedName(t),
           textAlign: align,
           style: TextStyle(
             color: WowTheme.textSecondary.withValues(alpha: 0.6),
@@ -725,7 +896,7 @@ class _SlotButtonState extends State<_SlotButton> {
         ),
         if (slot.item!.level != null)
           Text(
-            'iLvl ${slot.item!.level}',
+            '${t.ilvl} ${slot.item!.level}',
             textAlign: align,
             style: TextStyle(
               color: WowTheme.textSecondary.withValues(alpha: 0.7),
@@ -791,7 +962,11 @@ class _SlotButtonState extends State<_SlotButton> {
     );
   }
 
-  void _openSlotSheet(BuildContext context, BuildDetailCubit cubit) {
+  void _openSlotSheet(
+    BuildContext context,
+    BuildDetailCubit cubit,
+    BuildSlot slot,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: WowTheme.surfaceDark,
@@ -801,7 +976,7 @@ class _SlotButtonState extends State<_SlotButton> {
       isScrollControlled: true,
       builder: (_) => BlocProvider.value(
         value: cubit,
-        child: _SlotSheet(wowSlot: slot.slot),
+        child: _SlotSheet(wowSlot: slot.slot), // slot.slot sigue siendo WowSlot
       ),
     );
   }
@@ -872,7 +1047,7 @@ class _SlotSheetContent extends StatelessWidget {
               Icon(_slotIcon(slot.slot), color: WowTheme.primaryGold, size: 20),
               const SizedBox(width: 8),
               Text(
-                slot.slot.displayName,
+                slot.slot.localizedName(t),
                 style: const TextStyle(
                   color: WowTheme.primaryGold,
                   fontSize: 16,
@@ -918,7 +1093,7 @@ class _SlotSheetContent extends StatelessWidget {
                       slot.item!.iconUrl!,
                       width: 44,
                       height: 44,
-                      errorBuilder: (_, __, ___) => Icon(
+                      errorBuilder: (_, _, _) => Icon(
                         _slotIcon(slot.slot),
                         size: 44,
                         color: WowTheme.textSecondary,
@@ -948,7 +1123,7 @@ class _SlotSheetContent extends StatelessWidget {
                         ),
                         if (slot.item!.level != null)
                           Text(
-                            'iLvl ${slot.item!.level}',
+                            '${t.ilvl} ${slot.item!.level}',
                             style: const TextStyle(
                               color: WowTheme.textSecondary,
                               fontSize: 12,
@@ -1108,7 +1283,7 @@ class _SlotSheetContent extends StatelessWidget {
       context: context,
       builder: (_) => ItemSearchDialog(
         slot: slot.slot,
-        title: t.slotSearchItem(slot.slot.displayName),
+        title: t.slotSearchItem(slot.slot.localizedName(t)),
       ),
     );
     if (item != null) cubit.assignItem(slot.slot, item);
@@ -1178,7 +1353,7 @@ class _ProgressHeader extends StatelessWidget {
                     tween: Tween(begin: 0, end: progress),
                     duration: const Duration(milliseconds: 600),
                     curve: Curves.easeOut,
-                    builder: (_, value, __) => LinearProgressIndicator(
+                    builder: (_, value, _) => LinearProgressIndicator(
                       value: value,
                       backgroundColor: WowTheme.border,
                       color: barColor,

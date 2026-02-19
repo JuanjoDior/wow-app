@@ -1,29 +1,26 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
-import 'package:wow_companion/features/items/domain/entities/item.dart';
-import 'package:wow_companion/features/items/domain/usecases/search_items.dart';
+import 'package:wow_companion/features/builds/domain/usecases/search_spells.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
-import 'dart:async';
 
-class ItemSearchDialog extends StatefulWidget {
-  final WowSlot? slot;
+class SpellSearchDialog extends StatefulWidget {
   final String title;
-
-  const ItemSearchDialog({super.key, this.slot, required this.title});
+  const SpellSearchDialog({super.key, required this.title});
 
   @override
-  State<ItemSearchDialog> createState() => _ItemSearchDialogState();
+  State<SpellSearchDialog> createState() => _SpellSearchDialogState();
 }
 
-class _ItemSearchDialogState extends State<ItemSearchDialog> {
+class _SpellSearchDialogState extends State<SpellSearchDialog> {
   final _controller = TextEditingController();
   Timer? _debounce;
-  List<Item> _results = [];
+  List<WowSpell> _results = [];
   bool _loading = false;
-  bool _hasSearched = false; // ← nueva línea
+  bool _hasSearched = false;
   String? _error;
 
   @override
@@ -45,7 +42,7 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
     }
     setState(() => _loading = true);
     _debounce = Timer(const Duration(milliseconds: 400), () {
-      _hasSearched = true; // ← nueva línea
+      _hasSearched = true;
       _doSearch(query);
     });
   }
@@ -55,26 +52,21 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
       setState(() => _results = []);
       return;
     }
-
     setState(() {
       _loading = true;
       _error = null;
     });
-
     try {
-      final searchItems = sl<SearchItems>();
-      final result = await searchItems(
+      final result = await sl<SearchSpells>()(
         query.trim(),
-        inventoryType: widget.slot?.inventoryType,
         locale: sl<LocaleNotifier>().blizzardLocale,
       );
-
       result.fold(
         (failure) {
           if (mounted) setState(() => _error = failure.toString());
         },
-        (items) {
-          if (mounted) setState(() => _results = items);
+        (spells) {
+          if (mounted) setState(() => _results = spells);
         },
       );
     } catch (e) {
@@ -171,47 +163,48 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
     return ListView.builder(
       itemCount: _results.length,
       itemBuilder: (_, i) {
-        final item = _results[i];
-        final color = WowTheme.getQualityColor(item.quality);
+        final spell = _results[i];
         return ListTile(
           leading: ClipRRect(
             borderRadius: BorderRadius.circular(4),
-            child: item.iconUrl != null
+            child: spell.iconUrl != null
                 ? Image.network(
-                    item.iconUrl!,
+                    spell.iconUrl!,
                     width: 36,
                     height: 36,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => _fallbackIcon(color),
+                    errorBuilder: (_, _, _) => _fallbackIcon(),
                   )
-                : _fallbackIcon(color),
+                : _fallbackIcon(),
           ),
           title: Text(
-            item.name,
-            style: TextStyle(color: color, fontWeight: FontWeight.w500),
+            spell.name,
+            style: const TextStyle(
+              color: WowTheme.textPrimary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           subtitle: Text(
-            [
-              if (item.level != null) 'iLvl ${item.level}',
-              if (item.inventoryName != null) item.inventoryName!,
-            ].join(' · '),
-            style: const TextStyle(color: WowTheme.textSecondary, fontSize: 12),
+            'ID: ${spell.id}',
+            style: const TextStyle(color: WowTheme.textSecondary, fontSize: 11),
           ),
-          onTap: () => Navigator.of(context).pop(item),
+          onTap: () => Navigator.of(context).pop(spell),
         );
       },
     );
   }
 
-  Widget _fallbackIcon(Color color) {
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: WowTheme.border,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Icon(Icons.inventory_2_outlined, size: 20, color: color),
-    );
-  }
+  Widget _fallbackIcon() => Container(
+    width: 36,
+    height: 36,
+    decoration: BoxDecoration(
+      color: WowTheme.border,
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: const Icon(
+      Icons.flash_on_outlined,
+      size: 20,
+      color: WowTheme.primaryGold,
+    ),
+  );
 }

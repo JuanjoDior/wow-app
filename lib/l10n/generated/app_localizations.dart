@@ -702,6 +702,210 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Type'**
   String get tooltipType;
+
+  /// No description provided for @wowSlotHead.
+  ///
+  /// In en, this message translates to:
+  /// **'Helm'**
+  String get wowSlotHead;
+
+  /// No description provided for @wowSlotNeck.
+  ///
+  /// In en, this message translates to:
+  /// **'Neck'**
+  String get wowSlotNeck;
+
+  /// No description provided for @wowSlotShoulder.
+  ///
+  /// In en, this message translates to:
+  /// **'Shoulder'**
+  String get wowSlotShoulder;
+
+  /// No description provided for @wowSlotBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloak'**
+  String get wowSlotBack;
+
+  /// No description provided for @wowSlotChest.
+  ///
+  /// In en, this message translates to:
+  /// **'Chest'**
+  String get wowSlotChest;
+
+  /// No description provided for @wowSlotWrist.
+  ///
+  /// In en, this message translates to:
+  /// **'Bracers'**
+  String get wowSlotWrist;
+
+  /// No description provided for @wowSlotHands.
+  ///
+  /// In en, this message translates to:
+  /// **'Gloves'**
+  String get wowSlotHands;
+
+  /// No description provided for @wowSlotWaist.
+  ///
+  /// In en, this message translates to:
+  /// **'Belt'**
+  String get wowSlotWaist;
+
+  /// No description provided for @wowSlotLegs.
+  ///
+  /// In en, this message translates to:
+  /// **'Legs'**
+  String get wowSlotLegs;
+
+  /// No description provided for @wowSlotFeet.
+  ///
+  /// In en, this message translates to:
+  /// **'Boots'**
+  String get wowSlotFeet;
+
+  /// No description provided for @wowSlotFinger1.
+  ///
+  /// In en, this message translates to:
+  /// **'Ring #1'**
+  String get wowSlotFinger1;
+
+  /// No description provided for @wowSlotFinger2.
+  ///
+  /// In en, this message translates to:
+  /// **'Ring #2'**
+  String get wowSlotFinger2;
+
+  /// No description provided for @wowSlotTrinket1.
+  ///
+  /// In en, this message translates to:
+  /// **'Trinket #1'**
+  String get wowSlotTrinket1;
+
+  /// No description provided for @wowSlotTrinket2.
+  ///
+  /// In en, this message translates to:
+  /// **'Trinket #2'**
+  String get wowSlotTrinket2;
+
+  /// No description provided for @wowSlotMainHand.
+  ///
+  /// In en, this message translates to:
+  /// **'Weapon Main-Hand'**
+  String get wowSlotMainHand;
+
+  /// No description provided for @wowSlotOffHand.
+  ///
+  /// In en, this message translates to:
+  /// **'Weapon Off-Hand'**
+  String get wowSlotOffHand;
+
+  /// No description provided for @buildNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Build not found'**
+  String get buildNotFound;
+
+  /// No description provided for @guideTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Build Guide'**
+  String get guideTitle;
+
+  /// No description provided for @guideContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Content'**
+  String get guideContent;
+
+  /// No description provided for @guideContentRaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Raid'**
+  String get guideContentRaid;
+
+  /// No description provided for @guideContentMythicPlus.
+  ///
+  /// In en, this message translates to:
+  /// **'M+'**
+  String get guideContentMythicPlus;
+
+  /// No description provided for @guideContentBoth.
+  ///
+  /// In en, this message translates to:
+  /// **'Both'**
+  String get guideContentBoth;
+
+  /// No description provided for @guideHeroTalent.
+  ///
+  /// In en, this message translates to:
+  /// **'Hero Talent / Import string'**
+  String get guideHeroTalent;
+
+  /// No description provided for @guideHeroTalentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste your talent import string here...'**
+  String get guideHeroTalentHint;
+
+  /// No description provided for @guideRotation.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotation'**
+  String get guideRotation;
+
+  /// No description provided for @guideRotationEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No spells added yet. Add your priority list.'**
+  String get guideRotationEmpty;
+
+  /// No description provided for @guideAddSpell.
+  ///
+  /// In en, this message translates to:
+  /// **'Add spell'**
+  String get guideAddSpell;
+
+  /// No description provided for @guideSearchSpell.
+  ///
+  /// In en, this message translates to:
+  /// **'Search spell'**
+  String get guideSearchSpell;
+
+  /// No description provided for @guideConsumables.
+  ///
+  /// In en, this message translates to:
+  /// **'Consumables'**
+  String get guideConsumables;
+
+  /// No description provided for @guideFlask.
+  ///
+  /// In en, this message translates to:
+  /// **'Flask'**
+  String get guideFlask;
+
+  /// No description provided for @guidePotion.
+  ///
+  /// In en, this message translates to:
+  /// **'Potion'**
+  String get guidePotion;
+
+  /// No description provided for @guideFood.
+  ///
+  /// In en, this message translates to:
+  /// **'Food'**
+  String get guideFood;
+
+  /// No description provided for @guideNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get guideNotes;
+
+  /// No description provided for @guideNotesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Situational tips, cooldown notes...'**
+  String get guideNotesHint;
 }
 
 class _SDelegate extends LocalizationsDelegate<S> {

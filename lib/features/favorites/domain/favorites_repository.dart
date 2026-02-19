@@ -7,6 +7,7 @@ class FavoriteCharacter {
   final String region;
   final String characterClass;
   final String? specialization;
+  final String? race;
   final int? itemLevel;
   final DateTime addedAt;
 
@@ -16,6 +17,7 @@ class FavoriteCharacter {
     required this.region,
     required this.characterClass,
     this.specialization,
+    this.race,
     this.itemLevel,
     DateTime? addedAt,
   }) : addedAt = addedAt ?? DateTime.now();
@@ -32,6 +34,7 @@ class FavoriteCharacter {
       region: c.region,
       characterClass: c.characterClass,
       specialization: c.specialization,
+      race: c.race,
       itemLevel: c.equippedItemLevel,
     );
   }
@@ -43,6 +46,7 @@ class FavoriteCharacter {
     'region': region,
     'characterClass': characterClass,
     'specialization': specialization,
+    'race': race,
     'itemLevel': itemLevel,
     'addedAt': addedAt.toIso8601String(),
   };
@@ -54,6 +58,7 @@ class FavoriteCharacter {
       region: json['region'] as String,
       characterClass: json['characterClass'] as String,
       specialization: json['specialization'] as String?,
+      race: json['race'] as String?,
       itemLevel: json['itemLevel'] as int?,
       addedAt: DateTime.parse(json['addedAt'] as String),
     );

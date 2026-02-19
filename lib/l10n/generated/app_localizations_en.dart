@@ -325,4 +325,107 @@ class SEn extends S {
 
   @override
   String get tooltipType => 'Type';
+
+  @override
+  String get wowSlotHead => 'Helm';
+
+  @override
+  String get wowSlotNeck => 'Neck';
+
+  @override
+  String get wowSlotShoulder => 'Shoulder';
+
+  @override
+  String get wowSlotBack => 'Cloak';
+
+  @override
+  String get wowSlotChest => 'Chest';
+
+  @override
+  String get wowSlotWrist => 'Bracers';
+
+  @override
+  String get wowSlotHands => 'Gloves';
+
+  @override
+  String get wowSlotWaist => 'Belt';
+
+  @override
+  String get wowSlotLegs => 'Legs';
+
+  @override
+  String get wowSlotFeet => 'Boots';
+
+  @override
+  String get wowSlotFinger1 => 'Ring #1';
+
+  @override
+  String get wowSlotFinger2 => 'Ring #2';
+
+  @override
+  String get wowSlotTrinket1 => 'Trinket #1';
+
+  @override
+  String get wowSlotTrinket2 => 'Trinket #2';
+
+  @override
+  String get wowSlotMainHand => 'Weapon Main-Hand';
+
+  @override
+  String get wowSlotOffHand => 'Weapon Off-Hand';
+
+  @override
+  String get buildNotFound => 'Build not found';
+
+  @override
+  String get guideTitle => 'Build Guide';
+
+  @override
+  String get guideContent => 'Content';
+
+  @override
+  String get guideContentRaid => 'Raid';
+
+  @override
+  String get guideContentMythicPlus => 'M+';
+
+  @override
+  String get guideContentBoth => 'Both';
+
+  @override
+  String get guideHeroTalent => 'Hero Talent / Import string';
+
+  @override
+  String get guideHeroTalentHint => 'Paste your talent import string here...';
+
+  @override
+  String get guideRotation => 'Rotation';
+
+  @override
+  String get guideRotationEmpty =>
+      'No spells added yet. Add your priority list.';
+
+  @override
+  String get guideAddSpell => 'Add spell';
+
+  @override
+  String get guideSearchSpell => 'Search spell';
+
+  @override
+  String get guideConsumables => 'Consumables';
+
+  @override
+  String get guideFlask => 'Flask';
+
+  @override
+  String get guidePotion => 'Potion';
+
+  @override
+  String get guideFood => 'Food';
+
+  @override
+  String get guideNotes => 'Notes';
+
+  @override
+  String get guideNotesHint => 'Situational tips, cooldown notes...';
 }

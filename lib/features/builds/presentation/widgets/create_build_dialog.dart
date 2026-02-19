@@ -53,6 +53,9 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
       characterRefDisplay: _selectedCharacter != null
           ? '${_selectedCharacter!.name} - ${_selectedCharacter!.realm}'
           : null,
+      characterClass: _selectedCharacter?.characterClass,
+      characterSpec: _selectedCharacter?.specialization,
+      characterRace: _selectedCharacter?.race,
       createdAt: DateTime.now(),
       slots: Build.emptySlots,
     );

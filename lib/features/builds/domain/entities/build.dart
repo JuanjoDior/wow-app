@@ -1,6 +1,153 @@
 import 'package:equatable/equatable.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
 
+// ─── BuildContent ─────────────────────────────────────────────────────────────
+enum BuildContent { raid, mythicPlus, both }
+
+// ─── WowSpell ─────────────────────────────────────────────────────────────────
+/// Habilidad de WoW para la pizarra de rotación.
+class WowSpell extends Equatable {
+  final int id;
+  final String name;
+  final String? iconUrl;
+
+  const WowSpell({required this.id, required this.name, this.iconUrl});
+
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'iconUrl': iconUrl};
+
+  factory WowSpell.fromJson(Map<String, dynamic> json) => WowSpell(
+    id: json['id'] as int,
+    name: json['name'] as String,
+    iconUrl: json['iconUrl'] as String?,
+  );
+
+  @override
+  List<Object?> get props => [id, name, iconUrl];
+}
+
+// ─── BuildConsumables ─────────────────────────────────────────────────────────
+/// Flask, poción y comida recomendados para la build.
+class BuildConsumables extends Equatable {
+  final Item? flask;
+  final Item? potion;
+  final Item? food;
+
+  const BuildConsumables({this.flask, this.potion, this.food});
+
+  bool get isEmpty => flask == null && potion == null && food == null;
+
+  BuildConsumables copyWith({
+    Item? flask,
+    Item? potion,
+    Item? food,
+    bool clearFlask = false,
+    bool clearPotion = false,
+    bool clearFood = false,
+  }) => BuildConsumables(
+    flask: clearFlask ? null : (flask ?? this.flask),
+    potion: clearPotion ? null : (potion ?? this.potion),
+    food: clearFood ? null : (food ?? this.food),
+  );
+
+  Map<String, dynamic> toJson() => {
+    'flask': flask?.toJson(),
+    'potion': potion?.toJson(),
+    'food': food?.toJson(),
+  };
+
+  factory BuildConsumables.fromJson(Map<String, dynamic> json) =>
+      BuildConsumables(
+        flask: json['flask'] != null
+            ? Item.fromJson(json['flask'] as Map<String, dynamic>)
+            : null,
+        potion: json['potion'] != null
+            ? Item.fromJson(json['potion'] as Map<String, dynamic>)
+            : null,
+        food: json['food'] != null
+            ? Item.fromJson(json['food'] as Map<String, dynamic>)
+            : null,
+      );
+
+  @override
+  List<Object?> get props => [flask, potion, food];
+}
+
+// ─── BuildGuide ───────────────────────────────────────────────────────────────
+/// Sección de guía: talentos, rotación, consumibles y notas.
+class BuildGuide extends Equatable {
+  final BuildContent? content;
+  final String? heroTalent;
+  final List<WowSpell> rotation;
+  final BuildConsumables consumables;
+  final String? notes;
+
+  const BuildGuide({
+    this.content,
+    this.heroTalent,
+    this.rotation = const [],
+    this.consumables = const BuildConsumables(),
+    this.notes,
+  });
+
+  bool get isEmpty =>
+      content == null &&
+      (heroTalent == null || heroTalent!.trim().isEmpty) &&
+      rotation.isEmpty &&
+      consumables.isEmpty &&
+      (notes == null || notes!.trim().isEmpty);
+
+  BuildGuide copyWith({
+    BuildContent? content,
+    String? heroTalent,
+    List<WowSpell>? rotation,
+    BuildConsumables? consumables,
+    String? notes,
+    bool clearContent = false,
+    bool clearHeroTalent = false,
+    bool clearNotes = false,
+  }) => BuildGuide(
+    content: clearContent ? null : (content ?? this.content),
+    heroTalent: clearHeroTalent ? null : (heroTalent ?? this.heroTalent),
+    rotation: rotation ?? this.rotation,
+    consumables: consumables ?? this.consumables,
+    notes: clearNotes ? null : (notes ?? this.notes),
+  );
+
+  Map<String, dynamic> toJson() => {
+    'content': content?.name,
+    'heroTalent': heroTalent,
+    'rotation': rotation.map((s) => s.toJson()).toList(),
+    'consumables': consumables.toJson(),
+    'notes': notes,
+  };
+
+  factory BuildGuide.fromJson(Map<String, dynamic> json) => BuildGuide(
+    content: json['content'] != null
+        ? BuildContent.values.firstWhere(
+            (e) => e.name == json['content'],
+            orElse: () => BuildContent.both,
+          )
+        : null,
+    heroTalent: json['heroTalent'] as String?,
+    rotation: (json['rotation'] as List<dynamic>? ?? [])
+        .map((e) => WowSpell.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    consumables: json['consumables'] != null
+        ? BuildConsumables.fromJson(json['consumables'] as Map<String, dynamic>)
+        : const BuildConsumables(),
+    notes: json['notes'] as String?,
+  );
+
+  @override
+  List<Object?> get props => [
+    content,
+    heroTalent,
+    rotation,
+    consumables,
+    notes,
+  ];
+}
+
 /// Slots estándar de WoW
 enum WowSlot {
   head,
@@ -19,25 +166,6 @@ enum WowSlot {
   trinket2,
   mainHand,
   offHand;
-
-  String get displayName => switch (this) {
-    WowSlot.head => 'Helm',
-    WowSlot.neck => 'Neck',
-    WowSlot.shoulder => 'Shoulder',
-    WowSlot.back => 'Cloak',
-    WowSlot.chest => 'Chest',
-    WowSlot.wrist => 'Bracers',
-    WowSlot.hands => 'Gloves',
-    WowSlot.waist => 'Belt',
-    WowSlot.legs => 'Legs',
-    WowSlot.feet => 'Boots',
-    WowSlot.finger1 => 'Ring #1',
-    WowSlot.finger2 => 'Ring #2',
-    WowSlot.trinket1 => 'Trinket #1',
-    WowSlot.trinket2 => 'Trinket #2',
-    WowSlot.mainHand => 'Weapon Main-Hand',
-    WowSlot.offHand => 'Weapon Off-Hand',
-  };
 
   /// Valor inventoryType que usamos en la API de Blizzard
   String get inventoryType => switch (this) {
@@ -95,16 +223,18 @@ class BuildSlot extends Equatable {
       enchantment: clearEnchantment ? null : (enchantment ?? this.enchantment),
       gems: gems ?? this.gems,
       obtained: obtained ?? this.obtained,
-      enchantmentObtained: clearEnchantment ? false : (enchantmentObtained ?? this.enchantmentObtained),
+      enchantmentObtained: clearEnchantment
+          ? false
+          : (enchantmentObtained ?? this.enchantmentObtained),
       gemsObtained: gemsObtained ?? this.gemsObtained,
     );
   }
 
   Map<String, dynamic> toJson() => {
     'slot': slot.name,
-    'item': item != null ? _itemToJson(item!) : null,
-    'enchantment': enchantment != null ? _itemToJson(enchantment!) : null,
-    'gems': gems.map(_itemToJson).toList(),
+    'item': item?.toJson(),
+    'enchantment': enchantment?.toJson(),
+    'gems': gems.map((g) => g.toJson()).toList(),
     'obtained': obtained,
     'enchantmentObtained': enchantmentObtained,
     'gemsObtained': gemsObtained,
@@ -114,13 +244,13 @@ class BuildSlot extends Equatable {
     return BuildSlot(
       slot: WowSlot.values.firstWhere((e) => e.name == json['slot']),
       item: json['item'] != null
-          ? _itemFromJson(json['item'] as Map<String, dynamic>)
+          ? Item.fromJson(json['item'] as Map<String, dynamic>)
           : null,
       enchantment: json['enchantment'] != null
-          ? _itemFromJson(json['enchantment'] as Map<String, dynamic>)
+          ? Item.fromJson(json['enchantment'] as Map<String, dynamic>)
           : null,
       gems: (json['gems'] as List<dynamic>? ?? [])
-          .map((e) => _itemFromJson(e as Map<String, dynamic>))
+          .map((e) => Item.fromJson(e as Map<String, dynamic>))
           .toList(),
       obtained: json['obtained'] as bool? ?? false,
       enchantmentObtained: json['enchantmentObtained'] as bool? ?? false,
@@ -131,7 +261,15 @@ class BuildSlot extends Equatable {
   }
 
   @override
-  List<Object?> get props => [slot, item, enchantment, gems, obtained, enchantmentObtained, gemsObtained];
+  List<Object?> get props => [
+    slot,
+    item,
+    enchantment,
+    gems,
+    obtained,
+    enchantmentObtained,
+    gemsObtained,
+  ];
 }
 
 class Build extends Equatable {
@@ -143,16 +281,26 @@ class Build extends Equatable {
 
   /// Nombre para mostrar: "Ganae - Sanguino" o null
   final String? characterRefDisplay;
+  final String? characterClass;
+  final String? characterSpec;
+  final String? characterRace;
   final DateTime createdAt;
   final List<BuildSlot> slots;
+
+  /// Guía opcional: talentos, rotación, consumibles y notas
+  final BuildGuide guide;
 
   const Build({
     required this.id,
     required this.name,
     this.characterRefKey,
     this.characterRefDisplay,
+    this.characterClass,
+    this.characterSpec,
+    this.characterRace,
     required this.createdAt,
     required this.slots,
+    this.guide = const BuildGuide(),
   });
 
   /// Slots vacíos para una build nueva
@@ -168,6 +316,7 @@ class Build extends Equatable {
     String? characterRefKey,
     String? characterRefDisplay,
     List<BuildSlot>? slots,
+    BuildGuide? guide,
     bool clearCharacterRef = false,
   }) {
     return Build(
@@ -179,8 +328,12 @@ class Build extends Equatable {
       characterRefDisplay: clearCharacterRef
           ? null
           : (characterRefDisplay ?? this.characterRefDisplay),
+      characterClass: clearCharacterRef ? null : characterClass,
+      characterSpec: clearCharacterRef ? null : characterSpec,
+      characterRace: clearCharacterRef ? null : characterRace,
       createdAt: createdAt,
       slots: slots ?? this.slots,
+      guide: guide ?? this.guide,
     );
   }
 
@@ -189,8 +342,12 @@ class Build extends Equatable {
     'name': name,
     'characterRefKey': characterRefKey,
     'characterRefDisplay': characterRefDisplay,
+    'characterClass': characterClass,
+    'characterSpec': characterSpec,
+    'characterRace': characterRace,
     'createdAt': createdAt.toIso8601String(),
     'slots': slots.map((s) => s.toJson()).toList(),
+    'guide': guide.toJson(),
   };
 
   factory Build.fromJson(Map<String, dynamic> json) {
@@ -199,34 +356,31 @@ class Build extends Equatable {
       name: json['name'] as String,
       characterRefKey: json['characterRefKey'] as String?,
       characterRefDisplay: json['characterRefDisplay'] as String?,
+      characterClass: json['characterClass'] as String?,
+      characterSpec: json['characterSpec'] as String?,
+      characterRace: json['characterRace'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       slots: (json['slots'] as List<dynamic>)
           .map((e) => BuildSlot.fromJson(e as Map<String, dynamic>))
           .toList(),
+      // Backward compatible: builds antiguas sin 'guide' cargan con guía vacía
+      guide: json['guide'] != null
+          ? BuildGuide.fromJson(json['guide'] as Map<String, dynamic>)
+          : const BuildGuide(),
     );
   }
 
   @override
-  List<Object?> get props => [id, name, characterRefKey, characterRefDisplay, createdAt, slots];
+  List<Object?> get props => [
+    id,
+    name,
+    characterRefKey,
+    characterRefDisplay,
+    characterClass,
+    characterSpec,
+    characterRace,
+    createdAt,
+    slots,
+    guide,
+  ];
 }
-
-// Helpers de serialización de Item (versión reducida para guardado)
-Map<String, dynamic> _itemToJson(Item item) => {
-  'id': item.id,
-  'name': item.name,
-  'quality': item.quality,
-  'level': item.level,
-  'iconUrl': item.iconUrl,
-  'inventoryType': item.inventoryType,
-  'inventoryName': item.inventoryName,
-};
-
-Item _itemFromJson(Map<String, dynamic> json) => Item(
-  id: json['id'] as int,
-  name: json['name'] as String,
-  quality: json['quality'] as String? ?? 'COMMON',
-  level: json['level'] as int?,
-  iconUrl: json['iconUrl'] as String?,
-  inventoryType: json['inventoryType'] as String?,
-  inventoryName: json['inventoryName'] as String?,
-);

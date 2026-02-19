@@ -25,6 +25,27 @@ class Item extends Equatable {
     this.iconUrl,
   });
 
+  /// Serialización reducida para persistencia en builds (solo campos necesarios).
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'quality': quality,
+    'level': level,
+    'iconUrl': iconUrl,
+    'inventoryType': inventoryType,
+    'inventoryName': inventoryName,
+  };
+
+  factory Item.fromJson(Map<String, dynamic> json) => Item(
+    id: json['id'] as int,
+    name: json['name'] as String,
+    quality: json['quality'] as String? ?? 'COMMON',
+    level: json['level'] as int?,
+    iconUrl: json['iconUrl'] as String?,
+    inventoryType: json['inventoryType'] as String?,
+    inventoryName: json['inventoryName'] as String?,
+  );
+
   @override
   List<Object?> get props => [id, name, quality, level, inventoryType];
 }

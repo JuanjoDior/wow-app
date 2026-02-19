@@ -23,7 +23,12 @@ import 'package:wow_companion/features/builds/data/repositories/builds_repositor
 import 'package:wow_companion/features/builds/domain/repositories/builds_repository.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/builds_cubit.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/build_detail_cubit.dart';
+import 'package:wow_companion/features/builds/data/datasources/spells_datasource.dart';
+import 'package:wow_companion/features/builds/data/repositories/spells_repository_impl.dart';
+import 'package:wow_companion/features/builds/domain/repositories/spells_repository.dart';
+import 'package:wow_companion/features/builds/domain/usecases/search_spells.dart';
 import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dart';
+import 'package:wow_companion/features/builds/data/datasources/character_media_datasource.dart';
 
 final sl = GetIt.instance;
 
@@ -79,6 +84,18 @@ Future<void> initDependencies() async {
 
   sl.registerFactory(() => BuildsCubit(sl()));
 
-  sl.registerFactory(() => BuildDetailCubit(sl()));
+  sl.registerFactory(() => BuildDetailCubit(sl(), sl()));
   sl.registerLazySingleton(() => GetItemDetail(sl()));
+
+  // ---- Spells (Build Guide) ----
+  sl.registerLazySingleton<SpellsDataSource>(() => SpellsDataSource(sl()));
+  sl.registerLazySingleton<SpellsRepository>(
+    () => SpellsRepositoryImpl(remoteDataSource: sl()),
+  );
+  sl.registerLazySingleton(() => SearchSpells(sl()));
+
+  // ---- Character Media (usado por BuildDetailCubit) ----
+  sl.registerLazySingleton<CharacterMediaDataSource>(
+    () => CharacterMediaDataSource(sl()),
+  );
 }

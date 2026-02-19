@@ -4,18 +4,16 @@ import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/builds/domain/repositories/builds_repository.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/build_detail_state.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dart';
+import 'package:wow_companion/features/builds/data/datasources/character_media_datasource.dart';
 
 class BuildDetailCubit extends Cubit<BuildDetailState> {
   final BuildsRepository _repository;
 
-  /// Caché en memoria: characterRefKey → renderUrl (null = sin render)
-  static final Map<String, String?> _renderCache = {};
-  static final Map<String, String?> _avatarCache = {};
+  final CharacterMediaDataSource _mediaDataSource;
 
-  BuildDetailCubit(this._repository) : super(const BuildDetailLoading());
+  BuildDetailCubit(this._repository, this._mediaDataSource)
+    : super(const BuildDetailLoading());
 
   Future<void> loadBuild(String id) async {
     try {
@@ -23,7 +21,7 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
       final build = builds.firstWhere((b) => b.id == id);
       emit(BuildDetailLoaded(build));
     } catch (e) {
-      emit(BuildDetailError('Build not found'));
+      emit(const BuildDetailError('buildNotFound'));
     }
   }
 
@@ -117,8 +115,9 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     if (current == null) return;
 
     final updatedSlots = current.slots.map((s) {
-      if (s.slot == slot)
+      if (s.slot == slot) {
         return s.copyWith(enchantmentObtained: !s.enchantmentObtained);
+      }
       return s;
     }).toList();
 
@@ -159,6 +158,64 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     await _save(current.copyWith(slots: updatedSlots));
   }
 
+  // ─── Guide ─────────────────────────────────────────────────────────────
+  Future<void> updateGuide(BuildGuide guide) async {
+    final current = _currentBuild;
+    if (current == null) return;
+    await _save(current.copyWith(guide: guide));
+  }
+
+  Future<void> addSpellToRotation(WowSpell spell) async {
+    final current = _currentBuild;
+    if (current == null) return;
+    final updated = current.guide.copyWith(
+      rotation: [...current.guide.rotation, spell],
+    );
+    await _save(current.copyWith(guide: updated));
+  }
+
+  Future<void> removeSpellFromRotation(int index) async {
+    final current = _currentBuild;
+    if (current == null) return;
+    final newRotation = [...current.guide.rotation]..removeAt(index);
+    final updated = current.guide.copyWith(rotation: newRotation);
+    await _save(current.copyWith(guide: updated));
+  }
+
+  Future<void> reorderRotation(int oldIndex, int newIndex) async {
+    final current = _currentBuild;
+    if (current == null) return;
+    final list = [...current.guide.rotation];
+    final item = list.removeAt(oldIndex);
+    final insertAt = newIndex > oldIndex ? newIndex - 1 : newIndex;
+    list.insert(insertAt, item);
+    final updated = current.guide.copyWith(rotation: list);
+    await _save(current.copyWith(guide: updated));
+  }
+
+  Future<void> updateConsumable({
+    Item? flask,
+    Item? potion,
+    Item? food,
+    bool clearFlask = false,
+    bool clearPotion = false,
+    bool clearFood = false,
+  }) async {
+    final current = _currentBuild;
+    if (current == null) return;
+    final updated = current.guide.copyWith(
+      consumables: current.guide.consumables.copyWith(
+        flask: flask,
+        potion: potion,
+        food: food,
+        clearFlask: clearFlask,
+        clearPotion: clearPotion,
+        clearFood: clearFood,
+      ),
+    );
+    await _save(current.copyWith(guide: updated));
+  }
+
   Future<void> clearSlot(WowSlot slot) async {
     final current = _currentBuild;
     if (current == null) return;
@@ -185,51 +242,26 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
   }
 
   Future<String?> fetchCharacterRenderUrl() async {
+    final media = await _fetchMedia();
+    return media?.renderUrl ?? media?.avatarUrl;
+  }
+
+  Future<String?> fetchCharacterAvatarUrl() async {
+    final media = await _fetchMedia();
+    return media?.avatarUrl;
+  }
+
+  Future<CharacterMedia?> _fetchMedia() async {
     final current = _currentBuild;
     if (current?.characterRefKey == null) return null;
 
-    final key = current!.characterRefKey!;
-
-    // Devolver desde caché si ya se obtuvo (incluso si fue null = sin render)
-    if (_renderCache.containsKey(key)) return _renderCache[key];
-
-    final parts = key.split('-');
+    final parts = current!.characterRefKey!.split('-');
     if (parts.length < 3) return null;
 
     final region = parts[0];
     final realm = parts[1];
     final name = parts.sublist(2).join('-');
 
-    try {
-      final client = http.Client();
-      final uri = Uri.parse(
-        'https://wow-companion-api.wow-comp-app.workers.dev/api/character/$region/$realm/$name/media',
-      );
-      final response = await client.get(uri);
-      client.close();
-      if (response.statusCode != 200) {
-        _renderCache[key] = null;
-        return null;
-      }
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final url = json['renderUrl'] as String?;
-      final avatar = json['avatarUrl'] as String?;
-      _renderCache[key] = url ?? avatar;
-      _avatarCache[key] = avatar;
-      return url ?? avatar;
-    } catch (_) {
-      _renderCache[key] = null;
-      return null;
-    }
-  }
-
-  Future<String?> fetchCharacterAvatarUrl() async {
-    final current = _currentBuild;
-    if (current?.characterRefKey == null) return null;
-    final key = current!.characterRefKey!;
-    // Reutiliza la misma llamada HTTP si ya se hizo
-    if (_avatarCache.containsKey(key)) return _avatarCache[key];
-    await fetchCharacterRenderUrl(); // dispara la llamada y puebla _avatarCache
-    return _avatarCache[key];
+    return _mediaDataSource.getMedia(region: region, realm: realm, name: name);
   }
 }

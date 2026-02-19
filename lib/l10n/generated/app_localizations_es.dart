@@ -70,7 +70,7 @@ class SEs extends S {
   }
 
   @override
-  String get ilvl => 'iObj';
+  String get ilvl => 'iLvl';
 
   @override
   String get character => 'Personaje';
@@ -325,4 +325,107 @@ class SEs extends S {
 
   @override
   String get tooltipType => 'Tipo';
+
+  @override
+  String get wowSlotHead => 'Casco';
+
+  @override
+  String get wowSlotNeck => 'Cuello';
+
+  @override
+  String get wowSlotShoulder => 'Hombros';
+
+  @override
+  String get wowSlotBack => 'Capa';
+
+  @override
+  String get wowSlotChest => 'Pecho';
+
+  @override
+  String get wowSlotWrist => 'Muñequeras';
+
+  @override
+  String get wowSlotHands => 'Guantes';
+
+  @override
+  String get wowSlotWaist => 'Cinturón';
+
+  @override
+  String get wowSlotLegs => 'Piernas';
+
+  @override
+  String get wowSlotFeet => 'Botas';
+
+  @override
+  String get wowSlotFinger1 => 'Anillo #1';
+
+  @override
+  String get wowSlotFinger2 => 'Anillo #2';
+
+  @override
+  String get wowSlotTrinket1 => 'Reliquia #1';
+
+  @override
+  String get wowSlotTrinket2 => 'Reliquia #2';
+
+  @override
+  String get wowSlotMainHand => 'Arma Principal';
+
+  @override
+  String get wowSlotOffHand => 'Mano Secundaria';
+
+  @override
+  String get buildNotFound => 'Build no encontrada';
+
+  @override
+  String get guideTitle => 'Guía de Build';
+
+  @override
+  String get guideContent => 'Contenido';
+
+  @override
+  String get guideContentRaid => 'Raid';
+
+  @override
+  String get guideContentMythicPlus => 'M+';
+
+  @override
+  String get guideContentBoth => 'Ambos';
+
+  @override
+  String get guideHeroTalent => 'Hero Talent / Import string';
+
+  @override
+  String get guideHeroTalentHint => 'Pega aquí tu import string de talentos...';
+
+  @override
+  String get guideRotation => 'Rotación';
+
+  @override
+  String get guideRotationEmpty =>
+      'Sin habilidades. Añade tu lista de prioridad.';
+
+  @override
+  String get guideAddSpell => 'Añadir habilidad';
+
+  @override
+  String get guideSearchSpell => 'Buscar habilidad';
+
+  @override
+  String get guideConsumables => 'Consumibles';
+
+  @override
+  String get guideFlask => 'Frasco';
+
+  @override
+  String get guidePotion => 'Poción';
+
+  @override
+  String get guideFood => 'Comida';
+
+  @override
+  String get guideNotes => 'Notas';
+
+  @override
+  String get guideNotesHint => 'Tips situacionales, notas de cooldowns...';
 }
