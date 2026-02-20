@@ -1,0 +1,15 @@
+name = "wow-recommendations"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "RECS_CACHE"
+id = "bf433eaa4bf948da9b555646f5b287d8"
+
+[vars]
+CURRENT_PATCH = "12.0.1"
+CACHE_TTL_SECONDS = "604800"
+
+# Secrets — añadir via CLI, NUNCA en este archivo:
+#   wrangler secret put ANTHROPIC_API_KEY
+#   wrangler secret put INVALIDATE_SECRET   (opcional, protege /invalidate)
