@@ -916,7 +916,7 @@ abstract class S {
   /// No description provided for @recPanelSourceAI.
   ///
   /// In en, this message translates to:
-  /// **'Claude AI'**
+  /// **'Remote'**
   String get recPanelSourceAI;
 
   /// No description provided for @recPanelSourceCache.
