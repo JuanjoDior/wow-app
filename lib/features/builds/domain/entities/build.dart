@@ -284,6 +284,7 @@ class Build extends Equatable {
   final String? characterClass;
   final String? characterSpec;
   final String? characterRace;
+  final String? characterAvatarUrl;
   final DateTime createdAt;
   final List<BuildSlot> slots;
 
@@ -298,6 +299,7 @@ class Build extends Equatable {
     this.characterClass,
     this.characterSpec,
     this.characterRace,
+    this.characterAvatarUrl,
     required this.createdAt,
     required this.slots,
     this.guide = const BuildGuide(),
@@ -315,6 +317,7 @@ class Build extends Equatable {
     String? name,
     String? characterRefKey,
     String? characterRefDisplay,
+    String? characterAvatarUrl,
     List<BuildSlot>? slots,
     BuildGuide? guide,
     bool clearCharacterRef = false,
@@ -331,6 +334,9 @@ class Build extends Equatable {
       characterClass: clearCharacterRef ? null : characterClass,
       characterSpec: clearCharacterRef ? null : characterSpec,
       characterRace: clearCharacterRef ? null : characterRace,
+      characterAvatarUrl: clearCharacterRef
+          ? null
+          : (characterAvatarUrl ?? this.characterAvatarUrl),
       createdAt: createdAt,
       slots: slots ?? this.slots,
       guide: guide ?? this.guide,
@@ -345,6 +351,7 @@ class Build extends Equatable {
     'characterClass': characterClass,
     'characterSpec': characterSpec,
     'characterRace': characterRace,
+    'characterAvatarUrl': characterAvatarUrl,
     'createdAt': createdAt.toIso8601String(),
     'slots': slots.map((s) => s.toJson()).toList(),
     'guide': guide.toJson(),
@@ -359,6 +366,7 @@ class Build extends Equatable {
       characterClass: json['characterClass'] as String?,
       characterSpec: json['characterSpec'] as String?,
       characterRace: json['characterRace'] as String?,
+      characterAvatarUrl: json['characterAvatarUrl'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       slots: (json['slots'] as List<dynamic>)
           .map((e) => BuildSlot.fromJson(e as Map<String, dynamic>))
@@ -379,6 +387,7 @@ class Build extends Equatable {
     characterClass,
     characterSpec,
     characterRace,
+    characterAvatarUrl,
     createdAt,
     slots,
     guide,

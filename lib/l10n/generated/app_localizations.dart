@@ -906,6 +906,114 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Situational tips, cooldown notes...'**
   String get guideNotesHint;
+
+  /// No description provided for @recPanelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommendations'**
+  String get recPanelTitle;
+
+  /// No description provided for @recPanelSourceAI.
+  ///
+  /// In en, this message translates to:
+  /// **'Claude AI'**
+  String get recPanelSourceAI;
+
+  /// No description provided for @recPanelSourceCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache'**
+  String get recPanelSourceCache;
+
+  /// No description provided for @recPanelSourceWorker.
+  ///
+  /// In en, this message translates to:
+  /// **'Worker'**
+  String get recPanelSourceWorker;
+
+  /// No description provided for @recPanelSourceLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get recPanelSourceLocal;
+
+  /// No description provided for @recPanelStatPriority.
+  ///
+  /// In en, this message translates to:
+  /// **'Stat priority'**
+  String get recPanelStatPriority;
+
+  /// No description provided for @recPanelGems.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended gems'**
+  String get recPanelGems;
+
+  /// No description provided for @recPanelGemMeta.
+  ///
+  /// In en, this message translates to:
+  /// **'Meta'**
+  String get recPanelGemMeta;
+
+  /// No description provided for @recPanelGemSockets.
+  ///
+  /// In en, this message translates to:
+  /// **'Sockets'**
+  String get recPanelGemSockets;
+
+  /// No description provided for @recPanelConsumables.
+  ///
+  /// In en, this message translates to:
+  /// **'Consumables'**
+  String get recPanelConsumables;
+
+  /// No description provided for @recPanelFlask.
+  ///
+  /// In en, this message translates to:
+  /// **'Flask'**
+  String get recPanelFlask;
+
+  /// No description provided for @recPanelPotion.
+  ///
+  /// In en, this message translates to:
+  /// **'Potion'**
+  String get recPanelPotion;
+
+  /// No description provided for @recPanelFood.
+  ///
+  /// In en, this message translates to:
+  /// **'Food'**
+  String get recPanelFood;
+
+  /// No description provided for @recPanelWeapon.
+  ///
+  /// In en, this message translates to:
+  /// **'Weapon'**
+  String get recPanelWeapon;
+
+  /// No description provided for @recPanelFootnote.
+  ///
+  /// In en, this message translates to:
+  /// **'Patch {patch} · Always sim on Raidbots to confirm'**
+  String recPanelFootnote(String patch);
+
+  /// No description provided for @recEnchantSuggestedSpec.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested for your spec (TWW S3)'**
+  String get recEnchantSuggestedSpec;
+
+  /// No description provided for @recEnchantSuggestedGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested (TWW S3)'**
+  String get recEnchantSuggestedGeneric;
+
+  /// No description provided for @recEnchantApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get recEnchantApply;
 }
 
 class _SDelegate extends LocalizationsDelegate<S> {

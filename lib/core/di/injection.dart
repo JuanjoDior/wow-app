@@ -29,73 +29,66 @@ import 'package:wow_companion/features/builds/domain/repositories/spells_reposit
 import 'package:wow_companion/features/builds/domain/usecases/search_spells.dart';
 import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dart';
 import 'package:wow_companion/features/builds/data/datasources/character_media_datasource.dart';
+// ── Spec Recommendations ──────────────────────────────────────────────────────
+import 'package:wow_companion/features/builds/data/datasources/spec_recommendations_datasource.dart';
+import 'package:wow_companion/features/builds/data/repositories/spec_recommendations_repository_impl.dart';
+import 'package:wow_companion/features/builds/domain/repositories/spec_recommendations_repository.dart';
 
 final sl = GetIt.instance;
 
 Future<void> initDependencies() async {
   sl.registerLazySingleton<CheatsheetRepository>(() => CheatsheetRepository());
-  // ---- Core ----
+
+  // ── Core ──────────────────────────────────────────────────────────────────
   sl.registerLazySingleton<ApiClient>(() => ApiClient());
+  sl.registerLazySingleton<MemoryCache<Character>>(() => MemoryCache<Character>());
 
-  sl.registerLazySingleton<MemoryCache<Character>>(
-    () => MemoryCache<Character>(),
-  );
-
+  // ── Character Feature ─────────────────────────────────────────────────────
+  sl.registerLazySingleton<RaiderIoDataSource>(() => RaiderIoDataSource(sl()));
   sl.registerLazySingleton<CharacterRepository>(
     () => CharacterRepositoryImpl(
       remoteDataSource: sl(),
       cache: sl<MemoryCache<Character>>(),
     ),
   );
-
-  // ---- Character Feature ----
-  sl.registerLazySingleton<RaiderIoDataSource>(() => RaiderIoDataSource(sl()));
-
   sl.registerLazySingleton(() => GetCharacter(sl()));
-
   sl.registerFactory(() => CharacterCubit(sl()));
 
-  // ---- Favorites Feature ----
-  sl.registerLazySingleton<FavoritesRepository>(
-    () => FavoritesRepositoryImpl(),
-  );
-
+  // ── Favorites Feature ─────────────────────────────────────────────────────
+  sl.registerLazySingleton<FavoritesRepository>(() => FavoritesRepositoryImpl());
   sl.registerLazySingleton(() => FavoritesCubit(sl()));
 
-  // ---- Search History ----
-  sl.registerLazySingleton<SearchHistoryRepository>(
-    () => SearchHistoryRepositoryImpl(),
-  );
+  // ── Search History ────────────────────────────────────────────────────────
+  sl.registerLazySingleton<SearchHistoryRepository>(() => SearchHistoryRepositoryImpl());
   sl.registerLazySingleton<LocaleNotifier>(() => LocaleNotifier());
   await sl<LocaleNotifier>().load();
 
-  // ---- Items Feature ----
-  sl.registerLazySingleton<BlizzardItemsDataSource>(
-    () => BlizzardItemsDataSource(sl()),
-  );
-  sl.registerLazySingleton<ItemsRepository>(
-    () => ItemsRepositoryImpl(remoteDataSource: sl()),
-  );
+  // ── Items Feature ─────────────────────────────────────────────────────────
+  sl.registerLazySingleton<BlizzardItemsDataSource>(() => BlizzardItemsDataSource(sl()));
+  sl.registerLazySingleton<ItemsRepository>(() => ItemsRepositoryImpl(remoteDataSource: sl()));
   sl.registerLazySingleton(() => SearchItems(sl()));
   sl.registerFactory(() => ItemsCubit(sl()));
-
-  // ---- Builds Feature ----
-  sl.registerLazySingleton<BuildsRepository>(() => BuildsRepositoryImpl());
-
-  sl.registerFactory(() => BuildsCubit(sl()));
-
-  sl.registerFactory(() => BuildDetailCubit(sl(), sl()));
   sl.registerLazySingleton(() => GetItemDetail(sl()));
 
-  // ---- Spells (Build Guide) ----
-  sl.registerLazySingleton<SpellsDataSource>(() => SpellsDataSource(sl()));
-  sl.registerLazySingleton<SpellsRepository>(
-    () => SpellsRepositoryImpl(remoteDataSource: sl()),
+  // ── Builds Feature ────────────────────────────────────────────────────────
+  sl.registerLazySingleton<BuildsRepository>(() => BuildsRepositoryImpl());
+  sl.registerFactory(() => BuildsCubit(sl()));
+
+  // ── Spec Recommendations ──────────────────────────────────────────────────
+  sl.registerLazySingleton<SpecRecommendationsRemoteDatasource>(
+    () => SpecRecommendationsRemoteDatasource(),
   );
+  sl.registerLazySingleton<SpecRecommendationsRepository>(
+    () => SpecRecommendationsRepositoryImpl(remote: sl()),
+  );
+
+  sl.registerFactory(() => BuildDetailCubit(sl(), sl(), sl()));
+
+  // ── Spells (Build Guide) ──────────────────────────────────────────────────
+  sl.registerLazySingleton<SpellsDataSource>(() => SpellsDataSource(sl()));
+  sl.registerLazySingleton<SpellsRepository>(() => SpellsRepositoryImpl(remoteDataSource: sl()));
   sl.registerLazySingleton(() => SearchSpells(sl()));
 
-  // ---- Character Media (usado por BuildDetailCubit) ----
-  sl.registerLazySingleton<CharacterMediaDataSource>(
-    () => CharacterMediaDataSource(sl()),
-  );
+  // ── Character Media ───────────────────────────────────────────────────────
+  sl.registerLazySingleton<CharacterMediaDataSource>(() => CharacterMediaDataSource(sl()));
 }

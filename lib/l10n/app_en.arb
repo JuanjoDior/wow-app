@@ -160,5 +160,27 @@
   "guidePotion": "Potion",
   "guideFood": "Food",
   "guideNotes": "Notes",
-  "guideNotesHint": "Situational tips, cooldown notes..."
+  "guideNotesHint": "Situational tips, cooldown notes...",
+
+  "recPanelTitle": "Recommendations",
+  "recPanelSourceAI": "Claude AI",
+  "recPanelSourceCache": "Cache",
+  "recPanelSourceWorker": "Worker",
+  "recPanelSourceLocal": "Local",
+  "recPanelStatPriority": "Stat priority",
+  "recPanelGems": "Recommended gems",
+  "recPanelGemMeta": "Meta",
+  "recPanelGemSockets": "Sockets",
+  "recPanelConsumables": "Consumables",
+  "recPanelFlask": "Flask",
+  "recPanelPotion": "Potion",
+  "recPanelFood": "Food",
+  "recPanelWeapon": "Weapon",
+  "recPanelFootnote": "Patch {patch} · Always sim on Raidbots to confirm",
+  "@recPanelFootnote": {
+    "placeholders": { "patch": { "type": "String" } }
+  },
+  "recEnchantSuggestedSpec": "Suggested for your spec (TWW S3)",
+  "recEnchantSuggestedGeneric": "Suggested (TWW S3)",
+  "recEnchantApply": "Apply"
 }

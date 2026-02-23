@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/builds/domain/repositories/builds_repository.dart';
+import 'package:wow_companion/features/builds/domain/repositories/spec_recommendations_repository.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/build_detail_state.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
 import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dart';
@@ -9,27 +10,65 @@ import 'package:wow_companion/features/builds/data/datasources/character_media_d
 
 class BuildDetailCubit extends Cubit<BuildDetailState> {
   final BuildsRepository _repository;
-
   final CharacterMediaDataSource _mediaDataSource;
+  final SpecRecommendationsRepository _recsRepository;
 
-  BuildDetailCubit(this._repository, this._mediaDataSource)
-    : super(const BuildDetailLoading());
+  BuildDetailCubit(
+    this._repository,
+    this._mediaDataSource,
+    this._recsRepository,
+  ) : super(const BuildDetailLoading());
 
   Future<void> loadBuild(String id) async {
     try {
       final builds = await _repository.getBuilds();
       final build = builds.firstWhere((b) => b.id == id);
       emit(BuildDetailLoaded(build));
+
+      // Cargar avatar si falta
+      if (build.characterAvatarUrl == null && build.characterRefKey != null) {
+        final media = await _fetchMedia();
+        if (media?.avatarUrl != null) {
+          final updated = build.copyWith(characterAvatarUrl: media!.avatarUrl);
+          await _repository.saveBuild(updated);
+          emit(BuildDetailLoaded(updated));
+        }
+      }
+
+      // Cargar recomendaciones por spec en paralelo
+      if (build.characterClass != null) {
+        _loadRecommendations(build);
+      }
     } catch (e) {
       emit(const BuildDetailError('buildNotFound'));
     }
   }
 
+  /// Carga recomendaciones de forma no bloqueante.
+  /// Emite un nuevo estado cuando llegan (sin interrumpir el uso de la pantalla).
+  Future<void> _loadRecommendations(Build build) async {
+    final className = build.characterClass;
+    final specName = build.characterSpec;
+    if (className == null) return;
+
+    final rec = await _recsRepository.getRecommendations(
+      className: className,
+      specName: specName ?? '',
+    );
+
+    // Solo emitir si el estado actual sigue siendo Loaded (no fue destruido)
+    final current = state;
+    if (current is BuildDetailLoaded) {
+      emit(current.copyWith(recommendation: rec));
+    }
+  }
+
+  // ─── Item / Enchantment / Gem ─────────────────────────────────────────────
+
   Future<void> assignItem(WowSlot slot, Item item) async {
     final current = _currentBuild;
     if (current == null) return;
 
-    // Enriquecer con iconUrl si no lo tiene
     Item enrichedItem = item;
     if (item.iconUrl == null) {
       final result = await sl<GetItemDetail>()(item.id);
@@ -74,7 +113,6 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
 
     final updatedSlots = current.slots.map((s) {
       if (s.slot == slot) {
-        // Sincronizar gemsObtained al añadir
         final syncedObtained = List<bool>.from(
           s.gemsObtained.length == s.gems.length
               ? s.gemsObtained
@@ -96,7 +134,6 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
       if (s.slot == slot) {
         if (gemIndex < 0 || gemIndex >= s.gems.length) return s;
         final newGems = [...s.gems]..removeAt(gemIndex);
-        // Sincronizar gemsObtained al eliminar
         final syncedObtained = List<bool>.from(
           s.gemsObtained.length == s.gems.length
               ? s.gemsObtained
@@ -110,14 +147,14 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     await _save(current.copyWith(slots: updatedSlots));
   }
 
+  // ─── Toggle states ────────────────────────────────────────────────────────
+
   Future<void> toggleEnchantmentObtained(WowSlot slot) async {
     final current = _currentBuild;
     if (current == null) return;
 
     final updatedSlots = current.slots.map((s) {
-      if (s.slot == slot) {
-        return s.copyWith(enchantmentObtained: !s.enchantmentObtained);
-      }
+      if (s.slot == slot) return s.copyWith(enchantmentObtained: !s.enchantmentObtained);
       return s;
     }).toList();
 
@@ -158,7 +195,8 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     await _save(current.copyWith(slots: updatedSlots));
   }
 
-  // ─── Guide ─────────────────────────────────────────────────────────────
+  // ─── Guide ────────────────────────────────────────────────────────────────
+
   Future<void> updateGuide(BuildGuide guide) async {
     final current = _currentBuild;
     if (current == null) return;
@@ -178,8 +216,7 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     final current = _currentBuild;
     if (current == null) return;
     final newRotation = [...current.guide.rotation]..removeAt(index);
-    final updated = current.guide.copyWith(rotation: newRotation);
-    await _save(current.copyWith(guide: updated));
+    await _save(current.copyWith(guide: current.guide.copyWith(rotation: newRotation)));
   }
 
   Future<void> reorderRotation(int oldIndex, int newIndex) async {
@@ -189,8 +226,7 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     final item = list.removeAt(oldIndex);
     final insertAt = newIndex > oldIndex ? newIndex - 1 : newIndex;
     list.insert(insertAt, item);
-    final updated = current.guide.copyWith(rotation: list);
-    await _save(current.copyWith(guide: updated));
+    await _save(current.copyWith(guide: current.guide.copyWith(rotation: list)));
   }
 
   Future<void> updateConsumable({
@@ -221,24 +257,26 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     if (current == null) return;
 
     final updatedSlots = current.slots.map((s) {
-      if (s.slot == slot) {
-        return BuildSlot(slot: slot);
-      }
+      if (s.slot == slot) return BuildSlot(slot: slot);
       return s;
     }).toList();
 
     await _save(current.copyWith(slots: updatedSlots));
   }
 
+  // ─── Private helpers ──────────────────────────────────────────────────────
+
+  /// Guarda y emite preservando las recomendaciones ya cargadas.
   Future<void> _save(Build updated) async {
     await _repository.saveBuild(updated);
-    emit(BuildDetailLoaded(updated));
+    final current = state;
+    final rec = current is BuildDetailLoaded ? current.recommendation : null;
+    emit(BuildDetailLoaded(updated, recommendation: rec));
   }
 
   Build? get _currentBuild {
     final s = state;
-    if (s is BuildDetailLoaded) return s.build;
-    return null;
+    return s is BuildDetailLoaded ? s.build : null;
   }
 
   Future<String?> fetchCharacterRenderUrl() async {

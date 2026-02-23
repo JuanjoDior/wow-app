@@ -428,4 +428,60 @@ class SEs extends S {
 
   @override
   String get guideNotesHint => 'Tips situacionales, notas de cooldowns...';
+
+  @override
+  String get recPanelTitle => 'Recomendaciones';
+
+  @override
+  String get recPanelSourceAI => 'Claude AI';
+
+  @override
+  String get recPanelSourceCache => 'Caché';
+
+  @override
+  String get recPanelSourceWorker => 'Worker';
+
+  @override
+  String get recPanelSourceLocal => 'Local';
+
+  @override
+  String get recPanelStatPriority => 'Prioridad de stats';
+
+  @override
+  String get recPanelGems => 'Gemas recomendadas';
+
+  @override
+  String get recPanelGemMeta => 'Meta';
+
+  @override
+  String get recPanelGemSockets => 'Sockets';
+
+  @override
+  String get recPanelConsumables => 'Consumibles';
+
+  @override
+  String get recPanelFlask => 'Frasco';
+
+  @override
+  String get recPanelPotion => 'Poción';
+
+  @override
+  String get recPanelFood => 'Comida';
+
+  @override
+  String get recPanelWeapon => 'Arma';
+
+  @override
+  String recPanelFootnote(String patch) {
+    return 'Patch $patch · Simula siempre en Raidbots para confirmar';
+  }
+
+  @override
+  String get recEnchantSuggestedSpec => 'Sugeridos para tu spec (TWW S3)';
+
+  @override
+  String get recEnchantSuggestedGeneric => 'Sugeridos (TWW S3)';
+
+  @override
+  String get recEnchantApply => 'Aplicar';
 }

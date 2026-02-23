@@ -14,11 +14,50 @@ class CreateBuildDialog extends StatefulWidget {
   State<CreateBuildDialog> createState() => _CreateBuildDialogState();
 }
 
+// ─── Clases y specs disponibles ───────────────────────────────────────────────
+
+// Todas las clases en orden alfabético
+const _classes = [
+  'Death Knight',
+  'Demon Hunter',
+  'Druid',
+  'Evoker',
+  'Hunter',
+  'Mage',
+  'Monk',
+  'Paladin',
+  'Priest',
+  'Rogue',
+  'Shaman',
+  'Warlock',
+  'Warrior',
+];
+
+const _specsByClass = <String, List<String>>{
+  'Death Knight': ['Blood', 'Frost', 'Unholy'],
+  'Demon Hunter': ['Devourer', 'Havoc', 'Vengeance'],
+  'Druid':        ['Balance', 'Feral', 'Guardian', 'Restoration'],
+  'Evoker':       ['Augmentation', 'Devastation', 'Preservation'],
+  'Hunter':       ['Beast Mastery', 'Marksmanship', 'Survival'],
+  'Mage':         ['Arcane', 'Fire', 'Frost'],
+  'Monk':         ['Brewmaster', 'Mistweaver', 'Windwalker'],
+  'Paladin':      ['Holy', 'Protection', 'Retribution'],
+  'Priest':       ['Discipline', 'Holy', 'Shadow'],
+  'Rogue':        ['Assassination', 'Outlaw', 'Subtlety'],
+  'Shaman':       ['Elemental', 'Enhancement', 'Restoration'],
+  'Warlock':      ['Affliction', 'Demonology', 'Destruction'],
+  'Warrior':      ['Arms', 'Fury', 'Protection'],
+};
+
 class _CreateBuildDialogState extends State<CreateBuildDialog> {
   final _nameController = TextEditingController();
   List<FavoriteCharacter> _favorites = [];
   FavoriteCharacter? _selectedCharacter;
   bool _loadingFavorites = true;
+
+  // Selección manual
+  String? _manualClass;
+  String? _manualSpec;
 
   @override
   void initState() {
@@ -42,6 +81,19 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
     super.dispose();
   }
 
+  String? get _effectiveClass =>
+      _selectedCharacter?.characterClass ?? _manualClass;
+
+  String? get _effectiveSpec =>
+      _selectedCharacter?.specialization ?? _manualSpec;
+
+  void _onClassChanged(String? value) {
+    setState(() {
+      _manualClass = value;
+      _manualSpec = null; // Reset spec al cambiar clase
+    });
+  }
+
   void _submit() {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
@@ -53,8 +105,8 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
       characterRefDisplay: _selectedCharacter != null
           ? '${_selectedCharacter!.name} - ${_selectedCharacter!.realm}'
           : null,
-      characterClass: _selectedCharacter?.characterClass,
-      characterSpec: _selectedCharacter?.specialization,
+      characterClass: _effectiveClass,
+      characterSpec: _effectiveSpec,
       characterRace: _selectedCharacter?.race,
       createdAt: DateTime.now(),
       slots: Build.emptySlots,
@@ -73,7 +125,8 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
         t.buildsNewBuild,
         style: const TextStyle(color: WowTheme.primaryGold),
       ),
-      content: Column(
+      content: SingleChildScrollView(
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
@@ -88,16 +141,8 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
           const SizedBox(height: 16),
           if (_loadingFavorites)
             const CircularProgressIndicator(color: WowTheme.primaryGold)
-          else if (_favorites.isEmpty)
-            Text(
-              t.buildsNoFavoritesYet,
-              style: const TextStyle(
-                color: WowTheme.textSecondary,
-                fontSize: 13,
-              ),
-            )
-          else
-            DropdownButtonFormField<FavoriteCharacter>(
+          else if (_favorites.isNotEmpty) ...[  
+            DropdownButtonFormField<FavoriteCharacter?>(
               initialValue: _selectedCharacter,
               dropdownColor: WowTheme.surfaceDark,
               decoration: InputDecoration(
@@ -123,9 +168,56 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
                   ),
                 ),
               ],
-              onChanged: (value) => setState(() => _selectedCharacter = value),
+              onChanged: (value) => setState(() {
+                _selectedCharacter = value;
+                // Reset manual si vinculamos personaje
+                if (value != null) { _manualClass = null; _manualSpec = null; }
+              }),
             ),
+            const SizedBox(height: 8),
+          ],
+
+          // Selector manual (solo si no hay personaje vinculado)
+          if (_selectedCharacter == null) ...[  
+            const Divider(color: WowTheme.textSecondary),
+            const SizedBox(height: 4),
+            const Text(
+              'Class & Spec',
+              style: TextStyle(color: WowTheme.textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              initialValue: _manualClass,
+              dropdownColor: WowTheme.surfaceDark,
+              decoration: const InputDecoration(
+                hintText: 'Select class',
+                hintStyle: TextStyle(color: WowTheme.textSecondary),
+              ),
+              style: const TextStyle(color: WowTheme.textPrimary),
+              items: _classes
+                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                  .toList(),
+              onChanged: _onClassChanged,
+            ),
+            if (_manualClass != null) ...[  
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: _manualSpec,
+                dropdownColor: WowTheme.surfaceDark,
+                decoration: const InputDecoration(
+                  hintText: 'Select spec',
+                  hintStyle: TextStyle(color: WowTheme.textSecondary),
+                ),
+                style: const TextStyle(color: WowTheme.textPrimary),
+                items: (_specsByClass[_manualClass] ?? <String>[])
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    .toList(),
+                onChanged: (value) => setState(() => _manualSpec = value),
+              ),
+            ],
+          ],
         ],
+        ),
       ),
       actions: [
         TextButton(

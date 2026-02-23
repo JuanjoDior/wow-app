@@ -428,4 +428,60 @@ class SEn extends S {
 
   @override
   String get guideNotesHint => 'Situational tips, cooldown notes...';
+
+  @override
+  String get recPanelTitle => 'Recommendations';
+
+  @override
+  String get recPanelSourceAI => 'Claude AI';
+
+  @override
+  String get recPanelSourceCache => 'Cache';
+
+  @override
+  String get recPanelSourceWorker => 'Worker';
+
+  @override
+  String get recPanelSourceLocal => 'Local';
+
+  @override
+  String get recPanelStatPriority => 'Stat priority';
+
+  @override
+  String get recPanelGems => 'Recommended gems';
+
+  @override
+  String get recPanelGemMeta => 'Meta';
+
+  @override
+  String get recPanelGemSockets => 'Sockets';
+
+  @override
+  String get recPanelConsumables => 'Consumables';
+
+  @override
+  String get recPanelFlask => 'Flask';
+
+  @override
+  String get recPanelPotion => 'Potion';
+
+  @override
+  String get recPanelFood => 'Food';
+
+  @override
+  String get recPanelWeapon => 'Weapon';
+
+  @override
+  String recPanelFootnote(String patch) {
+    return 'Patch $patch · Always sim on Raidbots to confirm';
+  }
+
+  @override
+  String get recEnchantSuggestedSpec => 'Suggested for your spec (TWW S3)';
+
+  @override
+  String get recEnchantSuggestedGeneric => 'Suggested (TWW S3)';
+
+  @override
+  String get recEnchantApply => 'Apply';
 }
