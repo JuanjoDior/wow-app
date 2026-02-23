@@ -7,8 +7,6 @@ import 'package:wow_companion/features/favorites/presentation/favorites_page.dar
 import 'package:wow_companion/features/items/presentation/items_page.dart';
 import 'package:wow_companion/features/search/presentation/home_page.dart';
 import 'package:wow_companion/shared/widgets/shell_layout.dart';
-import 'package:wow_companion/features/guides/presentation/pages/guides_list_page.dart';
-import 'package:wow_companion/features/guides/presentation/pages/guide_detail_page.dart';
 import 'package:wow_companion/features/builds/presentation/pages/builds_list_page.dart';
 import 'package:wow_companion/features/builds/presentation/pages/build_detail_page.dart';
 
@@ -59,15 +57,6 @@ final GoRouter appRouter = GoRouter(
             ),
           ],
         ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/guides',
-              pageBuilder: (context, state) =>
-                  const NoTransitionPage(child: GuidesListPage()),
-            ),
-          ],
-        ),
       ],
     ),
     // Character profile — full screen
@@ -88,17 +77,7 @@ final GoRouter appRouter = GoRouter(
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const CompareSelectPage(),
     ),
-    // Guide detail
-    GoRoute(
-      path: '/guides/:classSlug/:specSlug',
-      parentNavigatorKey: _rootNavigatorKey,
-      builder: (context, state) {
-        return GuideDetailPage(
-          classSlug: state.pathParameters['classSlug']!,
-          specSlug: state.pathParameters['specSlug']!,
-        );
-      },
-    ),
+
     // Compare — results
     GoRoute(
       path: '/compare/:region1/:realm1/:name1/vs/:region2/:realm2/:name2',

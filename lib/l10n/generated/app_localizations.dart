@@ -1014,6 +1014,138 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Apply'**
   String get recEnchantApply;
+
+  /// No description provided for @analysisTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Character Analysis'**
+  String get analysisTitle;
+
+  /// No description provided for @analysisBased.
+  ///
+  /// In en, this message translates to:
+  /// **'Based on {spec} recommendations'**
+  String analysisBased(String spec);
+
+  /// No description provided for @analysisIssue.
+  ///
+  /// In en, this message translates to:
+  /// **'issue'**
+  String get analysisIssue;
+
+  /// No description provided for @analysisIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'issues'**
+  String get analysisIssues;
+
+  /// No description provided for @analysisSectionReadiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Content Readiness'**
+  String get analysisSectionReadiness;
+
+  /// No description provided for @analysisSectionEnchantments.
+  ///
+  /// In en, this message translates to:
+  /// **'Enchantments'**
+  String get analysisSectionEnchantments;
+
+  /// No description provided for @analysisSectionGems.
+  ///
+  /// In en, this message translates to:
+  /// **'Gems'**
+  String get analysisSectionGems;
+
+  /// No description provided for @analysisSectionStats.
+  ///
+  /// In en, this message translates to:
+  /// **'Stat Distribution'**
+  String get analysisSectionStats;
+
+  /// No description provided for @analysisSectionProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Gear Progress'**
+  String get analysisSectionProgress;
+
+  /// No description provided for @insightBadgeFix.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix now'**
+  String get insightBadgeFix;
+
+  /// No description provided for @insightBadgeImprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Improve'**
+  String get insightBadgeImprove;
+
+  /// No description provided for @insightBadgeInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Info'**
+  String get insightBadgeInfo;
+
+  /// No description provided for @insightBadgeGood.
+  ///
+  /// In en, this message translates to:
+  /// **'Good'**
+  String get insightBadgeGood;
+
+  /// No description provided for @insightModeSimple.
+  ///
+  /// In en, this message translates to:
+  /// **'Simple'**
+  String get insightModeSimple;
+
+  /// No description provided for @insightModeAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get insightModeAdvanced;
+
+  /// No description provided for @insightActionSteps.
+  ///
+  /// In en, this message translates to:
+  /// **'Action steps:'**
+  String get insightActionSteps;
+
+  /// No description provided for @consumableTypeFlask.
+  ///
+  /// In en, this message translates to:
+  /// **'Flask'**
+  String get consumableTypeFlask;
+
+  /// No description provided for @consumableTypePotion.
+  ///
+  /// In en, this message translates to:
+  /// **'Potion'**
+  String get consumableTypePotion;
+
+  /// No description provided for @consumableTypeFood.
+  ///
+  /// In en, this message translates to:
+  /// **'Food'**
+  String get consumableTypeFood;
+
+  /// No description provided for @consumableTypeRune.
+  ///
+  /// In en, this message translates to:
+  /// **'Rune'**
+  String get consumableTypeRune;
+
+  /// No description provided for @consumableTypeWeapon.
+  ///
+  /// In en, this message translates to:
+  /// **'Weapon'**
+  String get consumableTypeWeapon;
+
+  /// No description provided for @consumableTypeEnchant.
+  ///
+  /// In en, this message translates to:
+  /// **'Enchantment'**
+  String get consumableTypeEnchant;
 }
 
 class _SDelegate extends LocalizationsDelegate<S> {

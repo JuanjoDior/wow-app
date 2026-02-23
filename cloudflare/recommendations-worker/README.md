@@ -1,7 +1,7 @@
-# wow-recommendations — Cloudflare Worker v2
+# wow-recommendations — Cloudflare Worker v4
 
-Genera y cachea recomendaciones de enchants, gemas y consumibles por clase/spec.
-Usa Claude API para generar datos frescos y KV Storage para cachear (TTL 7 días).
+Sirve recomendaciones de enchants, gemas y consumibles por clase/spec.
+Prioriza static data embebido (actualizable por parche) y usa KV Storage como caché de respaldo (TTL 7 días).
 
 ## Endpoints
 
@@ -9,8 +9,8 @@ Usa Claude API para generar datos frescos y KV Storage para cachear (TTL 7 días
 |--------|------|-------------|
 | GET | `/health` | Estado del Worker |
 | GET | `/recommendations?class=druid&spec=feral` | Obtener recomendaciones |
-| POST | `/invalidate` | Limpiar cache de una spec |
-| GET | `/specs` | Listar specs y estado de cache |
+| POST | `/invalidate` | Limpiar caché de una spec |
+| GET | `/specs` | Listar specs y estado de caché |
 
 ### GET /recommendations
 
@@ -19,16 +19,16 @@ Usa Claude API para generar datos frescos y KV Storage para cachear (TTL 7 días
 | `class` | ✓ | Clase en minúsculas (`druid`, `warrior`...) |
 | `spec` | ✓ | Spec en minúsculas (`feral`, `arms`...) |
 | `patch` | - | Versión (default: `CURRENT_PATCH` en wrangler.toml) |
-| `force` | - | `force=1` para ignorar cache y regenerar |
+| `force` | - | `force=1` para ignorar caché y refrescar |
 
 **Response:**
 ```json
 {
   "class_name": "druid",
   "spec_name": "feral",
-  "patch": "11.2.7",
+  "patch": "12.0.1",
   "generated_at": "2026-02-20T10:00:00Z",
-  "_source": "cache | generated",
+  "_source": "static | cache",
   "enchants": { "back": [{"name": "...", "note": "...", "is_primary": true}], ... },
   "gems": { "meta": {"name": "...", "note": "..."}, "generic": {...} },
   "consumables": { "flask": {...}, "food": {...}, "potion": {...}, "weapon": {...} },
@@ -41,7 +41,7 @@ Usa Claude API para generar datos frescos y KV Storage para cachear (TTL 7 días
 Requiere header `X-Invalidate-Secret` si `INVALIDATE_SECRET` está configurado.
 
 ```json
-{ "class": "druid", "spec": "feral", "patch": "11.2.7" }
+{ "class": "druid", "spec": "feral", "patch": "12.0.1" }
 ```
 
 ---
@@ -59,9 +59,8 @@ wrangler login
 wrangler kv:namespace create "RECS_CACHE"
 # → Copia el id que devuelve y pégalo en wrangler.toml
 
-# 4. Añadir secrets (NUNCA en wrangler.toml)
-wrangler secret put ANTHROPIC_API_KEY
-wrangler secret put INVALIDATE_SECRET   # opcional
+# 4. Añadir secrets (NUNCA en wrangler.toml) — opcional
+wrangler secret put INVALIDATE_SECRET
 
 # 5. Deploy
 wrangler deploy
@@ -81,13 +80,32 @@ static const String _baseUrl =
 
 ---
 
+## Flujo de resolución
+
+```
+GET /recommendations?class=druid&spec=feral
+        │
+        ▼
+1. ¿Existe en STATIC_DATA?  ──SÍ──▶  Devuelve datos + refresca KV  (_source: static)
+        │NO
+        ▼
+2. ¿Existe en KV cache?     ──SÍ──▶  Devuelve datos               (_source: cache)
+        │NO
+        ▼
+3. 404 — spec no soportada
+```
+
+El static data en `src/index.js` es la fuente de verdad. Para añadir o actualizar specs, edita `STATIC_DATA` y haz `wrangler deploy`.
+
+---
+
 ## Cuando sale un nuevo parche
 
 1. Actualizar `CURRENT_PATCH` en `wrangler.toml`
-2. `wrangler deploy`
-3. El GitHub Action semanal regenerará automáticamente el fallback estático
+2. Editar `STATIC_DATA` en `src/index.js` con los nuevos datos
+3. `wrangler deploy`
 
-Para invalidar cache manualmente de una spec:
+Para invalidar caché manualmente de una spec:
 ```bash
 curl -X POST https://wow-recommendations.TU-SUBDOMINIO.workers.dev/invalidate \
   -H "Content-Type: application/json" \
@@ -97,7 +115,6 @@ curl -X POST https://wow-recommendations.TU-SUBDOMINIO.workers.dev/invalidate \
 
 Para invalidar TODAS las specs a la vez (útil tras un parche grande):
 ```bash
-# Script para invalidar todas las specs soportadas
 for spec in "druid:feral" "druid:balance" "warrior:arms" "warrior:fury" "paladin:retribution" "mage:fire" "hunter:beast mastery"; do
   CLASS="${spec%%:*}"
   SPEC="${spec##*:}"

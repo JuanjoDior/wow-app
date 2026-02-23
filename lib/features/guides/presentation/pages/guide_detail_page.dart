@@ -350,7 +350,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
               SizedBox(
                 width: 60,
                 child: Text(
-                  c.type,
+                  _translateConsumableType(c.type),
                   style: const TextStyle(
                     color: WowTheme.textSecondary,
                     fontSize: 12,
@@ -406,6 +406,20 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
         );
       }).toList(),
     );
+  }
+
+  /// Traduce el tipo de consumible (almacenado en inglés en el JSON) al idioma activo.
+  String _translateConsumableType(String type) {
+    final t = S.of(context)!;
+    return switch (type) {
+      'Flask'   => t.consumableTypeFlask,
+      'Potion'  => t.consumableTypePotion,
+      'Food'    => t.consumableTypeFood,
+      'Weapon'  => t.consumableTypeWeapon,
+      'Rune'    => t.consumableTypeRune,
+      'Enchant' => t.consumableTypeEnchant,
+      _         => type,
+    };
   }
 
   IconData _getConsumableIcon(String type) {

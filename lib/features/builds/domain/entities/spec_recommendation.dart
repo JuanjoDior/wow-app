@@ -73,7 +73,7 @@ class SpecRecommendation extends Equatable {
 
 /// Fuente de los datos de recomendacion.
 enum RecommendationSource {
-  remote,        // Generado por Claude via Worker
+  remote,        // Datos remotos del Worker
   cache,         // Cacheado en el Worker
   workerStatic,  // Static data en el Worker (sin API key)
   local,         // Static fallback local (sin conexion)

@@ -5,6 +5,7 @@ import 'package:wow_companion/features/builds/domain/entities/spec_recommendatio
 import 'package:wow_companion/features/builds/presentation/cubit/build_detail_cubit.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/build_detail_state.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
+import 'package:wow_companion/core/l10n/wow_translations.dart';
 
 /// Panel colapsable que muestra las recomendaciones de spec cargadas
 /// (stats, gemas, consumibles) cuando hay una SpecRecommendation disponible.
@@ -218,8 +219,8 @@ class _SpecRecommendationPanelState extends State<SpecRecommendationPanel> {
   }
 
   String _specLabel(SpecRecommendation rec) {
-    final cls = _capitalize(rec.className);
-    final spec = _capitalize(rec.specName);
+    final cls  = WowTranslations.translateClass(_capitalize(rec.className));
+    final spec = WowTranslations.translateSpec(_capitalize(rec.specName));
     return '$spec $cls';
   }
 

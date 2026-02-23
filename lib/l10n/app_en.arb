@@ -163,7 +163,7 @@
   "guideNotesHint": "Situational tips, cooldown notes...",
 
   "recPanelTitle": "Recommendations",
-  "recPanelSourceAI": "Claude AI",
+  "recPanelSourceAI": "Remote",
   "recPanelSourceCache": "Cache",
   "recPanelSourceWorker": "Worker",
   "recPanelSourceLocal": "Local",
@@ -182,5 +182,33 @@
   },
   "recEnchantSuggestedSpec": "Suggested for your spec (TWW S3)",
   "recEnchantSuggestedGeneric": "Suggested (TWW S3)",
-  "recEnchantApply": "Apply"
+  "recEnchantApply": "Apply",
+
+  "analysisTitle": "Character Analysis",
+  "analysisBased": "Based on {spec} recommendations",
+  "@analysisBased": {
+    "placeholders": { "spec": { "type": "String" } }
+  },
+  "analysisIssue": "issue",
+  "analysisIssues": "issues",
+  "analysisSectionReadiness": "Content Readiness",
+  "analysisSectionEnchantments": "Enchantments",
+  "analysisSectionGems": "Gems",
+  "analysisSectionStats": "Stat Distribution",
+  "analysisSectionProgress": "Gear Progress",
+
+  "insightBadgeFix": "Fix now",
+  "insightBadgeImprove": "Improve",
+  "insightBadgeInfo": "Info",
+  "insightBadgeGood": "Good",
+  "insightModeSimple": "Simple",
+  "insightModeAdvanced": "Advanced",
+  "insightActionSteps": "Action steps:",
+
+  "consumableTypeFlask": "Flask",
+  "consumableTypePotion": "Potion",
+  "consumableTypeFood": "Food",
+  "consumableTypeRune": "Rune",
+  "consumableTypeWeapon": "Weapon",
+  "consumableTypeEnchant": "Enchantment"
 }

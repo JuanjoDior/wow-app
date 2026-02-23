@@ -163,7 +163,7 @@
   "guideNotesHint": "Tips situacionales, notas de cooldowns...",
 
   "recPanelTitle": "Recomendaciones",
-  "recPanelSourceAI": "Claude AI",
+  "recPanelSourceAI": "Remoto",
   "recPanelSourceCache": "Caché",
   "recPanelSourceWorker": "Worker",
   "recPanelSourceLocal": "Local",
@@ -182,5 +182,33 @@
   },
   "recEnchantSuggestedSpec": "Sugeridos para tu spec (TWW S3)",
   "recEnchantSuggestedGeneric": "Sugeridos (TWW S3)",
-  "recEnchantApply": "Aplicar"
+  "recEnchantApply": "Aplicar",
+
+  "analysisTitle": "Análisis del Personaje",
+  "analysisBased": "Basado en recomendaciones de {spec}",
+  "@analysisBased": {
+    "placeholders": { "spec": { "type": "String" } }
+  },
+  "analysisIssue": "problema",
+  "analysisIssues": "problemas",
+  "analysisSectionReadiness": "Preparación para Contenido",
+  "analysisSectionEnchantments": "Encantamientos",
+  "analysisSectionGems": "Gemas",
+  "analysisSectionStats": "Distribución de Stats",
+  "analysisSectionProgress": "Progresión de Equipo",
+
+  "insightBadgeFix": "¡Corregir!",
+  "insightBadgeImprove": "Mejorar",
+  "insightBadgeInfo": "Info",
+  "insightBadgeGood": "Bien ✓",
+  "insightModeSimple": "Simple",
+  "insightModeAdvanced": "Avanzado",
+  "insightActionSteps": "Pasos a seguir:",
+
+  "consumableTypeFlask": "Frasco",
+  "consumableTypePotion": "Poción",
+  "consumableTypeFood": "Comida",
+  "consumableTypeRune": "Runa",
+  "consumableTypeWeapon": "Arma",
+  "consumableTypeEnchant": "Encantamiento"
 }

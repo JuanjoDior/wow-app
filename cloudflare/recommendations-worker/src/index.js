@@ -1,10 +1,10 @@
 /**
- * wow-recommendations Worker  v3
+ * wow-recommendations Worker  v4
  *
  * Flujo de resolución:
- *  1. KV cache  → devuelve si existe
- *  2. Groq API  → genera con Llama 3.3 70B (gratuito, sin tarjeta)
- *  3. Static fallback → datos embebidos por spec (siempre disponible, gratis)
+ *  1. Static data embebido → prioridad máxima, siempre disponible y gratuito
+ *  2. KV cache            → para specs sin datos estáticos (raro)
+ *  3. 404                 → spec no soportada
  *
  * Endpoints:
  *   GET  /health
@@ -301,7 +301,6 @@ const STATIC_DATA = {
       potion:  { name: "Tempered Potion",                  note: "With CDs" },
       weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
     },
-    // Templar: Haste > Mastery > Vers/Crit | Lightsmith: Haste > Crit > Vers/Mastery
     stat_priority: ["Strength", "Haste", "Mastery", "Versatility", "Critical Strike"],
   },
 
@@ -360,7 +359,6 @@ const STATIC_DATA = {
       potion:  { name: "Tempered Potion",                  note: "Damage CDs" },
       weapon:  { name: "Algari Mana Oil",                  note: "Or Ironclaw Whetstone" },
     },
-    // Deathbringer: Crit/Vers/Mastery > Haste | San'layn: Haste > Crit/Vers/Mastery
     stat_priority: ["Strength", "Critical Strike", "Versatility", "Mastery", "Haste"],
   },
 
@@ -390,8 +388,6 @@ const STATIC_DATA = {
       potion:  { name: "Tempered Potion",                  note: "With CDs" },
       weapon:  { name: "Crystallized Augment Rune",        note: "Primary stat boost" },
     },
-    // Survival: Armor/Agi/Stam > Haste > Vers > Mastery > Crit
-    // Damage: Haste > Vers = Crit = Mastery
     stat_priority: ["Agility", "Haste", "Versatility", "Mastery", "Critical Strike"],
   },
 
@@ -421,7 +417,6 @@ const STATIC_DATA = {
       potion:  { name: "Tempered Potion",                  note: "With CDs" },
       weapon:  { name: "Ironclaw Weightstone",             note: "Or Algari Mana Oil" },
     },
-    // Defense: Vers = Crit = Mastery > Haste | Offense: Crit > Vers > Mastery > Haste
     stat_priority: ["Agility", "Critical Strike", "Versatility", "Mastery", "Haste"],
   },
 
@@ -451,7 +446,6 @@ const STATIC_DATA = {
       potion:  { name: "Tempered Potion",                  note: "With CDs" },
       weapon:  { name: "Oil of Deep Toxins",               note: "Or Ironclaw Whetstone" },
     },
-    // Defensive: Agi > Haste > Vers/Crit > Mastery
     stat_priority: ["Agility", "Haste", "Versatility", "Critical Strike", "Mastery"],
   },
 
@@ -484,8 +478,6 @@ const STATIC_DATA = {
       potion:  { name: "Slumbering Soul Serum",          note: "Mana; or Algari Mana Potion" },
       weapon:  { name: "Algari Mana Oil",                note: "Crit + Haste" },
     },
-    // Raid: Int > Haste > Crit > Vers > Mastery
-    // M+: Int > Haste > Crit >= Vers > Mastery
     stat_priority: ["Intellect", "Haste", "Critical Strike", "Versatility", "Mastery"],
   },
 
@@ -514,8 +506,6 @@ const STATIC_DATA = {
       potion:  { name: "Slumbering Soul Serum",          note: "Mana; or Algari Mana Potion" },
       weapon:  { name: "Algari Mana Oil",                note: "Crit + Haste" },
     },
-    // Haste until 20-25% > Crit = Mastery > Haste beyond > Vers
-    // Voidweaver: Haste > Mastery > Crit > Vers
     stat_priority: ["Intellect", "Haste", "Critical Strike", "Mastery", "Versatility"],
   },
 
@@ -544,8 +534,6 @@ const STATIC_DATA = {
       potion:  { name: "Algari Mana Potion",           note: "Mana; Tempered Potion for stats" },
       weapon:  { name: "Algari Mana Oil",              note: "Crit + Haste" },
     },
-    // Raid: Int > Haste = Mastery > Vers > Crit
-    // M+: Int > Mastery = Haste > Vers > Crit
     stat_priority: ["Intellect", "Haste", "Mastery", "Versatility", "Critical Strike"],
   },
 
@@ -574,8 +562,6 @@ const STATIC_DATA = {
       potion:  { name: "Slumbering Soul Serum",        note: "Mana; Invigorating Healing alt" },
       weapon:  { name: "Crystallized Augment Rune",    note: "Or Ethereal Augment Rune" },
     },
-    // Raid: Int > Mastery > Crit > Haste > Vers
-    // M+: Int > Crit > Haste > Vers > Mastery
     stat_priority: ["Intellect", "Mastery", "Critical Strike", "Haste", "Versatility"],
   },
 
@@ -604,8 +590,6 @@ const STATIC_DATA = {
       potion:  { name: "Slumbering Soul Serum",         note: "Mana; Invigorating Healing alt" },
       weapon:  { name: "Algari Mana Oil",               note: "Crit + Haste" },
     },
-    // Raid: Crit preferred | M+: Vers preferred
-    // Stats very close — Crit, Vers, Haste balance; Mastery less value for mana conservation
     stat_priority: ["Intellect", "Critical Strike", "Versatility", "Haste", "Mastery"],
   },
 
@@ -632,8 +616,6 @@ const STATIC_DATA = {
       potion:  { name: "Algari Mana Potion",            note: "Mana; Tempered for damage" },
       weapon:  { name: "Algari Mana Oil",               note: "Crit + Haste" },
     },
-    // Raid: Crit > Vers = Mastery > Haste
-    // M+: Crit > Vers = Haste > Mastery
     stat_priority: ["Intellect", "Critical Strike", "Versatility", "Mastery", "Haste"],
   },
 
@@ -661,9 +643,6 @@ export default {
     if (url.pathname === '/specs' && request.method === 'GET') {
       return handleSpecs(url, env);
     }
-    if (url.pathname === '/debug-gemini' && request.method === 'GET') {
-      return handleDebugGemini(env);
-    }
 
     return new Response('Not Found', { status: 404, headers: CORS_HEADERS });
   },
@@ -683,10 +662,8 @@ async function handleRecommendations(url, env) {
 
   const cacheKey = buildCacheKey(classParam, specParam, patch);
 
-  // 1. Static data verificado — SIEMPRE tiene prioridad sobre caché y generación.
-  //    Esto garantiza que cualquier actualización manual en STATIC_DATA se aplica
-  //    de inmediato, sin importar lo que haya en la KV cache (evita datos de tests
-  //    anteriores que queden cacheados durante días).
+  // 1. Static data — prioridad máxima, siempre disponible y sin coste.
+  //    Actualizar STATIC_DATA aquí con cada parche relevante.
   const staticKey = `${classParam}:${specParam}`;
   const staticData = STATIC_DATA[staticKey];
 
@@ -699,29 +676,17 @@ async function handleRecommendations(url, env) {
       ...staticData,
       _source: 'static',
     };
-    // Actualizar KV con los datos estáticos frescos (sobrescribe cualquier dato viejo)
+    // Refrescar KV con los datos estáticos actuales (sobrescribe cualquier versión antigua)
     const ttl = parseInt(env.CACHE_TTL_SECONDS || '604800', 10);
     await env.RECS_CACHE.put(cacheKey, JSON.stringify(result), { expirationTtl: ttl });
     return json({ ...result, _source: 'static' });
   }
 
-  // 2. KV cache — solo para specs SIN datos estáticos (o cuando force=1 para test)
+  // 2. KV cache — fallback para specs sin datos estáticos
   if (!force) {
     const cached = await env.RECS_CACHE.get(cacheKey, 'json');
     if (cached) {
       return json({ ...cached, _source: 'cache' });
-    }
-  }
-
-  // 3. Groq API — solo para specs SIN datos estáticos verificados
-  if (env.GROQ_API_KEY) {
-    try {
-      const recommendations = await generateWithGroq(classParam, specParam, patch, env.GROQ_API_KEY);
-      const ttl = parseInt(env.CACHE_TTL_SECONDS || '604800', 10);
-      await env.RECS_CACHE.put(cacheKey, JSON.stringify(recommendations), { expirationTtl: ttl });
-      return json({ ...recommendations, _source: 'generated' });
-    } catch (err) {
-      console.error('Groq generation failed:', err.message);
     }
   }
 
@@ -778,154 +743,6 @@ async function handleSpecs(url, env) {
   );
 
   return json({ patch, specs: results });
-}
-
-// ─── Debug ──────────────────────────────────────────────────────────────────────
-
-async function handleDebugGemini(env) {
-  if (!env.GROQ_API_KEY) {
-    return json({ error: 'GROQ_API_KEY not set' }, 500);
-  }
-
-  try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.1,
-        max_tokens: 20,
-        response_format: { type: 'json_object' },
-        messages: [{ role: 'user', content: 'Reply with this exact JSON: {"ok": true}' }],
-      }),
-    });
-
-    const statusCode = response.status;
-    const rawText = await response.text();
-    let parsed = null;
-    try { parsed = JSON.parse(rawText); } catch (_) {}
-
-    return json({
-      key_prefix: env.GROQ_API_KEY.slice(0, 8) + '...',
-      groq_status: statusCode,
-      groq_ok: response.ok,
-      groq_response: parsed?.choices?.[0]?.message?.content ?? null,
-    });
-  } catch (err) {
-    return json({ fetch_error: err.message }, 500);
-  }
-}
-
-// ─── Groq generation ─────────────────────────────────────────────────────────
-
-async function generateWithGroq(className, specName, patch, apiKey) {
-  const prompt = buildPrompt(className, specName, patch);
-
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
-      temperature: 0.2,
-      max_tokens: 1500,
-      response_format: { type: 'json_object' }, // Fuerza JSON puro sin markdown
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Groq API error ${response.status}: ${err}`);
-  }
-
-  const data = await response.json();
-  const text = data.choices?.[0]?.message?.content ?? '';
-
-  if (!text) {
-    throw new Error('Groq returned empty response');
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch (e) {
-    throw new Error(`Failed to parse Groq JSON: ${e.message}. Raw: ${text.slice(0, 200)}`);
-  }
-
-  return {
-    class_name: className,
-    spec_name: specName,
-    patch,
-    generated_at: new Date().toISOString(),
-    ...parsed,
-  };
-}
-
-function buildPrompt(className, specName, patch) {
-  return `You are a World of Warcraft expert specializing in PvE optimization for The War Within expansion (patch ${patch}, Season 3).
-
-Generate BiS enchants, gems, consumables and stat priority for a ${specName} ${className} in The War Within patch ${patch}.
-
-CRITICAL: All item names MUST be from The War Within expansion (patch 11.x / 12.0.x pre-patch Midnight). Do NOT use items from Shadowlands, Dragonflight, or any previous expansion. The War Within items remain valid in patch 12.0.1 pre-patch.
-
-The War Within enchants include (use these, not old ones):
-- Back: Chant of Burrowing Rapidity, Chant of Winged Grace
-- Chest: Stormrider's Agility / Strength / Intellect
-- Wrist: Chant of Armored Speed, Chant of Powerful Rituals
-- Legs: Stormbound Armor Kit (physical), Daybreak Spellthread (caster)
-- Feet: Scout's March, Cavalry's March
-- Rings: Glimmering Critical Strike, Glimmering Mastery, Radiant Haste, Radiant Versatility
-- Weapon: Authority of Radiant Power, Authority of Fiery Resolve, Authority of the Depths
-
-The War Within gems include:
-- Meta: Culminating Blasphemite
-- Regular: Radiant Mastery, Radiant Critical Strike, Energized Ysemerald, Crafty Alexstraszite
-
-The War Within consumables include:
-- Flasks: Flask of Alchemical Chaos, Flask of Tempered Aggression, Flask of Tempered Mastery
-- Food: Feast of the Midnight Masquerade, or stat-specific foods
-- Potions: Tempered Potion, Potion of Unwavering Focus
-- Weapon: Algari Mana Oil, Burst of Knowledge
-
-Return ONLY a valid JSON object, no markdown, no explanation:
-
-{
-  "enchants": {
-    "back":     [{"name": "string", "note": "string", "is_primary": true}],
-    "chest":    [{"name": "string", "note": "string", "is_primary": true}],
-    "wrist":    [{"name": "string", "note": "string", "is_primary": true}],
-    "legs":     [{"name": "string", "note": "string", "is_primary": true}],
-    "feet":     [{"name": "string", "note": "string", "is_primary": true}],
-    "finger1":  [{"name": "string", "note": "string", "is_primary": true}],
-    "finger2":  [{"name": "string", "note": "string", "is_primary": true}],
-    "mainHand": [{"name": "string", "note": "string", "is_primary": true}],
-    "offHand":  []
-  },
-  "gems": {
-    "meta":    {"name": "string", "note": "string"},
-    "generic": {"name": "string", "note": "string"}
-  },
-  "consumables": {
-    "flask":  {"name": "string", "note": "string"},
-    "food":   {"name": "string", "note": "string"},
-    "potion": {"name": "string", "note": "string"},
-    "weapon": {"name": "string", "note": "string"}
-  },
-  "stat_priority": ["stat1", "stat2", "stat3", "stat4", "stat5"]
-}
-
-Rules:
-- 1-3 options per enchant slot, best first with is_primary: true, rest with is_primary: false
-- offHand: empty [] unless spec actively dual-wields (e.g. Fury Warrior)
-- stat_priority names: Agility, Strength, Intellect, Critical Strike, Mastery, Haste, Versatility
-- note: short English description max 6 words, or null
-- Prioritize raid + M+ viability for patch ${patch}`;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

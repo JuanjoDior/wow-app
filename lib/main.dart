@@ -11,6 +11,7 @@ void main() async {
   configureUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
   await initDependencies();
+  await sl<LocaleNotifier>().load(); // Restaura el idioma guardado
   runApp(const MainApp());
 }
 

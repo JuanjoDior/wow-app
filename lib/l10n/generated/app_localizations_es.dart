@@ -433,7 +433,7 @@ class SEs extends S {
   String get recPanelTitle => 'Recomendaciones';
 
   @override
-  String get recPanelSourceAI => 'Claude AI';
+  String get recPanelSourceAI => 'Remoto';
 
   @override
   String get recPanelSourceCache => 'Caché';
@@ -484,4 +484,72 @@ class SEs extends S {
 
   @override
   String get recEnchantApply => 'Aplicar';
+
+  @override
+  String get analysisTitle => 'Análisis del Personaje';
+
+  @override
+  String analysisBased(String spec) {
+    return 'Basado en recomendaciones de $spec';
+  }
+
+  @override
+  String get analysisIssue => 'problema';
+
+  @override
+  String get analysisIssues => 'problemas';
+
+  @override
+  String get analysisSectionReadiness => 'Preparación para Contenido';
+
+  @override
+  String get analysisSectionEnchantments => 'Encantamientos';
+
+  @override
+  String get analysisSectionGems => 'Gemas';
+
+  @override
+  String get analysisSectionStats => 'Distribución de Stats';
+
+  @override
+  String get analysisSectionProgress => 'Progresión de Equipo';
+
+  @override
+  String get insightBadgeFix => '¡Corregir!';
+
+  @override
+  String get insightBadgeImprove => 'Mejorar';
+
+  @override
+  String get insightBadgeInfo => 'Info';
+
+  @override
+  String get insightBadgeGood => 'Bien ✓';
+
+  @override
+  String get insightModeSimple => 'Simple';
+
+  @override
+  String get insightModeAdvanced => 'Avanzado';
+
+  @override
+  String get insightActionSteps => 'Pasos a seguir:';
+
+  @override
+  String get consumableTypeFlask => 'Frasco';
+
+  @override
+  String get consumableTypePotion => 'Poción';
+
+  @override
+  String get consumableTypeFood => 'Comida';
+
+  @override
+  String get consumableTypeRune => 'Runa';
+
+  @override
+  String get consumableTypeWeapon => 'Arma';
+
+  @override
+  String get consumableTypeEnchant => 'Encantamiento';
 }

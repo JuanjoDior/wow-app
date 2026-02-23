@@ -12,7 +12,6 @@ import 'package:wow_companion/features/search/data/search_history_repository_imp
 import 'package:wow_companion/features/search/domain/search_history_repository.dart';
 import 'package:wow_companion/core/cache/memory_cache.dart';
 import 'package:wow_companion/features/character/domain/entities/character.dart';
-import 'package:wow_companion/features/guides/data/cheatsheet_repository.dart';
 import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/features/items/data/datasources/blizzard_items_datasource.dart';
 import 'package:wow_companion/features/items/data/repositories/items_repository_impl.dart';
@@ -29,6 +28,10 @@ import 'package:wow_companion/features/builds/domain/repositories/spells_reposit
 import 'package:wow_companion/features/builds/domain/usecases/search_spells.dart';
 import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dart';
 import 'package:wow_companion/features/builds/data/datasources/character_media_datasource.dart';
+// ── Analysis Feature ─────────────────────────────────────────────────────────
+import 'package:wow_companion/features/analysis/domain/services/character_analysis_service.dart';
+import 'package:wow_companion/features/analysis/domain/services/gear_progress_service.dart';
+import 'package:wow_companion/features/analysis/presentation/cubit/character_analysis_cubit.dart';
 // ── Spec Recommendations ──────────────────────────────────────────────────────
 import 'package:wow_companion/features/builds/data/datasources/spec_recommendations_datasource.dart';
 import 'package:wow_companion/features/builds/data/repositories/spec_recommendations_repository_impl.dart';
@@ -37,8 +40,6 @@ import 'package:wow_companion/features/builds/domain/repositories/spec_recommend
 final sl = GetIt.instance;
 
 Future<void> initDependencies() async {
-  sl.registerLazySingleton<CheatsheetRepository>(() => CheatsheetRepository());
-
   // ── Core ──────────────────────────────────────────────────────────────────
   sl.registerLazySingleton<ApiClient>(() => ApiClient());
   sl.registerLazySingleton<MemoryCache<Character>>(() => MemoryCache<Character>());
@@ -88,6 +89,11 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<SpellsDataSource>(() => SpellsDataSource(sl()));
   sl.registerLazySingleton<SpellsRepository>(() => SpellsRepositoryImpl(remoteDataSource: sl()));
   sl.registerLazySingleton(() => SearchSpells(sl()));
+
+  // ── Analysis Feature ─────────────────────────────────────────────────────
+  sl.registerLazySingleton<CharacterAnalysisService>(() => const CharacterAnalysisService());
+  sl.registerLazySingleton<GearProgressService>(() => GearProgressService());
+  sl.registerFactory(() => CharacterAnalysisCubit(sl(), sl()));
 
   // ── Character Media ───────────────────────────────────────────────────────
   sl.registerLazySingleton<CharacterMediaDataSource>(() => CharacterMediaDataSource(sl()));

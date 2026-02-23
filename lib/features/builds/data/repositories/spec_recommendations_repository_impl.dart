@@ -6,7 +6,7 @@ import 'package:wow_companion/features/builds/domain/repositories/spec_recommend
 /// Repositorio con estrategia remote-first + fallback local.
 ///
 /// Orden de resolución:
-///  1. Worker remoto (Claude API + KV cache)
+///  1. Worker remoto (KV cache + static data)
 ///  2. Static data local (WowStaticRecommendations)
 ///  3. null → el consumer lo maneja mostrando hints genéricos
 class SpecRecommendationsRepositoryImpl implements SpecRecommendationsRepository {

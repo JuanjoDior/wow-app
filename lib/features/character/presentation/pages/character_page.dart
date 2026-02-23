@@ -10,6 +10,7 @@ import 'package:wow_companion/features/favorites/presentation/favorites_cubit.da
 import 'package:wow_companion/shared/widgets/common_widgets.dart';
 import 'package:wow_companion/shared/widgets/item_tooltip.dart';
 import 'package:wow_companion/core/l10n/wow_translations.dart';
+import 'package:wow_companion/features/analysis/presentation/widgets/character_insights_dashboard.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class CharacterPage extends StatefulWidget {
@@ -148,6 +149,8 @@ class _CharacterPageState extends State<CharacterPage> {
           _buildCharacterInfo(char),
           const SizedBox(height: 16),
           _buildEquipmentPanel(char),
+          const SizedBox(height: 16),
+          CharacterInsightsDashboard(character: char),
           const SizedBox(height: 16),
           _buildProgressionCard(char),
           const SizedBox(height: 24),
@@ -866,11 +869,28 @@ class _CharacterPageState extends State<CharacterPage> {
   }
 
   String _formatSlotName(String slot) {
-    return slot
-        .replaceAll('_', ' ')
-        .split(' ')
-        .map((w) => w[0].toUpperCase() + w.substring(1).toLowerCase())
-        .join(' ');
+    final t = S.of(context)!;
+    return switch (slot) {
+      'HEAD'      => t.wowSlotHead,
+      'NECK'      => t.wowSlotNeck,
+      'SHOULDER'  => t.wowSlotShoulder,
+      'BACK'      => t.wowSlotBack,
+      'CHEST'     => t.wowSlotChest,
+      'WRIST'     => t.wowSlotWrist,
+      'HANDS'     => t.wowSlotHands,
+      'WAIST'     => t.wowSlotWaist,
+      'LEGS'      => t.wowSlotLegs,
+      'FEET'      => t.wowSlotFeet,
+      'FINGER_1'  => t.wowSlotFinger1,
+      'FINGER_2'  => t.wowSlotFinger2,
+      'TRINKET_1' => t.wowSlotTrinket1,
+      'TRINKET_2' => t.wowSlotTrinket2,
+      'MAIN_HAND' => t.wowSlotMainHand,
+      'OFF_HAND'  => t.wowSlotOffHand,
+      _ => slot.replaceAll('_', ' ').split(' ')
+              .map((w) => w[0].toUpperCase() + w.substring(1).toLowerCase())
+              .join(' '),
+    };
   }
 
   Color _getMythicPlusColor(double score) {

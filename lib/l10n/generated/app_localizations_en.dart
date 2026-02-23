@@ -433,7 +433,7 @@ class SEn extends S {
   String get recPanelTitle => 'Recommendations';
 
   @override
-  String get recPanelSourceAI => 'Claude AI';
+  String get recPanelSourceAI => 'Remote';
 
   @override
   String get recPanelSourceCache => 'Cache';
@@ -484,4 +484,72 @@ class SEn extends S {
 
   @override
   String get recEnchantApply => 'Apply';
+
+  @override
+  String get analysisTitle => 'Character Analysis';
+
+  @override
+  String analysisBased(String spec) {
+    return 'Based on $spec recommendations';
+  }
+
+  @override
+  String get analysisIssue => 'issue';
+
+  @override
+  String get analysisIssues => 'issues';
+
+  @override
+  String get analysisSectionReadiness => 'Content Readiness';
+
+  @override
+  String get analysisSectionEnchantments => 'Enchantments';
+
+  @override
+  String get analysisSectionGems => 'Gems';
+
+  @override
+  String get analysisSectionStats => 'Stat Distribution';
+
+  @override
+  String get analysisSectionProgress => 'Gear Progress';
+
+  @override
+  String get insightBadgeFix => 'Fix now';
+
+  @override
+  String get insightBadgeImprove => 'Improve';
+
+  @override
+  String get insightBadgeInfo => 'Info';
+
+  @override
+  String get insightBadgeGood => 'Good';
+
+  @override
+  String get insightModeSimple => 'Simple';
+
+  @override
+  String get insightModeAdvanced => 'Advanced';
+
+  @override
+  String get insightActionSteps => 'Action steps:';
+
+  @override
+  String get consumableTypeFlask => 'Flask';
+
+  @override
+  String get consumableTypePotion => 'Potion';
+
+  @override
+  String get consumableTypeFood => 'Food';
+
+  @override
+  String get consumableTypeRune => 'Rune';
+
+  @override
+  String get consumableTypeWeapon => 'Weapon';
+
+  @override
+  String get consumableTypeEnchant => 'Enchantment';
 }

@@ -83,11 +83,6 @@ class ShellLayout extends StatelessWidget {
                   selectedIcon: const Icon(Icons.construction),
                   label: Text(t.builds),
                 ),
-                NavigationRailDestination(
-                  icon: const Icon(Icons.menu_book_outlined),
-                  selectedIcon: const Icon(Icons.menu_book),
-                  label: Text(t.guides),
-                ),
               ],
             ),
           Expanded(child: navigationShell),
@@ -118,11 +113,6 @@ class ShellLayout extends StatelessWidget {
                   icon: const Icon(Icons.construction_outlined),
                   selectedIcon: const Icon(Icons.construction),
                   label: t.builds,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.menu_book_outlined),
-                  selectedIcon: const Icon(Icons.menu_book),
-                  label: t.guides,
                 ),
               ],
             ),
