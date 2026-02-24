@@ -149,6 +149,10 @@ class _CharacterPageState extends State<CharacterPage> {
           _buildCharacterInfo(char),
           const SizedBox(height: 16),
           _buildEquipmentPanel(char),
+          if (char.stats != null) ...[            
+            const SizedBox(height: 16),
+            _buildStatsPanel(char.stats!),
+          ],
           const SizedBox(height: 16),
           CharacterInsightsDashboard(character: char),
           const SizedBox(height: 16),
@@ -543,6 +547,139 @@ class _CharacterPageState extends State<CharacterPage> {
               ),
       ),
     );
+  }
+
+  Widget _buildStatsPanel(CharacterStats stats) {
+    // Stat primaria del personaje (la que tiene valor)
+    final primaryLabel = stats.strength != null
+        ? 'Fuerza'
+        : stats.agility != null
+            ? 'Agilidad'
+            : 'Intelecto';
+    final primaryValue =
+        stats.strength ?? stats.agility ?? stats.intellect ?? 0;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Recursos primarios: Salud + Maná/Energía/Furia
+            if (stats.health != null || stats.mana != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    if (stats.health != null)
+                      Expanded(
+                        child: _StatTile(
+                          icon: Icons.favorite,
+                          iconColor: const Color(0xFF2ECC71),
+                          label: 'Salud',
+                          value: _formatLargeNumber(stats.health!),
+                        ),
+                      ),
+                    if (stats.mana != null) ...[  
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _StatTile(
+                          icon: Icons.water_drop,
+                          iconColor: const Color(0xFF3498DB),
+                          label: _powerLabel(stats.powerType),
+                          value: _formatLargeNumber(stats.mana!),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+            // Stats base: Agilidad/Fuerza/Int + Aguante
+            Row(
+              children: [
+                Expanded(
+                  child: _StatTile(
+                    icon: Icons.local_fire_department,
+                    iconColor: WowTheme.primaryGold,
+                    label: primaryLabel,
+                    value: primaryValue.toString(),
+                  ),
+                ),
+                if (stats.stamina != null) ...[  
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _StatTile(
+                      icon: Icons.shield_outlined,
+                      iconColor: const Color(0xFFF39C12),
+                      label: 'Aguante',
+                      value: stats.stamina!.toString(),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: WowTheme.border),
+            const SizedBox(height: 10),
+
+            // Stats secundarias: Crítico, Celeridad, Maestría, Versatilidad
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (stats.criticalStrike != null)
+                  _SecondaryStatChip(
+                    label: 'Golpe Crítico',
+                    value: stats.criticalStrike!,
+                    color: const Color(0xFFE74C3C),
+                  ),
+                if (stats.haste != null)
+                  _SecondaryStatChip(
+                    label: 'Celeridad',
+                    value: stats.haste!,
+                    color: const Color(0xFF27AE60),
+                  ),
+                if (stats.mastery != null)
+                  _SecondaryStatChip(
+                    label: 'Maestría',
+                    value: stats.mastery!,
+                    color: const Color(0xFF9B59B6),
+                  ),
+                if (stats.versatility != null)
+                  _SecondaryStatChip(
+                    label: 'Versatilidad',
+                    value: stats.versatility!,
+                    color: const Color(0xFF2980B9),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatLargeNumber(int n) {
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(0)}K';
+    return n.toString();
+  }
+
+  String _powerLabel(String? powerType) {
+    return switch (powerType?.toUpperCase()) {
+      'ENERGY'       => 'Energía',
+      'RAGE'         => 'Furia',
+      'RUNIC_POWER'  => 'Poder Rúnico',
+      'FOCUS'        => 'Concentración',
+      'MAELSTROM'    => 'Maelstrom',
+      'FURY'         => 'Furia del DH',
+      'PAIN'         => 'Dolor',
+      'ESSENCE'      => 'Esencia',
+      'ASTRAL_POWER' => 'Poder Astral',
+      _              => 'Maná',
+    };
   }
 
   Widget _buildProgressionCard(Character char) {
@@ -1047,5 +1184,111 @@ class _CharacterPageState extends State<CharacterPage> {
       default:
         return WowTheme.textSecondary;
     }
+  }
+}
+
+// ─── Widgets auxiliares de stats ─────────────────────────────────────────────
+
+/// Tile de recurso primario (Salud, Maná, etc.) con icon + label + valor grande.
+class _StatTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+
+  const _StatTile({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: iconColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: iconColor.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: WowTheme.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  label.toUpperCase(),
+                  style: TextStyle(
+                    color: WowTheme.textSecondary.withValues(alpha: 0.7),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Chip de stat secundaria con porcentaje coloreado.
+class _SecondaryStatChip extends StatelessWidget {
+  final String label;
+  final double value;
+  final Color color;
+
+  const _SecondaryStatChip({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${value.toStringAsFixed(1)}%',
+            style: TextStyle(
+              color: color,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: WowTheme.textSecondary.withValues(alpha: 0.65),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

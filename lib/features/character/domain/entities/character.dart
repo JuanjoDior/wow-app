@@ -12,7 +12,10 @@ class Character extends Equatable {
   final int? achievementPoints;
   final int? averageItemLevel;
   final int? equippedItemLevel;
+  /// URL del render 3D del personaje (main-raw.png — puede ser null si no está disponible).
   final String? avatarUrl;
+  /// URL del avatar en miniatura (JPEG pequeño — siempre disponible si hay datos).
+  final String? thumbnailUrl;
   final List<EquippedItem> equipment;
   final CharacterStats? stats;
   final double? mythicPlusScore;
@@ -33,6 +36,7 @@ class Character extends Equatable {
     this.averageItemLevel,
     this.equippedItemLevel,
     this.avatarUrl,
+    this.thumbnailUrl,
     this.equipment = const [],
     this.stats,
     this.mythicPlusScore,
@@ -40,6 +44,9 @@ class Character extends Equatable {
     this.mythicPlusProfile,
     this.raidProgressionDetails = const [],
   });
+
+  /// Primera URL de imagen disponible: render 3D si existe, si no la miniatura.
+  String? get bestAvatarUrl => avatarUrl ?? thumbnailUrl;
 
   String get displayName => '$name - $realm ($region)';
   String get realmSlug => realm.toLowerCase().replaceAll(' ', '-');
@@ -98,16 +105,27 @@ class EquippedItem extends Equatable {
 }
 
 class CharacterStats extends Equatable {
+  /// Recursos primarios
+  final int? health;
+  final int? mana;
+  final String? powerType; // 'MANA', 'ENERGY', 'RAGE', 'RUNIC_POWER', etc.
+
+  /// Stats base
   final int? strength;
   final int? agility;
   final int? intellect;
   final int? stamina;
+
+  /// Stats secundarias (como porcentaje, e.g. 14.0 = 14%)
   final double? criticalStrike;
   final double? haste;
   final double? mastery;
   final double? versatility;
 
   const CharacterStats({
+    this.health,
+    this.mana,
+    this.powerType,
     this.strength,
     this.agility,
     this.intellect,
@@ -120,6 +138,9 @@ class CharacterStats extends Equatable {
 
   @override
   List<Object?> get props => [
+    health,
+    mana,
+    powerType,
     strength,
     agility,
     intellect,

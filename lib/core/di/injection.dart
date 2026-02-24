@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:wow_companion/core/network/api_client.dart';
+import 'package:wow_companion/features/character/data/datasources/blizzard_character_datasource.dart';
 import 'package:wow_companion/features/character/data/datasources/raiderio_datasource.dart';
 import 'package:wow_companion/features/character/data/repositories/character_repository_impl.dart';
 import 'package:wow_companion/features/character/domain/repositories/character_repository.dart';
@@ -45,10 +46,14 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<MemoryCache<Character>>(() => MemoryCache<Character>());
 
   // ── Character Feature ─────────────────────────────────────────────────────
+  sl.registerLazySingleton<BlizzardCharacterDatasource>(
+    () => BlizzardCharacterDatasource(),
+  );
   sl.registerLazySingleton<RaiderIoDataSource>(() => RaiderIoDataSource(sl()));
   sl.registerLazySingleton<CharacterRepository>(
     () => CharacterRepositoryImpl(
-      remoteDataSource: sl(),
+      blizzardDataSource: sl(),
+      raiderIoDataSource: sl(),
       cache: sl<MemoryCache<Character>>(),
     ),
   );

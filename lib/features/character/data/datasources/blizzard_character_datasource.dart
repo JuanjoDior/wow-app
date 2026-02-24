@@ -1,0 +1,200 @@
+import 'package:dio/dio.dart';
+import 'package:wow_companion/core/error/exceptions.dart';
+import 'package:wow_companion/features/character/domain/entities/character.dart';
+
+/// Datasource que obtiene el perfil de un personaje a través del Cloudflare Worker,
+/// el cual consulta la Blizzard Battle.net API en nombre de la app.
+///
+/// Devuelve: nombre, clase, spec, raza, nivel, guild, ilvl, equipo (con enchants y
+/// gemas exactos), stats exactas (%, valores), y avatar_url de Blizzard.
+/// NO devuelve M+ score ni raid progression (eso es de Raider.IO).
+class BlizzardCharacterDatasource {
+  final Dio _dio;
+
+  static const String _workerBaseUrl =
+      'https://wow-recommendations.wow-comp-app.workers.dev';
+
+  BlizzardCharacterDatasource({Dio? dio})
+      : _dio = dio ??
+            Dio(BaseOptions(
+              connectTimeout: const Duration(seconds: 10),
+              receiveTimeout: const Duration(seconds: 15),
+            ));
+
+  Future<CharacterBlizzardData> getCharacter({
+    required String region,
+    required String realm,
+    required String name,
+    bool force = false,
+  }) async {
+    try {
+      final params = <String, String>{
+        'region': region.toLowerCase(),
+        'realm': realm.toLowerCase(),
+        'name': name.toLowerCase(),
+        if (force) 'force': '1',
+      };
+
+      final response = await _dio.get(
+        '$_workerBaseUrl/character',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
+        return CharacterBlizzardData.fromJson(
+          response.data as Map<String, dynamic>,
+        );
+      }
+
+      throw const ServerException(message: 'Unexpected response from Worker');
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+
+      if (statusCode == 404) {
+        final msg = (e.response?.data is Map)
+            ? (e.response?.data as Map)['error'] as String? ??
+                'Character not found. Check region, realm and name.'
+            : 'Character not found. Check region, realm and name.';
+        throw NotFoundException(message: msg);
+      }
+      if (statusCode == 503) {
+        throw const ServerException(
+          message: 'Blizzard API not configured on Worker.',
+          statusCode: 503,
+        );
+      }
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        throw const NetworkException(
+          message: 'Request timed out. Check your connection.',
+        );
+      }
+      if (e.type == DioExceptionType.connectionError) {
+        throw const NetworkException();
+      }
+
+      throw ServerException(
+        message: e.message ?? 'Unknown Worker error',
+        statusCode: statusCode,
+      );
+    }
+  }
+}
+
+// ─── Data transfer object ─────────────────────────────────────────────────────
+//
+// Contiene sólo los datos que provienen de Blizzard.
+// El repositorio combina esto con los datos M+ de Raider.IO.
+
+class CharacterBlizzardData {
+  final String name;
+  final String realm;
+  final String region;
+  final int level;
+  final String race;
+  final String characterClass;
+  final String? specialization;
+  final String? guild;
+  final int? achievementPoints;
+  final int? averageItemLevel;
+  final int? equippedItemLevel;
+  final String? avatarUrl;
+  final List<EquippedItem> equipment;
+  final CharacterStats? stats;
+
+  const CharacterBlizzardData({
+    required this.name,
+    required this.realm,
+    required this.region,
+    required this.level,
+    required this.race,
+    required this.characterClass,
+    this.specialization,
+    this.guild,
+    this.achievementPoints,
+    this.averageItemLevel,
+    this.equippedItemLevel,
+    this.avatarUrl,
+    this.equipment = const [],
+    this.stats,
+  });
+
+  factory CharacterBlizzardData.fromJson(Map<String, dynamic> json) {
+    final equipRaw = json['equipment'] as List<dynamic>? ?? [];
+    final equipment = equipRaw
+        .map((e) => _parseItem(e as Map<String, dynamic>))
+        .toList();
+
+    final statsRaw = json['stats'] as Map<String, dynamic>?;
+    CharacterStats? stats;
+    if (statsRaw != null) {
+      stats = CharacterStats(
+        health:         (statsRaw['health']          as num?)?.toInt(),
+        mana:           (statsRaw['mana']            as num?)?.toInt(),
+        powerType:      statsRaw['power_type']       as String?,
+        strength:       (statsRaw['strength']        as num?)?.toInt(),
+        agility:        (statsRaw['agility']         as num?)?.toInt(),
+        intellect:      (statsRaw['intellect']       as num?)?.toInt(),
+        stamina:        (statsRaw['stamina']         as num?)?.toInt(),
+        criticalStrike: (statsRaw['critical_strike'] as num?)?.toDouble(),
+        haste:          (statsRaw['haste']           as num?)?.toDouble(),
+        mastery:        (statsRaw['mastery']         as num?)?.toDouble(),
+        versatility:    (statsRaw['versatility']     as num?)?.toDouble(),
+      );
+    }
+
+    return CharacterBlizzardData(
+      name:              json['name']                as String? ?? '',
+      realm:             json['realm']               as String? ?? '',
+      region:            (json['region']             as String? ?? '').toUpperCase(),
+      level:             (json['level']              as num?)?.toInt() ?? 80,
+      race:              json['race']                as String? ?? 'Unknown',
+      characterClass:    json['class']               as String? ?? 'Unknown',
+      specialization:    json['spec']                as String?,
+      guild:             json['guild']               as String?,
+      achievementPoints: (json['achievement_points'] as num?)?.toInt(),
+      averageItemLevel:  (json['average_item_level'] as num?)?.toInt(),
+      equippedItemLevel: (json['equipped_item_level'] as num?)?.toInt(),
+      avatarUrl:         json['avatar_url']          as String?,
+      equipment:         equipment,
+      stats:             stats,
+    );
+  }
+
+  static EquippedItem _parseItem(Map<String, dynamic> item) {
+    final rawSlot = (item['slot'] as String? ?? 'UNKNOWN').toUpperCase();
+
+    // Enchantments: lista de strings con el nombre del encant exacto (en inglés)
+    final enchantments = (item['enchantments'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .where((e) => e.isNotEmpty)
+            .toList() ??
+        [];
+
+    // Gems: lista de strings con el nombre de la gema exacto (en inglés)
+    final gems = (item['gems'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .where((e) => e.isNotEmpty)
+            .toList() ??
+        [];
+
+    final bonusIds = (item['bonus_ids'] as List<dynamic>?)
+            ?.map((e) => (e as num).toInt())
+            .toList() ??
+        [];
+
+    return EquippedItem(
+      slot:         rawSlot,
+      name:         item['name']        as String? ?? 'Unknown',
+      itemLevel:    (item['item_level'] as num?)?.toInt() ?? 0,
+      quality:      (item['quality']    as String? ?? 'EPIC').toUpperCase(),
+      itemId:       (item['item_id']    as num?)?.toInt(),
+      // Blizzard no devuelve iconUrl en el endpoint de equipo (requiere llamada extra).
+      // La UI muestra placeholder; el tooltip usa wowheadUrl via itemId.
+      iconUrl:      null,
+      enchantments: enchantments,
+      gems:         gems,
+      bonusIds:     bonusIds,
+    );
+  }
+}

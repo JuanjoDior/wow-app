@@ -9,6 +9,11 @@ id = "bf433eaa4bf948da9b555646f5b287d8"
 [vars]
 CURRENT_PATCH = "12.0.1"
 CACHE_TTL_SECONDS = "604800"
+# Blizzard API — client_id es público, va aquí. El secret va como wrangler secret.
+BLIZZARD_CLIENT_ID = "078c6007e3954e70be67706d98cb818d"
+# TTL del caché de personaje en segundos (5 min). Los datos de equipo cambian poco.
+BLIZZARD_CHAR_CACHE_TTL = "300"
 
 # Secrets — añadir via CLI, NUNCA en este archivo:
+#   wrangler secret put BLIZZARD_CLIENT_SECRET
 #   wrangler secret put INVALIDATE_SECRET   (opcional, protege /invalidate)

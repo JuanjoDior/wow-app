@@ -1,16 +1,23 @@
 /**
- * wow-recommendations Worker  v4
- *
- * Flujo de resolución:
- *  1. Static data embebido → prioridad máxima, siempre disponible y gratuito
- *  2. KV cache            → para specs sin datos estáticos (raro)
- *  3. 404                 → spec no soportada
+ * wow-recommendations Worker  v5
  *
  * Endpoints:
  *   GET  /health
  *   GET  /recommendations?class=druid&spec=feral[&patch=12.0.1][&force=1]
+ *   GET  /character?region=eu&realm=sanguino&name=apastar[&force=1]
  *   POST /invalidate   body: { class, spec, patch? }
  *   GET  /specs
+ *
+ * Flujo /recommendations:
+ *  1. Static data embebido → prioridad máxima, siempre disponible y gratuito
+ *  2. KV cache            → para specs sin datos estáticos (raro)
+ *  3. 404                 → spec no soportada
+ *
+ * Flujo /character:
+ *  1. KV cache (TTL=5min)
+ *  2. Blizzard Battle.net API (profile + equipment + statistics + media en paralelo)
+ *     → Token OAuth2 client_credentials cacheado en KV (TTL=23h)
+ *  3. 404 / 502 si falla Blizzard
  */
 
 const CORS_HEADERS = {
@@ -19,6 +26,16 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, X-Invalidate-Secret',
 };
 
+// ─── Blizzard API base URLs ───────────────────────────────────────────────────
+const BLIZZARD_API_BASE = {
+  us: 'https://us.api.blizzard.com',
+  eu: 'https://eu.api.blizzard.com',
+  kr: 'https://kr.api.blizzard.com',
+  tw: 'https://tw.api.blizzard.com',
+};
+const BLIZZARD_OAUTH_URL = 'https://oauth.battle.net/token';
+
+// ─── Supported specs (for /specs endpoint) ───────────────────────────────────
 export const SUPPORTED_SPECS = [
   // DPS
   { class: 'druid',        spec: 'feral' },
@@ -45,16 +62,11 @@ export const SUPPORTED_SPECS = [
   { class: 'shaman',       spec: 'restoration' },
 ];
 
-// ─── Static fallback data ─────────────────────────────────────────────────────
+// ─── Static recommendations data ─────────────────────────────────────────────
 // Fuente: Icy Veins Pre-Patch Midnight / Patch 12.0.1 — Febrero 2026
-// Cubre specs Tier S y A en Tanks, Healers y DPS principales.
-// Actualizar aquí con cada parche relevante.
-
 const STATIC_DATA = {
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // DPS
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─── DPS ──────────────────────────────────────────────────────────────────
 
   'druid:feral': {
     enchants: {
@@ -81,10 +93,10 @@ const STATIC_DATA = {
       generic: { name: "Radiant Mastery",         note: "Sim — Crit/Mastery close" },
     },
     consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",       note: "More RNG, net positive" },
+      flask:   { name: "Flask of Alchemical Chaos",        note: "More RNG, net positive" },
       food:    { name: "Feast of the Midnight Masquerade", note: "Group feast (Agility)" },
-      potion:  { name: "Tempered Potion",                 note: "With CDs + Bloodlust" },
-      weapon:  { name: "Algari Mana Oil",                 note: "Crit + Haste bonus" },
+      potion:  { name: "Tempered Potion",                  note: "With CDs + Bloodlust" },
+      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste bonus" },
     },
     stat_priority: ["Agility", "Critical Strike", "Mastery", "Haste", "Versatility"],
   },
@@ -108,10 +120,10 @@ const STATIC_DATA = {
       generic: { name: "Energized Ysemerald",     note: "Haste/Crit" },
     },
     consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",       note: "Recommended" },
+      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
       food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                 note: "With major CDs" },
-      weapon:  { name: "Algari Mana Oil",                 note: "Crit + Haste" },
+      potion:  { name: "Tempered Potion",                  note: "With major CDs" },
+      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
     },
     stat_priority: ["Intellect", "Haste", "Critical Strike", "Mastery", "Versatility"],
   },
@@ -135,10 +147,10 @@ const STATIC_DATA = {
       generic: { name: "Radiant Critical Strike",  note: "BiS" },
     },
     consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",       note: "Recommended" },
+      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
       food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                 note: "With major CDs" },
-      weapon:  { name: "Algari Mana Oil",                 note: "Crit + Haste" },
+      potion:  { name: "Tempered Potion",                  note: "With major CDs" },
+      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
     },
     stat_priority: ["Strength", "Critical Strike", "Mastery", "Haste", "Versatility"],
   },
@@ -160,10 +172,10 @@ const STATIC_DATA = {
       generic: { name: "Energized Ysemerald",     note: "Haste" },
     },
     consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",       note: "Recommended" },
+      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
       food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                 note: "With major CDs" },
-      weapon:  { name: "Algari Mana Oil",                 note: "Crit + Haste" },
+      potion:  { name: "Tempered Potion",                  note: "With major CDs" },
+      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
     },
     stat_priority: ["Strength", "Haste", "Critical Strike", "Mastery", "Versatility"],
   },
@@ -185,10 +197,10 @@ const STATIC_DATA = {
       generic: { name: "Energized Ysemerald",     note: "Haste" },
     },
     consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",       note: "Recommended" },
+      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
       food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                 note: "With major CDs" },
-      weapon:  { name: "Algari Mana Oil",                 note: "Crit + Haste" },
+      potion:  { name: "Tempered Potion",                  note: "With major CDs" },
+      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
     },
     stat_priority: ["Strength", "Haste", "Critical Strike", "Versatility", "Mastery"],
   },
@@ -210,10 +222,10 @@ const STATIC_DATA = {
       generic: { name: "Radiant Critical Strike",  note: "BiS" },
     },
     consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",       note: "Recommended" },
+      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
       food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                 note: "With major CDs" },
-      weapon:  { name: "Algari Mana Oil",                 note: "Crit + Haste" },
+      potion:  { name: "Tempered Potion",                  note: "With major CDs" },
+      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
     },
     stat_priority: ["Intellect", "Critical Strike", "Mastery", "Haste", "Versatility"],
   },
@@ -235,15 +247,14 @@ const STATIC_DATA = {
       generic: { name: "Radiant Critical Strike",  note: "BiS" },
     },
     consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",       note: "Recommended" },
+      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
       food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                 note: "With major CDs" },
-      weapon:  { name: "Algari Mana Oil",                 note: "Crit + Haste" },
+      potion:  { name: "Tempered Potion",                  note: "With major CDs" },
+      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
     },
     stat_priority: ["Agility", "Critical Strike", "Haste", "Mastery", "Versatility"],
   },
 
-  // Devastation Evoker — DPS S-tier (Icy Veins 12.0.1)
   'evoker:devastation': {
     enchants: {
       back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS movement",      is_primary: true }],
@@ -251,11 +262,11 @@ const STATIC_DATA = {
       wrist:    [{ name: "Chant of Powerful Rituals",   note: "BiS caster",        is_primary: true }],
       legs:     [{ name: "Daybreak Spellthread",        note: "BiS caster",        is_primary: true }],
       feet:     [{ name: "Scout's March",               note: "Movement + stats",  is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "BiS",              is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",      is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "BiS",              is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",      is_primary: false }],
-      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",       is_primary: true }],
+      finger1:  [{ name: "Radiant Haste",               note: "BiS",               is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "Alternative",       is_primary: false }],
+      finger2:  [{ name: "Radiant Haste",               note: "BiS",               is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "Alternative",       is_primary: false }],
+      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",        is_primary: true }],
       offHand:  [],
     },
     gems: {
@@ -271,11 +282,8 @@ const STATIC_DATA = {
     stat_priority: ["Intellect", "Haste", "Critical Strike", "Mastery", "Versatility"],
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // TANKS
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─── TANKS ────────────────────────────────────────────────────────────────
 
-  // Protection Paladin — Tank S-tier (Icy Veins 12.0.1)
   'paladin:protection': {
     enchants: {
       back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS survivability",  is_primary: true }],
@@ -283,12 +291,12 @@ const STATIC_DATA = {
       wrist:    [{ name: "Chant of Armored Speed",      note: "BiS physical",       is_primary: true }],
       legs:     [{ name: "Stormbound Armor Kit",        note: "BiS physical",       is_primary: true }],
       feet:     [{ name: "Scout's March",               note: "Movement + stats",   is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "BiS (Templar)",     is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Lightsmith alt",    is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "BiS (Templar)",     is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Lightsmith alt",    is_primary: false }],
-      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",          is_primary: true },
-                 { name: "Authority of Radiant Power",  note: "Offensive alt",     is_primary: false }],
+      finger1:  [{ name: "Radiant Haste",               note: "BiS (Templar)",      is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "Lightsmith alt",     is_primary: false }],
+      finger2:  [{ name: "Radiant Haste",               note: "BiS (Templar)",      is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "Lightsmith alt",     is_primary: false }],
+      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",           is_primary: true },
+                 { name: "Authority of Radiant Power",  note: "Offensive alt",      is_primary: false }],
       offHand:  [],
     },
     gems: {
@@ -304,7 +312,6 @@ const STATIC_DATA = {
     stat_priority: ["Strength", "Haste", "Mastery", "Versatility", "Critical Strike"],
   },
 
-  // Protection Warrior — Tank S-tier (Icy Veins 12.0.1)
   'warrior:protection': {
     enchants: {
       back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS survivability",  is_primary: true }],
@@ -312,13 +319,13 @@ const STATIC_DATA = {
       wrist:    [{ name: "Chant of Armored Speed",      note: "BiS physical",       is_primary: true }],
       legs:     [{ name: "Stormbound Armor Kit",        note: "BiS physical",       is_primary: true }],
       feet:     [{ name: "Scout's March",               note: "Movement + stats",   is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "BiS",              is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",      is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "BiS",              is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",      is_primary: false }],
-      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",          is_primary: true },
-                 { name: "Authority of Radiant Power",  note: "Offensive alt",     is_primary: false }],
-      offHand:  [{ name: "Authority of the Depths",     note: "Shield",            is_primary: true }],
+      finger1:  [{ name: "Radiant Haste",               note: "BiS",                is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "Alternative",        is_primary: false }],
+      finger2:  [{ name: "Radiant Haste",               note: "BiS",                is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "Alternative",        is_primary: false }],
+      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",           is_primary: true },
+                 { name: "Authority of Radiant Power",  note: "Offensive alt",      is_primary: false }],
+      offHand:  [{ name: "Authority of the Depths",     note: "Shield",             is_primary: true }],
     },
     gems: {
       meta:    { name: "Culminating Blasphemite", note: "Meta BiS" },
@@ -333,7 +340,6 @@ const STATIC_DATA = {
     stat_priority: ["Strength", "Haste", "Critical Strike", "Versatility", "Mastery"],
   },
 
-  // Blood Death Knight — Tank A-tier (Icy Veins 12.0.1)
   'death knight:blood': {
     enchants: {
       back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS survivability",  is_primary: true }],
@@ -341,12 +347,12 @@ const STATIC_DATA = {
       wrist:    [{ name: "Chant of Armored Speed",      note: "BiS physical",       is_primary: true }],
       legs:     [{ name: "Stormbound Armor Kit",        note: "BiS physical",       is_primary: true }],
       feet:     [{ name: "Scout's March",               note: "Movement + stats",   is_primary: true }],
-      finger1:  [{ name: "Glimmering Critical Strike",  note: "Deathbringer BiS",  is_primary: true },
-                 { name: "Radiant Haste",               note: "San'layn alt",      is_primary: false }],
-      finger2:  [{ name: "Glimmering Critical Strike",  note: "Deathbringer BiS",  is_primary: true },
-                 { name: "Radiant Haste",               note: "San'layn alt",      is_primary: false }],
-      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",          is_primary: true },
-                 { name: "Authority of Radiant Power",  note: "Offensive alt",     is_primary: false }],
+      finger1:  [{ name: "Glimmering Critical Strike",  note: "Deathbringer BiS",   is_primary: true },
+                 { name: "Radiant Haste",               note: "San'layn alt",       is_primary: false }],
+      finger2:  [{ name: "Glimmering Critical Strike",  note: "Deathbringer BiS",   is_primary: true },
+                 { name: "Radiant Haste",               note: "San'layn alt",       is_primary: false }],
+      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",           is_primary: true },
+                 { name: "Authority of Radiant Power",  note: "Offensive alt",      is_primary: false }],
       offHand:  [],
     },
     gems: {
@@ -362,7 +368,6 @@ const STATIC_DATA = {
     stat_priority: ["Strength", "Critical Strike", "Versatility", "Mastery", "Haste"],
   },
 
-  // Guardian Druid — Tank A-tier (Icy Veins 12.0.1)
   'druid:guardian': {
     enchants: {
       back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS survivability",  is_primary: true }],
@@ -370,12 +375,12 @@ const STATIC_DATA = {
       wrist:    [{ name: "Chant of Armored Speed",      note: "BiS physical",       is_primary: true }],
       legs:     [{ name: "Stormbound Armor Kit",        note: "BiS physical",       is_primary: true }],
       feet:     [{ name: "Scout's March",               note: "Movement + stats",   is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "BiS survival",      is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Damage alt",        is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "BiS survival",      is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Damage alt",        is_primary: false }],
-      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",          is_primary: true },
-                 { name: "Authority of Radiant Power",  note: "Damage alt",        is_primary: false }],
+      finger1:  [{ name: "Radiant Haste",               note: "BiS survival",       is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "Damage alt",         is_primary: false }],
+      finger2:  [{ name: "Radiant Haste",               note: "BiS survival",       is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "Damage alt",         is_primary: false }],
+      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",           is_primary: true },
+                 { name: "Authority of Radiant Power",  note: "Damage alt",         is_primary: false }],
       offHand:  [],
     },
     gems: {
@@ -391,7 +396,6 @@ const STATIC_DATA = {
     stat_priority: ["Agility", "Haste", "Versatility", "Mastery", "Critical Strike"],
   },
 
-  // Brewmaster Monk — Tank A-tier (Icy Veins 12.0.1)
   'monk:brewmaster': {
     enchants: {
       back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS survivability",  is_primary: true }],
@@ -399,12 +403,12 @@ const STATIC_DATA = {
       wrist:    [{ name: "Chant of Armored Speed",      note: "BiS physical",       is_primary: true }],
       legs:     [{ name: "Stormbound Armor Kit",        note: "BiS physical",       is_primary: true }],
       feet:     [{ name: "Scout's March",               note: "Movement + stats",   is_primary: true }],
-      finger1:  [{ name: "Glimmering Critical Strike",  note: "BiS offensive",     is_primary: true },
-                 { name: "Radiant Versatility",         note: "Defensive alt",     is_primary: false }],
-      finger2:  [{ name: "Glimmering Critical Strike",  note: "BiS offensive",     is_primary: true },
-                 { name: "Radiant Versatility",         note: "Defensive alt",     is_primary: false }],
-      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",          is_primary: true },
-                 { name: "Authority of Radiant Power",  note: "Offensive alt",     is_primary: false }],
+      finger1:  [{ name: "Glimmering Critical Strike",  note: "BiS offensive",      is_primary: true },
+                 { name: "Radiant Versatility",         note: "Defensive alt",      is_primary: false }],
+      finger2:  [{ name: "Glimmering Critical Strike",  note: "BiS offensive",      is_primary: true },
+                 { name: "Radiant Versatility",         note: "Defensive alt",      is_primary: false }],
+      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",           is_primary: true },
+                 { name: "Authority of Radiant Power",  note: "Offensive alt",      is_primary: false }],
       offHand:  [],
     },
     gems: {
@@ -420,7 +424,6 @@ const STATIC_DATA = {
     stat_priority: ["Agility", "Critical Strike", "Versatility", "Mastery", "Haste"],
   },
 
-  // Vengeance Demon Hunter — Tank A-tier (Icy Veins 12.0.1)
   'demon hunter:vengeance': {
     enchants: {
       back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS survivability",  is_primary: true }],
@@ -428,12 +431,12 @@ const STATIC_DATA = {
       wrist:    [{ name: "Chant of Armored Speed",      note: "BiS physical",       is_primary: true }],
       legs:     [{ name: "Stormbound Armor Kit",        note: "BiS physical",       is_primary: true }],
       feet:     [{ name: "Scout's March",               note: "Movement + stats",   is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "BiS",              is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",      is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "BiS",              is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",      is_primary: false }],
-      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",          is_primary: true },
-                 { name: "Oil of Deep Toxins",          note: "Offensive alt",     is_primary: false }],
+      finger1:  [{ name: "Radiant Haste",               note: "BiS",                is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "Alternative",        is_primary: false }],
+      finger2:  [{ name: "Radiant Haste",               note: "BiS",                is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "Alternative",        is_primary: false }],
+      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",           is_primary: true },
+                 { name: "Oil of Deep Toxins",          note: "Offensive alt",      is_primary: false }],
       offHand:  [],
     },
     gems: {
@@ -449,11 +452,8 @@ const STATIC_DATA = {
     stat_priority: ["Agility", "Haste", "Versatility", "Critical Strike", "Mastery"],
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // HEALERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─── HEALERS ──────────────────────────────────────────────────────────────
 
-  // Mistweaver Monk — Healer S-tier (Icy Veins 12.0.1)
   'monk:mistweaver': {
     enchants: {
       back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS movement",      is_primary: true }],
@@ -461,11 +461,11 @@ const STATIC_DATA = {
       wrist:    [{ name: "Chant of Powerful Rituals",   note: "BiS caster",        is_primary: true }],
       legs:     [{ name: "Daybreak Spellthread",        note: "BiS caster",        is_primary: true }],
       feet:     [{ name: "Scout's March",               note: "Movement + stats",  is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "BiS",              is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",      is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "BiS",              is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",      is_primary: false }],
-      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",       is_primary: true }],
+      finger1:  [{ name: "Radiant Haste",               note: "BiS",               is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "Alternative",       is_primary: false }],
+      finger2:  [{ name: "Radiant Haste",               note: "BiS",               is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "Alternative",       is_primary: false }],
+      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",        is_primary: true }],
       offHand:  [],
     },
     gems: {
@@ -473,27 +473,26 @@ const STATIC_DATA = {
       generic: { name: "Deadly Emerald",      note: "Fill remaining sockets" },
     },
     consumables: {
-      flask:   { name: "Flask of Tempered Swiftness",    note: "BiS for Mistweaver" },
+      flask:   { name: "Flask of Tempered Swiftness",      note: "BiS for Mistweaver" },
       food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Slumbering Soul Serum",          note: "Mana; or Algari Mana Potion" },
-      weapon:  { name: "Algari Mana Oil",                note: "Crit + Haste" },
+      potion:  { name: "Slumbering Soul Serum",            note: "Mana; or Algari Mana Potion" },
+      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
     },
     stat_priority: ["Intellect", "Haste", "Critical Strike", "Versatility", "Mastery"],
   },
 
-  // Discipline Priest — Healer S-tier (Icy Veins 12.0.1)
   'priest:discipline': {
     enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS movement",      is_primary: true }],
-      chest:    [{ name: "Stormrider's Intellect",      note: "BiS Intellect",     is_primary: true }],
-      wrist:    [{ name: "Chant of Powerful Rituals",   note: "BiS caster",        is_primary: true }],
-      legs:     [{ name: "Daybreak Spellthread",        note: "BiS caster",        is_primary: true }],
-      feet:     [{ name: "Scout's March",               note: "Movement + stats",  is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "Until 20-25% Haste", is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Above haste cap",  is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "Until 20-25% Haste", is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Above haste cap",  is_primary: false }],
-      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",       is_primary: true }],
+      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS movement",         is_primary: true }],
+      chest:    [{ name: "Stormrider's Intellect",      note: "BiS Intellect",        is_primary: true }],
+      wrist:    [{ name: "Chant of Powerful Rituals",   note: "BiS caster",           is_primary: true }],
+      legs:     [{ name: "Daybreak Spellthread",        note: "BiS caster",           is_primary: true }],
+      feet:     [{ name: "Scout's March",               note: "Movement + stats",     is_primary: true }],
+      finger1:  [{ name: "Radiant Haste",               note: "Until 20-25% Haste",   is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "Above haste cap",      is_primary: false }],
+      finger2:  [{ name: "Radiant Haste",               note: "Until 20-25% Haste",   is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "Above haste cap",      is_primary: false }],
+      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",           is_primary: true }],
       offHand:  [],
     },
     gems: {
@@ -501,15 +500,14 @@ const STATIC_DATA = {
       generic: { name: "Quick Sapphire",      note: "One of each color for Blasphemite" },
     },
     consumables: {
-      flask:   { name: "Flask of Tempered Swiftness",    note: "BiS; or Aggression/Mastery" },
-      food:    { name: "Hearty Salt Baked Seafood",      note: "Personal BiS food" },
-      potion:  { name: "Slumbering Soul Serum",          note: "Mana; or Algari Mana Potion" },
-      weapon:  { name: "Algari Mana Oil",                note: "Crit + Haste" },
+      flask:   { name: "Flask of Tempered Swiftness",  note: "BiS; or Aggression/Mastery" },
+      food:    { name: "Hearty Salt Baked Seafood",    note: "Personal BiS food" },
+      potion:  { name: "Slumbering Soul Serum",        note: "Mana; or Algari Mana Potion" },
+      weapon:  { name: "Algari Mana Oil",              note: "Crit + Haste" },
     },
     stat_priority: ["Intellect", "Haste", "Critical Strike", "Mastery", "Versatility"],
   },
 
-  // Restoration Druid — Healer S-tier (Icy Veins 12.0.1)
   'druid:restoration': {
     enchants: {
       back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS movement",      is_primary: true }],
@@ -517,11 +515,11 @@ const STATIC_DATA = {
       wrist:    [{ name: "Chant of Powerful Rituals",   note: "BiS caster",        is_primary: true }],
       legs:     [{ name: "Daybreak Spellthread",        note: "BiS caster",        is_primary: true }],
       feet:     [{ name: "Scout's March",               note: "Movement + stats",  is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "Raid BiS",         is_primary: true },
-                 { name: "Glimmering Mastery",          note: "M+ alt",           is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "Raid BiS",         is_primary: true },
-                 { name: "Glimmering Mastery",          note: "M+ alt",           is_primary: false }],
-      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",       is_primary: true }],
+      finger1:  [{ name: "Radiant Haste",               note: "Raid BiS",          is_primary: true },
+                 { name: "Glimmering Mastery",          note: "M+ alt",            is_primary: false }],
+      finger2:  [{ name: "Radiant Haste",               note: "Raid BiS",          is_primary: true },
+                 { name: "Glimmering Mastery",          note: "M+ alt",            is_primary: false }],
+      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",        is_primary: true }],
       offHand:  [],
     },
     gems: {
@@ -537,7 +535,6 @@ const STATIC_DATA = {
     stat_priority: ["Intellect", "Haste", "Mastery", "Versatility", "Critical Strike"],
   },
 
-  // Preservation Evoker — Healer A-tier (Icy Veins 12.0.1)
   'evoker:preservation': {
     enchants: {
       back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS movement",      is_primary: true }],
@@ -545,11 +542,11 @@ const STATIC_DATA = {
       wrist:    [{ name: "Chant of Powerful Rituals",   note: "BiS caster",        is_primary: true }],
       legs:     [{ name: "Daybreak Spellthread",        note: "BiS caster",        is_primary: true }],
       feet:     [{ name: "Scout's March",               note: "Movement + stats",  is_primary: true }],
-      finger1:  [{ name: "Glimmering Mastery",          note: "Raid BiS",         is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "M+ alt",           is_primary: false }],
-      finger2:  [{ name: "Glimmering Mastery",          note: "Raid BiS",         is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "M+ alt",           is_primary: false }],
-      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",       is_primary: true }],
+      finger1:  [{ name: "Glimmering Mastery",          note: "Raid BiS",          is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "M+ alt",            is_primary: false }],
+      finger2:  [{ name: "Glimmering Mastery",          note: "Raid BiS",          is_primary: true },
+                 { name: "Glimmering Critical Strike",  note: "M+ alt",            is_primary: false }],
+      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",        is_primary: true }],
       offHand:  [],
     },
     gems: {
@@ -557,15 +554,14 @@ const STATIC_DATA = {
       generic: { name: "Deadly Onyx",         note: "Raid: Masterful alts; M+: Quick alts" },
     },
     consumables: {
-      flask:   { name: "Flask of Tempered Mastery",    note: "Healing BiS; Aggression for M+" },
+      flask:   { name: "Flask of Tempered Mastery",        note: "Healing BiS; Aggression for M+" },
       food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Slumbering Soul Serum",        note: "Mana; Invigorating Healing alt" },
-      weapon:  { name: "Crystallized Augment Rune",    note: "Or Ethereal Augment Rune" },
+      potion:  { name: "Slumbering Soul Serum",            note: "Mana; Invigorating Healing alt" },
+      weapon:  { name: "Crystallized Augment Rune",        note: "Or Ethereal Augment Rune" },
     },
     stat_priority: ["Intellect", "Mastery", "Critical Strike", "Haste", "Versatility"],
   },
 
-  // Restoration Shaman — Healer A-tier (Icy Veins 12.0.1)
   'shaman:restoration': {
     enchants: {
       back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS movement",      is_primary: true }],
@@ -573,11 +569,11 @@ const STATIC_DATA = {
       wrist:    [{ name: "Chant of Powerful Rituals",   note: "BiS caster",        is_primary: true }],
       legs:     [{ name: "Daybreak Spellthread",        note: "BiS caster",        is_primary: true }],
       feet:     [{ name: "Scout's March",               note: "Movement + stats",  is_primary: true }],
-      finger1:  [{ name: "Glimmering Critical Strike",  note: "Raid BiS",         is_primary: true },
-                 { name: "Radiant Versatility",         note: "M+ alt",           is_primary: false }],
-      finger2:  [{ name: "Glimmering Critical Strike",  note: "Raid BiS",         is_primary: true },
-                 { name: "Radiant Versatility",         note: "M+ alt",           is_primary: false }],
-      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",       is_primary: true }],
+      finger1:  [{ name: "Glimmering Critical Strike",  note: "Raid BiS",          is_primary: true },
+                 { name: "Radiant Versatility",         note: "M+ alt",            is_primary: false }],
+      finger2:  [{ name: "Glimmering Critical Strike",  note: "Raid BiS",          is_primary: true },
+                 { name: "Radiant Versatility",         note: "M+ alt",            is_primary: false }],
+      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",        is_primary: true }],
       offHand:  [],
     },
     gems: {
@@ -593,7 +589,6 @@ const STATIC_DATA = {
     stat_priority: ["Intellect", "Critical Strike", "Versatility", "Haste", "Mastery"],
   },
 
-  // Holy Priest — Healer A-tier (Icy Veins 12.0.1)
   'priest:holy': {
     enchants: {
       back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS movement",      is_primary: true }],
@@ -601,9 +596,9 @@ const STATIC_DATA = {
       wrist:    [{ name: "Chant of Powerful Rituals",   note: "BiS caster",        is_primary: true }],
       legs:     [{ name: "Daybreak Spellthread",        note: "BiS caster",        is_primary: true }],
       feet:     [{ name: "Scout's March",               note: "Movement + stats",  is_primary: true }],
-      finger1:  [{ name: "Glimmering Critical Strike",  note: "BiS",              is_primary: true }],
-      finger2:  [{ name: "Glimmering Critical Strike",  note: "BiS",              is_primary: true }],
-      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",       is_primary: true }],
+      finger1:  [{ name: "Glimmering Critical Strike",  note: "BiS",               is_primary: true }],
+      finger2:  [{ name: "Glimmering Critical Strike",  note: "BiS",               is_primary: true }],
+      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",        is_primary: true }],
       offHand:  [],
     },
     gems: {
@@ -637,6 +632,9 @@ export default {
     if (url.pathname === '/recommendations' && request.method === 'GET') {
       return handleRecommendations(url, env);
     }
+    if (url.pathname === '/character' && request.method === 'GET') {
+      return handleCharacter(url, env);
+    }
     if (url.pathname === '/invalidate' && request.method === 'POST') {
       return handleInvalidate(request, env);
     }
@@ -660,29 +658,27 @@ async function handleRecommendations(url, env) {
     return json({ error: 'Missing required params: class, spec' }, 400);
   }
 
-  const cacheKey = buildCacheKey(classParam, specParam, patch);
+  const cacheKey = buildRecsKey(classParam, specParam, patch);
 
-  // 1. Static data — prioridad máxima, siempre disponible y sin coste.
-  //    Actualizar STATIC_DATA aquí con cada parche relevante.
+  // 1. Static data — prioridad máxima.
   const staticKey = `${classParam}:${specParam}`;
   const staticData = STATIC_DATA[staticKey];
 
   if (staticData && !force) {
     const result = {
       class_name: classParam,
-      spec_name: specParam,
+      spec_name:  specParam,
       patch,
       generated_at: new Date().toISOString(),
       ...staticData,
       _source: 'static',
     };
-    // Refrescar KV con los datos estáticos actuales (sobrescribe cualquier versión antigua)
     const ttl = parseInt(env.CACHE_TTL_SECONDS || '604800', 10);
     await env.RECS_CACHE.put(cacheKey, JSON.stringify(result), { expirationTtl: ttl });
-    return json({ ...result, _source: 'static' });
+    return json(result);
   }
 
-  // 2. KV cache — fallback para specs sin datos estáticos
+  // 2. KV cache
   if (!force) {
     const cached = await env.RECS_CACHE.get(cacheKey, 'json');
     if (cached) {
@@ -691,6 +687,251 @@ async function handleRecommendations(url, env) {
   }
 
   return json({ error: `No data available for ${classParam}:${specParam}` }, 404);
+}
+
+// ─── /character ───────────────────────────────────────────────────────────────
+//
+// Obtiene el perfil completo de un personaje desde la Blizzard Battle.net API.
+// Datos devueltos: perfil, equipo (con enchants+gemas exactos), estadísticas,
+// y URL de render del personaje.
+//
+// Nota sobre locale: se usa en_US para que los nombres de encantamientos y gemas
+// coincidan con nuestra static data de recomendaciones (necesario para el análisis).
+
+async function handleCharacter(url, env) {
+  const region = (url.searchParams.get('region') || 'eu').toLowerCase().trim();
+  const realm  = (url.searchParams.get('realm')  || '').toLowerCase().trim();
+  const name   = (url.searchParams.get('name')   || '').toLowerCase().trim();
+  const force  = url.searchParams.get('force') === '1';
+
+  if (!realm || !name) {
+    return json({ error: 'Missing required params: realm, name' }, 400);
+  }
+
+  if (!BLIZZARD_API_BASE[region]) {
+    return json({ error: `Unknown region: ${region}. Use: us, eu, kr, tw` }, 400);
+  }
+
+  const cacheKey = `char:${region}:${realm}:${name}`;
+  const cacheTtl = parseInt(env.BLIZZARD_CHAR_CACHE_TTL || '300', 10);
+
+  // 1. KV cache
+  if (!force) {
+    const cached = await env.RECS_CACHE.get(cacheKey, 'json');
+    if (cached) {
+      return json({ ...cached, _source: 'cache' });
+    }
+  }
+
+  // 2. Blizzard API
+  if (!env.BLIZZARD_CLIENT_SECRET) {
+    return json({ error: 'Blizzard API not configured (missing BLIZZARD_CLIENT_SECRET secret)' }, 503);
+  }
+
+  try {
+    const token = await getBlizzardToken(region, env);
+    const data  = await fetchBlizzardCharacter(region, realm, name, token);
+    const result = { ...data, _source: 'blizzard' };
+
+    // Cachear resultado
+    await env.RECS_CACHE.put(cacheKey, JSON.stringify(result), { expirationTtl: cacheTtl });
+
+    return json(result);
+  } catch (err) {
+    const status = err.status || 502;
+    return json({ error: err.message || 'Blizzard API error' }, status);
+  }
+}
+
+// ─── Blizzard: token OAuth2 (client_credentials) ─────────────────────────────
+//
+// El token dura 24h. Lo cacheamos en KV 23h para renovar con margen.
+// La clave de KV es `btoken:{region}` (tokens son region-independientes para
+// client_credentials, pero usamos clave por región por si cambia en el futuro).
+
+async function getBlizzardToken(region, env) {
+  const tokenKey = `btoken:${region}`;
+
+  // Intentar desde KV
+  const cached = await env.RECS_CACHE.get(tokenKey, 'json');
+  if (cached && cached.expires_at > Date.now()) {
+    return cached.access_token;
+  }
+
+  // Solicitar nuevo token
+  const credentials = btoa(`${env.BLIZZARD_CLIENT_ID}:${env.BLIZZARD_CLIENT_SECRET}`);
+  const response = await fetch(BLIZZARD_OAUTH_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${credentials}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'grant_type=client_credentials',
+  });
+
+  if (!response.ok) {
+    const err = new Error(`Blizzard OAuth failed: ${response.status}`);
+    err.status = 502;
+    throw err;
+  }
+
+  const tokenData = await response.json();
+
+  // Cachear 23h (el token dura 24h)
+  const ttl23h = 23 * 60 * 60;
+  await env.RECS_CACHE.put(tokenKey, JSON.stringify({
+    access_token: tokenData.access_token,
+    expires_at:   Date.now() + ttl23h * 1000,
+  }), { expirationTtl: ttl23h });
+
+  return tokenData.access_token;
+}
+
+// ─── Blizzard: fetch character data en paralelo ───────────────────────────────
+
+async function fetchBlizzardCharacter(region, realm, name, token) {
+  const base      = BLIZZARD_API_BASE[region];
+  const namespace = `profile-${region}`;
+  // en_US para que los nombres de encantamientos/gemas coincidan con nuestra static data
+  const locale    = 'en_US';
+
+  // Realm slug: lowercase, espacios → guiones  (e.g. "Sanguino" → "sanguino")
+  const realmSlug  = realm.replace(/\s+/g, '-');
+  // Character name: lowercase + URL-encode (maneja caracteres especiales: Ä, ñ, etc.)
+  const charName   = encodeURIComponent(name.toLowerCase());
+
+  const charPath = `/profile/wow/character/${realmSlug}/${charName}`;
+  const qs       = `namespace=${namespace}&locale=${locale}`;
+  const headers  = { 'Authorization': `Bearer ${token}` };
+
+  // 4 llamadas en paralelo → minimiza latencia
+  const [profileRes, equipRes, statsRes, mediaRes] = await Promise.all([
+    fetch(`${base}${charPath}?${qs}`,                          { headers }),
+    fetch(`${base}${charPath}/equipment?${qs}`,                { headers }),
+    fetch(`${base}${charPath}/statistics?${qs}`,               { headers }),
+    fetch(`${base}${charPath}/character-media/summary?${qs}`,  { headers }),
+  ]);
+
+  // Profile es el endpoint crítico; si falla → error al cliente
+  if (!profileRes.ok) {
+    const err = new Error(
+      profileRes.status === 404
+        ? 'Character not found. Check region, realm and name.'
+        : `Blizzard profile API error: ${profileRes.status}`
+    );
+    err.status = profileRes.status === 404 ? 404 : 502;
+    throw err;
+  }
+
+  // Parsear respuestas (los demás endpoints son opcionales — si fallan, usamos null)
+  const [profile, equip, stats, media] = await Promise.all([
+    profileRes.json(),
+    equipRes.ok  ? equipRes.json()  : null,
+    statsRes.ok  ? statsRes.json()  : null,
+    mediaRes.ok  ? mediaRes.json()  : null,
+  ]);
+
+  return normalizeCharacter(profile, equip, stats, media, region);
+}
+
+// ─── Normalización del personaje ─────────────────────────────────────────────
+
+function normalizeCharacter(profile, equip, stats, media, region) {
+
+  // ── Avatar / render ──────────────────────────────────────────────────────
+  let avatarUrl = null;
+  if (media?.assets) {
+    // Preferencia: main-raw (PNG transparente) > main > avatar
+    const asset =
+      media.assets.find(a => a.key === 'main-raw') ||
+      media.assets.find(a => a.key === 'main')      ||
+      media.assets.find(a => a.key === 'avatar');
+    avatarUrl = asset?.value ?? null;
+  }
+
+  // ── Equipo ───────────────────────────────────────────────────────────────
+  const equipment = [];
+  if (equip?.equipped_items) {
+    for (const item of equip.equipped_items) {
+
+      // Encantamientos: sólo tipo PERMANENT (excluye BONUS_SOCKETS, TEMPORARY, etc.)
+      // display_string: "Enchanted: Chant of Burrowing Rapidity" → extraemos el nombre
+      const enchantments = (item.enchantments || [])
+        .filter(e => e.enchantment_slot?.type === 'PERMANENT')
+        .map(e => {
+          // Primero intentamos source_item.name: "Enchant Cloak - Chant of Burrowing Rapidity"
+          // y extraemos lo que va después del primer " - "
+          const sourceName = e.source_item?.name || '';
+          if (sourceName.includes(' - ')) {
+            return sourceName.split(' - ').slice(1).join(' - ').trim();
+          }
+          // Fallback: display_string menos el prefijo "Enchanted: "
+          return (e.display_string || '').replace(/^Enchanted:\s*/i, '').trim();
+        })
+        .filter(e => e.length > 0);
+
+      // Gemas: sólo sockets que tienen ítem equipado (ignorar sockets vacíos)
+      const gems = (item.sockets || [])
+        .map(s => s.item?.name || '')
+        .filter(g => g.length > 0);
+
+      equipment.push({
+        slot:         item.slot?.type  || 'UNKNOWN',
+        name:         item.name        || 'Unknown',
+        item_level:   item.level?.value ?? 0,
+        quality:      item.quality?.type || 'COMMON',
+        item_id:      item.item?.id    ?? null,
+        // icon_url: null — Blizzard requiere llamada extra a item media por pieza.
+        // La app usa wowheadUrl del item_id como alternativa.
+        icon_url:     null,
+        enchantments: enchantments,
+        gems:         gems,
+        // Blizzard equipment summary no devuelve bonus_ids directamente
+        bonus_ids:    [],
+      });
+    }
+  }
+
+  // ── Estadísticas ─────────────────────────────────────────────────────────
+  let normalizedStats = null;
+  if (stats) {
+    // Crítico: melee y spell tienen el mismo rating para la mayoría de specs;
+    // usamos melee si existe, spell como fallback
+    const critValue  = stats.melee_crit?.value  ?? stats.spell_crit?.value  ?? null;
+    const hasteValue = stats.melee_haste?.value ?? stats.spell_haste?.value ?? null;
+
+    normalizedStats = {
+      health:          stats.health?.effective             ?? null,
+      mana:            stats.power?.effective              ?? null,
+      power_type:      stats.power?.type?.type             ?? 'MANA',
+      strength:        stats.strength?.effective           ?? null,
+      agility:         stats.agility?.effective            ?? null,
+      intellect:       stats.intellect?.effective          ?? null,
+      stamina:         stats.stamina?.effective            ?? null,
+      critical_strike: critValue,
+      haste:           hasteValue,
+      mastery:         stats.mastery?.value                ?? null,
+      // versatility_damage_done_bonus ya viene como porcentaje (e.g. 12.0)
+      versatility:     stats.versatility_damage_done_bonus ?? null,
+    };
+  }
+
+  return {
+    name:              profile.name,
+    realm:             profile.realm?.name           || '',
+    region:            region.toUpperCase(),
+    level:             profile.level                 ?? 80,
+    race:              profile.race?.name            || 'Unknown',
+    class:             profile.character_class?.name || 'Unknown',
+    spec:              profile.active_spec?.name     ?? null,
+    guild:             profile.guild?.name           ?? null,
+    achievement_points: profile.achievement_points   ?? null,
+    average_item_level: profile.average_item_level   ?? null,
+    equipped_item_level: profile.equipped_item_level ?? null,
+    avatar_url:        avatarUrl,
+    equipment:         equipment,
+    stats:             normalizedStats,
+  };
 }
 
 // ─── /invalidate ─────────────────────────────────────────────────────────────
@@ -718,7 +959,7 @@ async function handleInvalidate(request, env) {
     return json({ error: 'Missing required fields: class, spec' }, 400);
   }
 
-  const cacheKey = buildCacheKey(classParam, specParam, patch);
+  const cacheKey = buildRecsKey(classParam, specParam, patch);
   await env.RECS_CACHE.delete(cacheKey);
   return json({ invalidated: cacheKey, ok: true });
 }
@@ -730,14 +971,14 @@ async function handleSpecs(url, env) {
 
   const results = await Promise.all(
     SUPPORTED_SPECS.map(async ({ class: cls, spec }) => {
-      const key = buildCacheKey(cls, spec, patch);
+      const key = buildRecsKey(cls, spec, patch);
       const cached = await env.RECS_CACHE.get(key, 'json');
       return {
         class: cls,
         spec,
-        cached: cached !== null,
+        cached:       cached !== null,
         generated_at: cached?.generated_at ?? null,
-        source: cached?._source ?? null,
+        source:       cached?._source      ?? null,
       };
     })
   );
@@ -747,7 +988,7 @@ async function handleSpecs(url, env) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function buildCacheKey(cls, spec, patch) {
+function buildRecsKey(cls, spec, patch) {
   return `recs:${cls}:${spec.replace(' ', '_')}:${patch}`;
 }
 
