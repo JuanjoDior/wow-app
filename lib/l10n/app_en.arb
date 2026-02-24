@@ -180,6 +180,7 @@
   "@recPanelFootnote": {
     "placeholders": { "patch": { "type": "String" } }
   },
+  "recPanelNoLocalData": "Check Icy Veins",
   "recEnchantSuggestedSpec": "Suggested for your spec (TWW S3)",
   "recEnchantSuggestedGeneric": "Suggested (TWW S3)",
   "recEnchantApply": "Apply",

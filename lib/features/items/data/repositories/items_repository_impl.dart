@@ -40,7 +40,7 @@ class ItemsRepositoryImpl implements ItemsRepository {
     String locale = 'en_GB',
   }) async {
     try {
-      final item = await remoteDataSource.getItemById(id);
+      final item = await remoteDataSource.getItemById(id, locale: locale);
       return Right(item);
     } on NetworkException catch (e) {
       return Left(NetworkFailure(message: e.message));

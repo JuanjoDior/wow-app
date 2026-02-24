@@ -477,6 +477,9 @@ class SEs extends S {
   }
 
   @override
+  String get recPanelNoLocalData => 'Consulta en Icy Veins';
+
+  @override
   String get recEnchantSuggestedSpec => 'Sugeridos para tu spec (TWW S3)';
 
   @override

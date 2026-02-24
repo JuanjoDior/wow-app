@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:wow_companion/core/wow/character_search_input.dart';
 
 /// Represents a recent character search entry.
 class SearchEntry extends Equatable {
@@ -19,14 +20,37 @@ class SearchEntry extends Equatable {
       '${region.toLowerCase()}-${realm.toLowerCase()}-${name.toLowerCase()}';
 
   /// Slug for navigation
-  String get realmSlug => realm.toLowerCase().replaceAll(' ', '-');
+  String get realmSlug => normalizeRealmForRequest(_safeDecodeRealm(realm));
 
   /// Display-friendly realm name
-  String get displayRealm =>
-      realm.split('-').map((w) {
-        if (w.isEmpty) return w;
-        return w[0].toUpperCase() + w.substring(1).toLowerCase();
-      }).join(' ');
+  String get displayRealm {
+    final decoded = _safeDecodeRealm(realm).trim();
+    if (decoded.isEmpty) return decoded;
+    final asWords = decoded.replaceAll('-', ' ');
+    return asWords
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .map(_capitalizeApostropheWord)
+        .join(' ');
+  }
+
+  String _capitalizeApostropheWord(String word) {
+    return word
+        .split("'")
+        .map((part) {
+          if (part.isEmpty) return part;
+          return part[0].toUpperCase() + part.substring(1).toLowerCase();
+        })
+        .join("'");
+  }
+
+  String _safeDecodeRealm(String input) {
+    try {
+      return Uri.decodeComponent(input);
+    } catch (_) {
+      return input;
+    }
+  }
 
   Map<String, dynamic> toJson() => {
     'region': region,

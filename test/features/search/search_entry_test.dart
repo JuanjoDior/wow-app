@@ -30,6 +30,20 @@ void main() {
       expect(entry.displayRealm, 'Burning Legion');
     });
 
+    test('realmSlug decodes encoded realms before slugging', () {
+      final entry = SearchEntry(
+        region: 'us',
+        realm: 'cho%27gall',
+        name: 'test',
+      );
+      expect(entry.realmSlug, "cho'gall");
+    });
+
+    test('displayRealm supports apostrophes', () {
+      final entry = SearchEntry(region: 'us', realm: "cho'gall", name: 'test');
+      expect(entry.displayRealm, "Cho'Gall");
+    });
+
     test('toJson and fromJson roundtrip', () {
       final original = SearchEntry(
         region: 'us',

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wow_companion/core/di/injection.dart';
+import 'package:wow_companion/core/wow/character_search_input.dart';
+import 'package:wow_companion/core/wow/supported_regions.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/search/domain/search_entry.dart';
 import 'package:wow_companion/features/search/domain/search_history_repository.dart';
@@ -17,7 +19,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final _realmController = TextEditingController();
   final _nameController = TextEditingController();
-  String _selectedRegion = 'eu';
+  String _selectedRegion = supportedRegionCodes.first;
   String? _errorMessage;
 
   List<SearchEntry> _history = [];
@@ -42,41 +44,69 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onSearch() {
-    final realm = _realmController.text.trim();
-    final name = _nameController.text.trim();
+    final realmInput = _realmController.text;
+    final nameInput = _nameController.text;
 
-    if (realm.isEmpty || name.isEmpty) {
+    if (realmInput.trim().isEmpty || nameInput.trim().isEmpty) {
       setState(() => _errorMessage = S.of(context)!.enterRealmAndName);
       return;
     }
 
-    setState(() => _errorMessage = null);
+    final normalizedRegion = normalizeRegion(_selectedRegion);
+    if (!isSupportedRegion(normalizedRegion)) {
+      setState(() {
+        _selectedRegion = supportedRegionCodes.first;
+        _errorMessage = S.of(context)!.checkRealmAndName;
+      });
+      return;
+    }
 
-    final realmSlug = realm.toLowerCase().replaceAll(' ', '-');
+    final normalizedRealm = normalizeRealmForRequest(realmInput);
+    final normalizedName = normalizeName(nameInput);
+
+    setState(() => _errorMessage = null);
 
     // Save to history
     _historyRepo.addEntry(
       SearchEntry(
-        region: _selectedRegion,
-        realm: realmSlug,
-        name: name.toLowerCase(),
+        region: normalizedRegion,
+        realm: normalizedRealm,
+        name: normalizedName,
       ),
     );
 
     context
-        .push('/character/$_selectedRegion/$realmSlug/${name.toLowerCase()}')
+        .push(
+          buildCharacterRoute(
+            region: normalizedRegion,
+            realm: normalizedRealm,
+            name: normalizedName,
+          ),
+        )
         .then((_) => _loadHistory());
   }
 
   void _onHistoryTap(SearchEntry entry) {
+    final normalizedRegion = normalizeRegion(entry.region);
+    final normalizedRealm = normalizeRealmForRequest(entry.realm);
+    final normalizedName = normalizeName(entry.name);
+
     // Update timestamp by re-adding
     _historyRepo.addEntry(
-      SearchEntry(region: entry.region, realm: entry.realm, name: entry.name),
+      SearchEntry(
+        region: normalizedRegion,
+        realm: normalizedRealm,
+        name: normalizedName,
+      ),
     );
 
     context
         .push(
-          '/character/${entry.region}/${entry.realmSlug}/${entry.name.toLowerCase()}',
+          buildCharacterRoute(
+            region: normalizedRegion,
+            realm: normalizedRealm,
+            name: normalizedName,
+          ),
         )
         .then((_) => _loadHistory());
   }
@@ -176,24 +206,16 @@ class _HomePageState extends State<HomePage> {
                 isExpanded: true,
                 dropdownColor: WowTheme.surfaceDark,
                 style: const TextStyle(color: WowTheme.textPrimary),
-                items: [
-                  DropdownMenuItem(
-                    value: 'eu',
-                    child: Text('🇪🇺 ${t.regionEurope}'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'us',
-                    child: Text('🇺🇸 ${t.regionAmericas}'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'kr',
-                    child: Text('🇰🇷 ${t.regionKorea}'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'tw',
-                    child: Text('🇹🇼 ${t.regionTaiwan}'),
-                  ),
-                ],
+                items: supportedRegionCodes
+                    .map(
+                      (regionCode) => DropdownMenuItem(
+                        value: regionCode,
+                        child: Text(
+                          '${regionFlag(regionCode)} ${regionLabel(regionCode, t)}',
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
                 onChanged: (v) => setState(() => _selectedRegion = v!),
               ),
             ),

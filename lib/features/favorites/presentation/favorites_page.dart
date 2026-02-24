@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wow_companion/core/di/injection.dart';
+import 'package:wow_companion/core/wow/character_search_input.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/favorites/presentation/favorites_cubit.dart';
 import 'package:wow_companion/shared/widgets/common_widgets.dart';
@@ -115,12 +116,12 @@ class _FavoritesPageState extends State<FavoritesPage> {
                       ? QualityBadge(quality: 'EPIC', itemLevel: fav.itemLevel!)
                       : null,
                   onTap: () {
-                    final realmSlug = fav.realm.toLowerCase().replaceAll(
-                      ' ',
-                      '-',
-                    );
                     context.push(
-                      '/character/${fav.region.toLowerCase()}/$realmSlug/${fav.name.toLowerCase()}',
+                      buildCharacterRoute(
+                        region: fav.region,
+                        realm: fav.realm,
+                        name: fav.name,
+                      ),
                     );
                   },
                 ),

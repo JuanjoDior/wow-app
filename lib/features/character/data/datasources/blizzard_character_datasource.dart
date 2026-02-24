@@ -15,11 +15,14 @@ class BlizzardCharacterDatasource {
       'https://wow-recommendations.wow-comp-app.workers.dev';
 
   BlizzardCharacterDatasource({Dio? dio})
-      : _dio = dio ??
-            Dio(BaseOptions(
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
               connectTimeout: const Duration(seconds: 10),
               receiveTimeout: const Duration(seconds: 15),
-            ));
+            ),
+          );
 
   Future<CharacterBlizzardData> getCharacter({
     required String region,
@@ -49,11 +52,21 @@ class BlizzardCharacterDatasource {
       throw const ServerException(message: 'Unexpected response from Worker');
     } on DioException catch (e) {
       final statusCode = e.response?.statusCode;
+      final workerErrorMessage = (e.response?.data is Map)
+          ? (e.response?.data as Map)['error'] as String?
+          : null;
+
+      if (statusCode == 400) {
+        throw ServerException(
+          message: workerErrorMessage ?? 'Invalid character query parameters.',
+          statusCode: 400,
+        );
+      }
 
       if (statusCode == 404) {
         final msg = (e.response?.data is Map)
             ? (e.response?.data as Map)['error'] as String? ??
-                'Character not found. Check region, realm and name.'
+                  'Character not found. Check region, realm and name.'
             : 'Character not found. Check region, realm and name.';
         throw NotFoundException(message: msg);
       }
@@ -129,72 +142,77 @@ class CharacterBlizzardData {
     CharacterStats? stats;
     if (statsRaw != null) {
       stats = CharacterStats(
-        health:         (statsRaw['health']          as num?)?.toInt(),
-        mana:           (statsRaw['mana']            as num?)?.toInt(),
-        powerType:      statsRaw['power_type']       as String?,
-        strength:       (statsRaw['strength']        as num?)?.toInt(),
-        agility:        (statsRaw['agility']         as num?)?.toInt(),
-        intellect:      (statsRaw['intellect']       as num?)?.toInt(),
-        stamina:        (statsRaw['stamina']         as num?)?.toInt(),
+        health: (statsRaw['health'] as num?)?.toInt(),
+        mana: (statsRaw['mana'] as num?)?.toInt(),
+        powerType: statsRaw['power_type'] as String?,
+        strength: (statsRaw['strength'] as num?)?.toInt(),
+        agility: (statsRaw['agility'] as num?)?.toInt(),
+        intellect: (statsRaw['intellect'] as num?)?.toInt(),
+        stamina: (statsRaw['stamina'] as num?)?.toInt(),
         criticalStrike: (statsRaw['critical_strike'] as num?)?.toDouble(),
-        haste:          (statsRaw['haste']           as num?)?.toDouble(),
-        mastery:        (statsRaw['mastery']         as num?)?.toDouble(),
-        versatility:    (statsRaw['versatility']     as num?)?.toDouble(),
+        haste: (statsRaw['haste'] as num?)?.toDouble(),
+        mastery: (statsRaw['mastery'] as num?)?.toDouble(),
+        versatility: (statsRaw['versatility'] as num?)?.toDouble(),
       );
     }
 
     return CharacterBlizzardData(
-      name:              json['name']                as String? ?? '',
-      realm:             json['realm']               as String? ?? '',
-      region:            (json['region']             as String? ?? '').toUpperCase(),
-      level:             (json['level']              as num?)?.toInt() ?? 80,
-      race:              json['race']                as String? ?? 'Unknown',
-      characterClass:    json['class']               as String? ?? 'Unknown',
-      specialization:    json['spec']                as String?,
-      guild:             json['guild']               as String?,
+      name: json['name'] as String? ?? '',
+      realm: json['realm'] as String? ?? '',
+      region: (json['region'] as String? ?? '').toUpperCase(),
+      level: (json['level'] as num?)?.toInt() ?? 80,
+      race: json['race'] as String? ?? 'Unknown',
+      characterClass: json['class'] as String? ?? 'Unknown',
+      specialization: json['spec'] as String?,
+      guild: json['guild'] as String?,
       achievementPoints: (json['achievement_points'] as num?)?.toInt(),
-      averageItemLevel:  (json['average_item_level'] as num?)?.toInt(),
+      averageItemLevel: (json['average_item_level'] as num?)?.toInt(),
       equippedItemLevel: (json['equipped_item_level'] as num?)?.toInt(),
-      avatarUrl:         json['avatar_url']          as String?,
-      equipment:         equipment,
-      stats:             stats,
+      avatarUrl: json['avatar_url'] as String?,
+      equipment: equipment,
+      stats: stats,
     );
   }
 
   static EquippedItem _parseItem(Map<String, dynamic> item) {
     final rawSlot = (item['slot'] as String? ?? 'UNKNOWN').toUpperCase();
+    final rawIconUrl = item['icon_url'] ?? item['iconUrl'];
+    final iconUrl = rawIconUrl is String && rawIconUrl.trim().isNotEmpty
+        ? rawIconUrl
+        : null;
 
     // Enchantments: lista de strings con el nombre del encant exacto (en inglés)
-    final enchantments = (item['enchantments'] as List<dynamic>?)
+    final enchantments =
+        (item['enchantments'] as List<dynamic>?)
             ?.map((e) => e.toString())
             .where((e) => e.isNotEmpty)
             .toList() ??
         [];
 
     // Gems: lista de strings con el nombre de la gema exacto (en inglés)
-    final gems = (item['gems'] as List<dynamic>?)
+    final gems =
+        (item['gems'] as List<dynamic>?)
             ?.map((e) => e.toString())
             .where((e) => e.isNotEmpty)
             .toList() ??
         [];
 
-    final bonusIds = (item['bonus_ids'] as List<dynamic>?)
+    final bonusIds =
+        (item['bonus_ids'] as List<dynamic>?)
             ?.map((e) => (e as num).toInt())
             .toList() ??
         [];
 
     return EquippedItem(
-      slot:         rawSlot,
-      name:         item['name']        as String? ?? 'Unknown',
-      itemLevel:    (item['item_level'] as num?)?.toInt() ?? 0,
-      quality:      (item['quality']    as String? ?? 'EPIC').toUpperCase(),
-      itemId:       (item['item_id']    as num?)?.toInt(),
-      // Blizzard no devuelve iconUrl en el endpoint de equipo (requiere llamada extra).
-      // La UI muestra placeholder; el tooltip usa wowheadUrl via itemId.
-      iconUrl:      null,
+      slot: rawSlot,
+      name: item['name'] as String? ?? 'Unknown',
+      itemLevel: (item['item_level'] as num?)?.toInt() ?? 0,
+      quality: (item['quality'] as String? ?? 'EPIC').toUpperCase(),
+      itemId: (item['item_id'] as num?)?.toInt(),
+      iconUrl: iconUrl,
       enchantments: enchantments,
-      gems:         gems,
-      bonusIds:     bonusIds,
+      gems: gems,
+      bonusIds: bonusIds,
     );
   }
 }

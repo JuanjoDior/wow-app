@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:wow_companion/core/di/injection.dart';
+import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
 import 'package:wow_companion/features/items/presentation/cubit/items_cubit.dart';
 import 'package:wow_companion/features/items/presentation/cubit/items_state.dart';
+import 'package:wow_companion/l10n/generated/app_localizations.dart';
+import 'package:wow_companion/shared/widgets/item_tooltip_trigger.dart';
 
 class ItemsPage extends StatelessWidget {
   const ItemsPage({super.key});
@@ -30,12 +33,32 @@ class _ItemsView extends StatefulWidget {
 class _ItemsViewState extends State<_ItemsView> {
   final _controller = TextEditingController();
   Timer? _debounce;
+  late final LocaleNotifier _localeNotifier;
+
+  @override
+  void initState() {
+    super.initState();
+    _localeNotifier = sl<LocaleNotifier>();
+    _localeNotifier.addListener(_onLocaleChanged);
+  }
 
   @override
   void dispose() {
+    _localeNotifier.removeListener(_onLocaleChanged);
     _controller.dispose();
     _debounce?.cancel();
     super.dispose();
+  }
+
+  void _onLocaleChanged() {
+    if (!mounted) return;
+    final query = _controller.text.trim();
+    if (query.length < 2) return;
+    _debounce?.cancel();
+    context.read<ItemsCubit>().search(
+      query,
+      locale: _localeNotifier.blizzardLocale,
+    );
   }
 
   void _onChanged(String value) {
@@ -45,14 +68,20 @@ class _ItemsViewState extends State<_ItemsView> {
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 500), () {
-      if (mounted) context.read<ItemsCubit>().search(value.trim());
+      if (mounted) {
+        context.read<ItemsCubit>().search(
+          value.trim(),
+          locale: _localeNotifier.blizzardLocale,
+        );
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = S.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Items')),
+      appBar: AppBar(title: Text(t.itemCatalog)),
       body: Column(
         children: [
           Padding(
@@ -62,7 +91,7 @@ class _ItemsViewState extends State<_ItemsView> {
               onChanged: _onChanged,
               style: const TextStyle(color: WowTheme.textPrimary),
               decoration: InputDecoration(
-                hintText: 'Search items by name...',
+                hintText: t.searchTypeAtLeast,
                 hintStyle: const TextStyle(color: WowTheme.textSecondary),
                 prefixIcon: const Icon(
                   Icons.search,
@@ -89,7 +118,7 @@ class _ItemsViewState extends State<_ItemsView> {
           Expanded(
             child: BlocBuilder<ItemsCubit, ItemsState>(
               builder: (context, state) {
-                if (state is ItemsInitial) return _buildHint();
+                if (state is ItemsInitial) return _buildHint(context);
                 if (state is ItemsLoading) {
                   return const Center(
                     child: CircularProgressIndicator(
@@ -97,7 +126,7 @@ class _ItemsViewState extends State<_ItemsView> {
                     ),
                   );
                 }
-                if (state is ItemsEmpty) return _buildEmpty();
+                if (state is ItemsEmpty) return _buildEmpty(context);
                 if (state is ItemsError) return _buildError(state.message);
                 if (state is ItemsLoaded) return _buildList(state.items);
                 return const SizedBox.shrink();
@@ -109,35 +138,41 @@ class _ItemsViewState extends State<_ItemsView> {
     );
   }
 
-  Widget _buildHint() => const Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.inventory_2_outlined,
-          size: 64,
-          color: WowTheme.textSecondary,
-        ),
-        SizedBox(height: 12),
-        Text(
-          'Search for items by name',
-          style: TextStyle(color: WowTheme.textSecondary, fontSize: 16),
-        ),
-        SizedBox(height: 4),
-        Text(
-          'Type at least 2 characters',
-          style: TextStyle(color: WowTheme.textSecondary, fontSize: 13),
-        ),
-      ],
-    ),
-  );
+  Widget _buildHint(BuildContext context) {
+    final t = S.of(context)!;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.inventory_2_outlined,
+            size: 64,
+            color: WowTheme.textSecondary,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            t.itemCatalog,
+            style: const TextStyle(color: WowTheme.textSecondary, fontSize: 16),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            t.searchTypeAtLeast,
+            style: const TextStyle(color: WowTheme.textSecondary, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
 
-  Widget _buildEmpty() => const Center(
-    child: Text(
-      'No items found',
-      style: TextStyle(color: WowTheme.textSecondary, fontSize: 15),
-    ),
-  );
+  Widget _buildEmpty(BuildContext context) {
+    final t = S.of(context)!;
+    return Center(
+      child: Text(
+        t.searchNoResults,
+        style: const TextStyle(color: WowTheme.textSecondary, fontSize: 15),
+      ),
+    );
+  }
 
   Widget _buildError(String message) => Center(
     child: Padding(
@@ -178,83 +213,86 @@ class _ItemCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(color: qualityColor.withValues(alpha: 0.4), width: 1),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: qualityColor, width: 2),
-                color: WowTheme.darkBackground,
-              ),
-              child: item.iconUrl != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: CachedNetworkImage(
-                        imageUrl: item.iconUrl!,
-                        fit: BoxFit.cover,
-                        placeholder: (_, _) => const Icon(
-                          Icons.inventory_2,
-                          color: WowTheme.textSecondary,
-                          size: 28,
+      child: ItemTooltipTrigger.forItemId(
+        itemId: item.id,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: qualityColor, width: 2),
+                  color: WowTheme.darkBackground,
+                ),
+                child: item.iconUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: CachedNetworkImage(
+                          imageUrl: item.iconUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (_, _) => const Icon(
+                            Icons.inventory_2,
+                            color: WowTheme.textSecondary,
+                            size: 28,
+                          ),
+                          errorWidget: (_, _, _) => const Icon(
+                            Icons.inventory_2,
+                            color: WowTheme.textSecondary,
+                            size: 28,
+                          ),
                         ),
-                        errorWidget: (_, _, _) => const Icon(
-                          Icons.inventory_2,
-                          color: WowTheme.textSecondary,
-                          size: 28,
-                        ),
+                      )
+                    : const Icon(
+                        Icons.inventory_2,
+                        color: WowTheme.textSecondary,
+                        size: 28,
                       ),
-                    )
-                  : const Icon(
-                      Icons.inventory_2,
-                      color: WowTheme.textSecondary,
-                      size: 28,
-                    ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name,
-                    style: TextStyle(
-                      color: qualityColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    [
-                      item.inventoryName,
-                      item.itemSubclass,
-                    ].where((e) => e != null && e.isNotEmpty).join(' · '),
-                    style: const TextStyle(
-                      color: WowTheme.textSecondary,
-                      fontSize: 12,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
               ),
-            ),
-            if (item.level != null)
-              Text(
-                'iLvl ${item.level}',
-                style: const TextStyle(
-                  color: WowTheme.primaryGold,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
+                      style: TextStyle(
+                        color: qualityColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        item.inventoryName,
+                        item.itemSubclass,
+                      ].where((e) => e != null && e.isNotEmpty).join(' · '),
+                      style: const TextStyle(
+                        color: WowTheme.textSecondary,
+                        fontSize: 12,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
-          ],
+              if (item.level != null)
+                Text(
+                  'iLvl ${item.level}',
+                  style: const TextStyle(
+                    color: WowTheme.primaryGold,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

@@ -35,6 +35,7 @@ import 'package:wow_companion/features/analysis/domain/services/gear_progress_se
 import 'package:wow_companion/features/analysis/presentation/cubit/character_analysis_cubit.dart';
 // ── Spec Recommendations ──────────────────────────────────────────────────────
 import 'package:wow_companion/features/builds/data/datasources/spec_recommendations_datasource.dart';
+import 'package:wow_companion/features/builds/data/datasources/spec_recommendations_local_datasource.dart';
 import 'package:wow_companion/features/builds/data/repositories/spec_recommendations_repository_impl.dart';
 import 'package:wow_companion/features/builds/domain/repositories/spec_recommendations_repository.dart';
 
@@ -43,7 +44,9 @@ final sl = GetIt.instance;
 Future<void> initDependencies() async {
   // ── Core ──────────────────────────────────────────────────────────────────
   sl.registerLazySingleton<ApiClient>(() => ApiClient());
-  sl.registerLazySingleton<MemoryCache<Character>>(() => MemoryCache<Character>());
+  sl.registerLazySingleton<MemoryCache<Character>>(
+    () => MemoryCache<Character>(),
+  );
 
   // ── Character Feature ─────────────────────────────────────────────────────
   sl.registerLazySingleton<BlizzardCharacterDatasource>(
@@ -61,17 +64,25 @@ Future<void> initDependencies() async {
   sl.registerFactory(() => CharacterCubit(sl()));
 
   // ── Favorites Feature ─────────────────────────────────────────────────────
-  sl.registerLazySingleton<FavoritesRepository>(() => FavoritesRepositoryImpl());
+  sl.registerLazySingleton<FavoritesRepository>(
+    () => FavoritesRepositoryImpl(),
+  );
   sl.registerLazySingleton(() => FavoritesCubit(sl()));
 
   // ── Search History ────────────────────────────────────────────────────────
-  sl.registerLazySingleton<SearchHistoryRepository>(() => SearchHistoryRepositoryImpl());
+  sl.registerLazySingleton<SearchHistoryRepository>(
+    () => SearchHistoryRepositoryImpl(),
+  );
   sl.registerLazySingleton<LocaleNotifier>(() => LocaleNotifier());
   await sl<LocaleNotifier>().load();
 
   // ── Items Feature ─────────────────────────────────────────────────────────
-  sl.registerLazySingleton<BlizzardItemsDataSource>(() => BlizzardItemsDataSource(sl()));
-  sl.registerLazySingleton<ItemsRepository>(() => ItemsRepositoryImpl(remoteDataSource: sl()));
+  sl.registerLazySingleton<BlizzardItemsDataSource>(
+    () => BlizzardItemsDataSource(sl()),
+  );
+  sl.registerLazySingleton<ItemsRepository>(
+    () => ItemsRepositoryImpl(remoteDataSource: sl()),
+  );
   sl.registerLazySingleton(() => SearchItems(sl()));
   sl.registerFactory(() => ItemsCubit(sl()));
   sl.registerLazySingleton(() => GetItemDetail(sl()));
@@ -84,22 +95,31 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<SpecRecommendationsRemoteDatasource>(
     () => SpecRecommendationsRemoteDatasource(),
   );
+  sl.registerLazySingleton<SpecRecommendationsLocalDatasource>(
+    () => SpecRecommendationsLocalDatasource(),
+  );
   sl.registerLazySingleton<SpecRecommendationsRepository>(
-    () => SpecRecommendationsRepositoryImpl(remote: sl()),
+    () => SpecRecommendationsRepositoryImpl(local: sl()),
   );
 
   sl.registerFactory(() => BuildDetailCubit(sl(), sl(), sl()));
 
   // ── Spells (Build Guide) ──────────────────────────────────────────────────
   sl.registerLazySingleton<SpellsDataSource>(() => SpellsDataSource(sl()));
-  sl.registerLazySingleton<SpellsRepository>(() => SpellsRepositoryImpl(remoteDataSource: sl()));
+  sl.registerLazySingleton<SpellsRepository>(
+    () => SpellsRepositoryImpl(remoteDataSource: sl()),
+  );
   sl.registerLazySingleton(() => SearchSpells(sl()));
 
   // ── Analysis Feature ─────────────────────────────────────────────────────
-  sl.registerLazySingleton<CharacterAnalysisService>(() => const CharacterAnalysisService());
+  sl.registerLazySingleton<CharacterAnalysisService>(
+    () => const CharacterAnalysisService(),
+  );
   sl.registerLazySingleton<GearProgressService>(() => GearProgressService());
   sl.registerFactory(() => CharacterAnalysisCubit(sl(), sl()));
 
   // ── Character Media ───────────────────────────────────────────────────────
-  sl.registerLazySingleton<CharacterMediaDataSource>(() => CharacterMediaDataSource(sl()));
+  sl.registerLazySingleton<CharacterMediaDataSource>(
+    () => CharacterMediaDataSource(sl()),
+  );
 }

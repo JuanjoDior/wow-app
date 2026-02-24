@@ -2,7 +2,7 @@ import 'package:wow_companion/features/builds/domain/entities/spec_recommendatio
 
 abstract class SpecRecommendationsRepository {
   /// Devuelve las recomendaciones para una clase/spec.
-  /// Intenta primero el Worker remoto; si falla, usa el fallback estático.
+  /// En esta fase usa únicamente la fuente local embebida en la app.
   Future<SpecRecommendation?> getRecommendations({
     required String className,
     required String specName,
@@ -10,7 +10,7 @@ abstract class SpecRecommendationsRepository {
   });
 
   /// Solo el fallback local — útil para tests y modo offline.
-  SpecRecommendation? getLocalFallback({
+  Future<SpecRecommendation?> getLocalFallback({
     required String className,
     required String specName,
   });

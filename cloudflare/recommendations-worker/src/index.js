@@ -34,6 +34,12 @@ const BLIZZARD_API_BASE = {
   tw: 'https://tw.api.blizzard.com',
 };
 const BLIZZARD_OAUTH_URL = 'https://oauth.battle.net/token';
+const REALM_SEARCH_LOCALES = {
+  us: ['en_US', 'es_MX', 'pt_BR'],
+  eu: ['en_GB', 'es_ES', 'fr_FR', 'de_DE', 'it_IT', 'ru_RU'],
+  kr: ['ko_KR', 'en_US'],
+  tw: ['zh_TW', 'en_US'],
+};
 
 // ─── Supported specs (for /specs endpoint) ───────────────────────────────────
 export const SUPPORTED_SPECS = [
@@ -700,11 +706,12 @@ async function handleRecommendations(url, env) {
 
 async function handleCharacter(url, env) {
   const region = (url.searchParams.get('region') || 'eu').toLowerCase().trim();
-  const realm  = (url.searchParams.get('realm')  || '').toLowerCase().trim();
+  const realmInput = (url.searchParams.get('realm') || '').trim();
+  const realmLegacyKeyPart = realmInput.toLowerCase();
   const name   = (url.searchParams.get('name')   || '').toLowerCase().trim();
   const force  = url.searchParams.get('force') === '1';
 
-  if (!realm || !name) {
+  if (!realmInput || !name) {
     return json({ error: 'Missing required params: realm, name' }, 400);
   }
 
@@ -712,14 +719,14 @@ async function handleCharacter(url, env) {
     return json({ error: `Unknown region: ${region}. Use: us, eu, kr, tw` }, 400);
   }
 
-  const cacheKey = `char:${region}:${realm}:${name}`;
+  const legacyCacheKey = `char:${region}:${realmLegacyKeyPart}:${name}`;
   const cacheTtl = parseInt(env.BLIZZARD_CHAR_CACHE_TTL || '300', 10);
 
-  // 1. KV cache
+  // 1. Legacy cache alias (pre-realm-canonicalization).
   if (!force) {
-    const cached = await env.RECS_CACHE.get(cacheKey, 'json');
-    if (cached) {
-      return json({ ...cached, _source: 'cache' });
+    const cachedLegacy = await env.RECS_CACHE.get(legacyCacheKey, 'json');
+    if (cachedLegacy) {
+      return json({ ...cachedLegacy, _source: 'cache' });
     }
   }
 
@@ -730,11 +737,21 @@ async function handleCharacter(url, env) {
 
   try {
     const token = await getBlizzardToken(region, env);
-    const data  = await fetchBlizzardCharacter(region, realm, name, token);
+    const realmSlug = await resolveRealmSlug(region, realmInput, token, env);
+    const canonicalCacheKey = `char:${region}:${realmSlug}:${name}`;
+
+    if (!force) {
+      const cachedCanonical = await env.RECS_CACHE.get(canonicalCacheKey, 'json');
+      if (cachedCanonical) {
+        return json({ ...cachedCanonical, _source: 'cache' });
+      }
+    }
+
+    const data = await fetchBlizzardCharacter(region, realmSlug, name, token, env);
     const result = { ...data, _source: 'blizzard' };
 
-    // Cachear resultado
-    await env.RECS_CACHE.put(cacheKey, JSON.stringify(result), { expirationTtl: cacheTtl });
+    // Cachear resultado con clave canónica.
+    await env.RECS_CACHE.put(canonicalCacheKey, JSON.stringify(result), { expirationTtl: cacheTtl });
 
     return json(result);
   } catch (err) {
@@ -787,20 +804,281 @@ async function getBlizzardToken(region, env) {
   return tokenData.access_token;
 }
 
+function stripDiacritics(str) {
+  return String(str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function normalizeRealmLookupValue(value) {
+  return stripDiacritics(String(value || '').toLowerCase())
+    .replace(/[’']/g, '')
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function slugifyRealmValue(value) {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function buildRealmSlugCandidates(input) {
+  const raw = String(input || '').trim().toLowerCase();
+  if (!raw) return [];
+
+  const collapsedWhitespace = raw.replace(/\s+/g, ' ');
+  const withoutApostrophes = collapsedWhitespace.replace(/[’']/g, '');
+  const withoutDiacritics = stripDiacritics(withoutApostrophes);
+  const asciiOnly = withoutDiacritics.replace(/[^a-z0-9\s-]/g, ' ');
+
+  const candidates = [
+    slugifyRealmValue(raw),
+    slugifyRealmValue(collapsedWhitespace),
+    slugifyRealmValue(withoutApostrophes),
+    slugifyRealmValue(withoutDiacritics),
+    slugifyRealmValue(asciiOnly),
+  ].filter(Boolean);
+
+  return [...new Set(candidates)];
+}
+
+function isSafeRealmSlug(slug) {
+  return /^[a-z0-9-]+$/.test(slug);
+}
+
+async function resolveRealmSlug(region, realmInput, token, env) {
+  const normalizedRealm = normalizeRealmLookupValue(realmInput);
+  if (!normalizedRealm) {
+    const err = new Error('Character not found. Check region, realm and name.');
+    err.status = 404;
+    throw err;
+  }
+
+  const cacheKey = `realm_slug:${region}:${normalizedRealm}`;
+  try {
+    const cached = await env.RECS_CACHE.get(cacheKey);
+    if (cached && isSafeRealmSlug(cached)) return cached;
+  } catch (_) {
+    // Ignore cache failures; realm resolution should still continue.
+  }
+
+  const candidates = buildRealmSlugCandidates(realmInput);
+  for (const candidate of candidates) {
+    const resolved = await tryFetchRealmBySlug(region, candidate, token);
+    if (!resolved) continue;
+
+    try {
+      const ttl = parseInt(env.BLIZZARD_REALM_CACHE_TTL || '2592000', 10);
+      await env.RECS_CACHE.put(cacheKey, resolved, { expirationTtl: ttl });
+    } catch (_) {
+      // Ignore cache failures.
+    }
+    return resolved;
+  }
+
+  const fromSearch = await searchRealmByName(region, realmInput, token);
+  if (fromSearch) {
+    try {
+      const ttl = parseInt(env.BLIZZARD_REALM_CACHE_TTL || '2592000', 10);
+      await env.RECS_CACHE.put(cacheKey, fromSearch, { expirationTtl: ttl });
+    } catch (_) {
+      // Ignore cache failures.
+    }
+    return fromSearch;
+  }
+
+  const fallbackCandidate = candidates.find(isSafeRealmSlug);
+  if (fallbackCandidate) return fallbackCandidate;
+
+  const err = new Error('Character not found. Check region, realm and name.');
+  err.status = 404;
+  throw err;
+}
+
+async function tryFetchRealmBySlug(region, slug, token) {
+  if (!slug || !isSafeRealmSlug(slug)) return null;
+
+  const base = BLIZZARD_API_BASE[region];
+  const namespace = `dynamic-${region}`;
+  const locale = 'en_US';
+  const headers = { 'Authorization': `Bearer ${token}` };
+
+  const url =
+    `${base}/data/wow/realm/${encodeURIComponent(slug)}` +
+    `?namespace=${namespace}&locale=${locale}`;
+
+  try {
+    const response = await fetch(url, { headers });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const resolved = String(data?.slug || slug).toLowerCase().trim();
+    return isSafeRealmSlug(resolved) ? resolved : slug;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function searchRealmByName(region, realmInput, token) {
+  const base = BLIZZARD_API_BASE[region];
+  const namespace = `dynamic-${region}`;
+  const rawInput = String(realmInput || '').trim();
+  const normalizedLookup = normalizeRealmLookupValue(rawInput);
+  if (!rawInput || !normalizedLookup) return null;
+
+  const locales = REALM_SEARCH_LOCALES[region] || ['en_US'];
+  const headers = { 'Authorization': `Bearer ${token}` };
+  let fallbackSlug = null;
+
+  for (const locale of locales) {
+    const searchFields = [`name.${locale}`, 'name.en_US'];
+    for (const searchField of [...new Set(searchFields)]) {
+      const searchParams = new URLSearchParams({
+        namespace,
+        locale,
+        _pageSize: '50',
+      });
+      searchParams.set(searchField, rawInput);
+
+      const url = `${base}/data/wow/search/realm?${searchParams.toString()}`;
+      let response;
+      try {
+        response = await fetch(url, { headers });
+      } catch (_) {
+        continue;
+      }
+
+      if (!response.ok) continue;
+
+      const payload = await response.json();
+      const entries = extractRealmSearchEntries(payload);
+
+      for (const entry of entries) {
+        const slug = getRealmSlugFromEntry(entry);
+        if (!slug) continue;
+
+        if (fallbackSlug === null) fallbackSlug = slug;
+
+        const names = getRealmNamesFromEntry(entry);
+        const isExact = names
+          .map(normalizeRealmLookupValue)
+          .some(name => name === normalizedLookup);
+
+        if (isExact) return slug;
+      }
+    }
+  }
+
+  return fallbackSlug;
+}
+
+function extractRealmSearchEntries(payload) {
+  const results = Array.isArray(payload?.results) ? payload.results : [];
+  return results
+    .map(entry => entry?.data || entry)
+    .filter(Boolean);
+}
+
+function getRealmSlugFromEntry(entry) {
+  const candidates = [
+    entry?.slug,
+    entry?.realm?.slug,
+    entry?.key?.slug,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const normalized = candidate.trim().toLowerCase();
+    if (isSafeRealmSlug(normalized)) return normalized;
+  }
+
+  return null;
+}
+
+function getRealmNamesFromEntry(entry) {
+  const names = [];
+
+  const collect = (value) => {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      names.push(value.trim());
+      return;
+    }
+    if (value && typeof value === 'object') {
+      for (const nested of Object.values(value)) {
+        if (typeof nested === 'string' && nested.trim().length > 0) {
+          names.push(nested.trim());
+        }
+      }
+    }
+  };
+
+  collect(entry?.name);
+  collect(entry?.realm?.name);
+  collect(entry?.display_string);
+
+  return [...new Set(names)];
+}
+
+function extractNumericStatValue(source, preferredKeys = []) {
+  if (typeof source === 'number' && Number.isFinite(source)) {
+    return source;
+  }
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+
+  const fallbackKeys = ['effective', 'value', 'max', 'base', 'current'];
+  const keys = [...preferredKeys, ...fallbackKeys];
+
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function extractPowerTypeValue(source) {
+  if (typeof source === 'string') {
+    const normalized = source.trim().toUpperCase().replace(/\s+/g, '_');
+    if (/^[A-Z_]+$/.test(normalized)) {
+      return normalized;
+    }
+    return null;
+  }
+
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+
+  const keys = ['type', 'power_type', 'name', 'id'];
+  for (const key of keys) {
+    const nested = extractPowerTypeValue(source[key]);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
 // ─── Blizzard: fetch character data en paralelo ───────────────────────────────
 
-async function fetchBlizzardCharacter(region, realm, name, token) {
+async function fetchBlizzardCharacter(region, realmSlug, name, token, env) {
   const base      = BLIZZARD_API_BASE[region];
   const namespace = `profile-${region}`;
   // en_US para que los nombres de encantamientos/gemas coincidan con nuestra static data
   const locale    = 'en_US';
 
-  // Realm slug: lowercase, espacios → guiones  (e.g. "Sanguino" → "sanguino")
-  const realmSlug  = realm.replace(/\s+/g, '-');
   // Character name: lowercase + URL-encode (maneja caracteres especiales: Ä, ñ, etc.)
   const charName   = encodeURIComponent(name.toLowerCase());
 
-  const charPath = `/profile/wow/character/${realmSlug}/${charName}`;
+  const charPath = `/profile/wow/character/${encodeURIComponent(realmSlug)}/${charName}`;
   const qs       = `namespace=${namespace}&locale=${locale}`;
   const headers  = { 'Authorization': `Bearer ${token}` };
 
@@ -831,12 +1109,13 @@ async function fetchBlizzardCharacter(region, realm, name, token) {
     mediaRes.ok  ? mediaRes.json()  : null,
   ]);
 
-  return normalizeCharacter(profile, equip, stats, media, region);
+  const iconUrlsByItemId = await resolveItemIcons(region, equip, token, env);
+  return normalizeCharacter(profile, equip, stats, media, region, iconUrlsByItemId);
 }
 
 // ─── Normalización del personaje ─────────────────────────────────────────────
 
-function normalizeCharacter(profile, equip, stats, media, region) {
+function normalizeCharacter(profile, equip, stats, media, region, iconUrlsByItemId = {}) {
 
   // ── Avatar / render ──────────────────────────────────────────────────────
   let avatarUrl = null;
@@ -875,15 +1154,15 @@ function normalizeCharacter(profile, equip, stats, media, region) {
         .map(s => s.item?.name || '')
         .filter(g => g.length > 0);
 
+      const itemId = item.item?.id ?? null;
+
       equipment.push({
         slot:         item.slot?.type  || 'UNKNOWN',
         name:         item.name        || 'Unknown',
         item_level:   item.level?.value ?? 0,
         quality:      item.quality?.type || 'COMMON',
-        item_id:      item.item?.id    ?? null,
-        // icon_url: null — Blizzard requiere llamada extra a item media por pieza.
-        // La app usa wowheadUrl del item_id como alternativa.
-        icon_url:     null,
+        item_id:      itemId,
+        icon_url:     itemId != null ? (iconUrlsByItemId[itemId] ?? null) : null,
         enchantments: enchantments,
         gems:         gems,
         // Blizzard equipment summary no devuelve bonus_ids directamente
@@ -897,22 +1176,32 @@ function normalizeCharacter(profile, equip, stats, media, region) {
   if (stats) {
     // Crítico: melee y spell tienen el mismo rating para la mayoría de specs;
     // usamos melee si existe, spell como fallback
-    const critValue  = stats.melee_crit?.value  ?? stats.spell_crit?.value  ?? null;
-    const hasteValue = stats.melee_haste?.value ?? stats.spell_haste?.value ?? null;
+    const critValue =
+      extractNumericStatValue(stats.melee_crit, ['value']) ??
+      extractNumericStatValue(stats.spell_crit, ['value']);
+    const hasteValue =
+      extractNumericStatValue(stats.melee_haste, ['value']) ??
+      extractNumericStatValue(stats.spell_haste, ['value']);
+    const powerType =
+      extractPowerTypeValue(stats.power) ??
+      extractPowerTypeValue(stats.power_type) ??
+      'MANA';
 
     normalizedStats = {
-      health:          stats.health?.effective             ?? null,
-      mana:            stats.power?.effective              ?? null,
-      power_type:      stats.power?.type?.type             ?? 'MANA',
-      strength:        stats.strength?.effective           ?? null,
-      agility:         stats.agility?.effective            ?? null,
-      intellect:       stats.intellect?.effective          ?? null,
-      stamina:         stats.stamina?.effective            ?? null,
+      health:          extractNumericStatValue(stats.health, ['effective', 'max', 'value']),
+      mana:            extractNumericStatValue(stats.power, ['effective', 'value', 'max']),
+      power_type:      powerType,
+      strength:        extractNumericStatValue(stats.strength, ['effective', 'value', 'base']),
+      agility:         extractNumericStatValue(stats.agility, ['effective', 'value', 'base']),
+      intellect:       extractNumericStatValue(stats.intellect, ['effective', 'value', 'base']),
+      stamina:         extractNumericStatValue(stats.stamina, ['effective', 'value', 'base']),
       critical_strike: critValue,
       haste:           hasteValue,
-      mastery:         stats.mastery?.value                ?? null,
+      mastery:         extractNumericStatValue(stats.mastery, ['value']),
       // versatility_damage_done_bonus ya viene como porcentaje (e.g. 12.0)
-      versatility:     stats.versatility_damage_done_bonus ?? null,
+      versatility:
+        extractNumericStatValue(stats.versatility_damage_done_bonus, ['value']) ??
+        extractNumericStatValue(stats.versatility, ['damage_done_bonus', 'value']),
     };
   }
 
@@ -932,6 +1221,89 @@ function normalizeCharacter(profile, equip, stats, media, region) {
     equipment:         equipment,
     stats:             normalizedStats,
   };
+}
+
+async function resolveItemIcons(region, equip, token, env) {
+  const iconUrlsByItemId = {};
+  const equippedItems = equip?.equipped_items;
+  if (!Array.isArray(equippedItems) || equippedItems.length === 0) {
+    return iconUrlsByItemId;
+  }
+
+  const itemIds = [...new Set(
+    equippedItems
+      .map(item => item?.item?.id)
+      .filter(itemId => Number.isInteger(itemId))
+  )];
+
+  if (itemIds.length === 0) {
+    return iconUrlsByItemId;
+  }
+
+  const ttl = parseInt(env.BLIZZARD_ITEM_ICON_CACHE_TTL || '604800', 10);
+  const base = BLIZZARD_API_BASE[region];
+  const namespace = `static-${region}`;
+  const locale = 'en_US';
+  const headers = { 'Authorization': `Bearer ${token}` };
+
+  await Promise.all(itemIds.map(async (itemId) => {
+    const cacheKey = `itemicon:${region}:${itemId}`;
+
+    try {
+      const cachedUrl = await env.RECS_CACHE.get(cacheKey);
+      if (cachedUrl && typeof cachedUrl === 'string') {
+        iconUrlsByItemId[itemId] = cachedUrl;
+        return;
+      }
+    } catch (_) {
+      // Ignorar errores de cache para no romper el perfil completo.
+    }
+
+    try {
+      const mediaUrl =
+        `${base}/data/wow/media/item/${itemId}?namespace=${namespace}&locale=${locale}`;
+      const mediaRes = await fetch(mediaUrl, { headers });
+      if (!mediaRes.ok) {
+        return;
+      }
+
+      const media = await mediaRes.json();
+      const iconUrl = extractItemIconUrl(media);
+      if (!iconUrl) {
+        return;
+      }
+
+      iconUrlsByItemId[itemId] = iconUrl;
+      try {
+        await env.RECS_CACHE.put(cacheKey, iconUrl, { expirationTtl: ttl });
+      } catch (_) {
+        // Ignorar errores de cache; el icono ya se resolvió para esta respuesta.
+      }
+    } catch (_) {
+      // Fallo por item: degradación controlada, icon_url quedará null.
+    }
+  }));
+
+  return iconUrlsByItemId;
+}
+
+function extractItemIconUrl(media) {
+  const assets = media?.assets;
+  if (!Array.isArray(assets) || assets.length === 0) {
+    return null;
+  }
+
+  const iconAsset = assets.find(
+    asset => asset?.key === 'icon' && typeof asset?.value === 'string' && asset.value.length > 0
+  );
+  if (iconAsset) {
+    return iconAsset.value;
+  }
+
+  const firstValidAsset = assets.find(
+    asset => typeof asset?.value === 'string' && asset.value.length > 0
+  );
+  return firstValidAsset?.value ?? null;
 }
 
 // ─── /invalidate ─────────────────────────────────────────────────────────────

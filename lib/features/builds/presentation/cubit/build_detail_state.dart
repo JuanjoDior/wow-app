@@ -15,24 +15,33 @@ class BuildDetailLoading extends BuildDetailState {
 class BuildDetailLoaded extends BuildDetailState {
   final Build build;
 
-  /// Recomendaciones por spec cargadas desde Worker o static fallback.
+  /// Recomendaciones por spec cargadas desde la fuente local.
   /// null = sin spec vinculada o fallo de carga.
   final SpecRecommendation? recommendation;
+  final bool recommendationLookupDone;
 
-  const BuildDetailLoaded(this.build, {this.recommendation});
+  const BuildDetailLoaded(
+    this.build, {
+    this.recommendation,
+    this.recommendationLookupDone = false,
+  });
 
   BuildDetailLoaded copyWith({
     Build? build,
     SpecRecommendation? recommendation,
     bool clearRecommendation = false,
-  }) =>
-      BuildDetailLoaded(
-        build ?? this.build,
-        recommendation: clearRecommendation ? null : (recommendation ?? this.recommendation),
-      );
+    bool? recommendationLookupDone,
+  }) => BuildDetailLoaded(
+    build ?? this.build,
+    recommendation: clearRecommendation
+        ? null
+        : (recommendation ?? this.recommendation),
+    recommendationLookupDone:
+        recommendationLookupDone ?? this.recommendationLookupDone,
+  );
 
   @override
-  List<Object?> get props => [build, recommendation];
+  List<Object?> get props => [build, recommendation, recommendationLookupDone];
 }
 
 class BuildDetailError extends BuildDetailState {

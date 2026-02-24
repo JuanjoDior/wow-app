@@ -61,14 +61,21 @@ class BlizzardItemsDataSource {
     }
   }
 
-  Future<ItemModel> getItemById(int id) async {
-    final cached = _detailCache.get('$id');
+  Future<ItemModel> getItemById(
+    int id, {
+    String locale = 'en_GB',
+  }) async {
+    final key = '$id:$locale';
+    final cached = _detailCache.get(key);
     if (cached != null) return cached;
 
     try {
-      final data = await _client.get('$_workerUrl/api/items/$id');
+      final data = await _client.get(
+        '$_workerUrl/api/items/$id',
+        queryParameters: {'locale': locale},
+      );
       final item = ItemModel.fromJson(data);
-      _detailCache.set('$id', item);
+      _detailCache.set(key, item);
       return item;
     } on DioException catch (e) {
       if (e.response?.statusCode == 429) throw const RateLimitException();

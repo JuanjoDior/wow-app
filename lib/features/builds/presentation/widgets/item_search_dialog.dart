@@ -7,6 +7,7 @@ import 'package:wow_companion/features/items/domain/entities/item.dart';
 import 'package:wow_companion/features/items/domain/usecases/search_items.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
 import 'dart:async';
+import 'package:wow_companion/shared/widgets/item_tooltip_trigger.dart';
 
 class ItemSearchDialog extends StatefulWidget {
   final WowSlot? slot;
@@ -173,31 +174,39 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
       itemBuilder: (_, i) {
         final item = _results[i];
         final color = WowTheme.getQualityColor(item.quality);
-        return ListTile(
-          leading: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: item.iconUrl != null
-                ? Image.network(
-                    item.iconUrl!,
-                    width: 36,
-                    height: 36,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => _fallbackIcon(color),
-                  )
-                : _fallbackIcon(color),
+        return ItemTooltipTrigger.forItemId(
+          itemId: item.id,
+          mode: ItemTooltipInteractionMode.actionFirstMode,
+          enableWebOfficialTooltip: false,
+          onPrimaryTap: () => Navigator.of(context).pop(item),
+          child: ListTile(
+            leading: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: item.iconUrl != null
+                  ? Image.network(
+                      item.iconUrl!,
+                      width: 36,
+                      height: 36,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => _fallbackIcon(color),
+                    )
+                  : _fallbackIcon(color),
+            ),
+            title: Text(
+              item.name,
+              style: TextStyle(color: color, fontWeight: FontWeight.w500),
+            ),
+            subtitle: Text(
+              [
+                if (item.level != null) 'iLvl ${item.level}',
+                if (item.inventoryName != null) item.inventoryName!,
+              ].join(' · '),
+              style: const TextStyle(
+                color: WowTheme.textSecondary,
+                fontSize: 12,
+              ),
+            ),
           ),
-          title: Text(
-            item.name,
-            style: TextStyle(color: color, fontWeight: FontWeight.w500),
-          ),
-          subtitle: Text(
-            [
-              if (item.level != null) 'iLvl ${item.level}',
-              if (item.inventoryName != null) item.inventoryName!,
-            ].join(' · '),
-            style: const TextStyle(color: WowTheme.textSecondary, fontSize: 12),
-          ),
-          onTap: () => Navigator.of(context).pop(item),
         );
       },
     );

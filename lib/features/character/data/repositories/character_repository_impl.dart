@@ -58,7 +58,7 @@ class CharacterRepositoryImpl implements CharacterRepository {
     ]);
 
     final blizzardResult = futures[0];
-    final raiderResult   = futures[1];
+    final raiderResult = futures[1];
 
     // 3. Evaluar resultados
     final blizzardData = blizzardResult is CharacterBlizzardData
@@ -69,27 +69,32 @@ class CharacterRepositoryImpl implements CharacterRepository {
     Character? character;
 
     if (blizzardData != null) {
+      final mergedEquipment = _mergeEquipmentIcons(
+        blizzardData.equipment,
+        raiderCharacter?.equipment ?? const [],
+      );
+
       // ── Blizzard OK: usar como base + fusionar M+ de Raider.IO ──────────
       character = Character(
-        name:              blizzardData.name,
-        realm:             blizzardData.realm,
-        region:            blizzardData.region,
-        level:             blizzardData.level,
-        race:              blizzardData.race,
-        characterClass:    blizzardData.characterClass,
-        specialization:    blizzardData.specialization,
-        guild:             blizzardData.guild,
+        name: blizzardData.name,
+        realm: blizzardData.realm,
+        region: blizzardData.region,
+        level: blizzardData.level,
+        race: blizzardData.race,
+        characterClass: blizzardData.characterClass,
+        specialization: blizzardData.specialization,
+        guild: blizzardData.guild,
         achievementPoints: blizzardData.achievementPoints,
-        averageItemLevel:  blizzardData.averageItemLevel,
+        averageItemLevel: blizzardData.averageItemLevel,
         equippedItemLevel: blizzardData.equippedItemLevel,
         // Fallback de imagen: Raider.IO tiene render siempre disponible
-        avatarUrl:         blizzardData.avatarUrl ?? raiderCharacter?.avatarUrl,
-        equipment:         blizzardData.equipment,
-        stats:             blizzardData.stats,
+        avatarUrl: blizzardData.avatarUrl ?? raiderCharacter?.avatarUrl,
+        equipment: mergedEquipment,
+        stats: blizzardData.stats,
         // M+ data de Raider.IO (si disponible)
-        mythicPlusScore:        raiderCharacter?.mythicPlusScore,
-        mythicPlusProfile:      raiderCharacter?.mythicPlusProfile,
-        raidProgression:        raiderCharacter?.raidProgression,
+        mythicPlusScore: raiderCharacter?.mythicPlusScore,
+        mythicPlusProfile: raiderCharacter?.mythicPlusProfile,
+        raidProgression: raiderCharacter?.raidProgression,
         raidProgressionDetails: raiderCharacter?.raidProgressionDetails ?? [],
       );
     } else if (raiderCharacter != null) {
@@ -128,4 +133,48 @@ class CharacterRepositoryImpl implements CharacterRepository {
 
     return Left(ServerFailure(message: err?.toString() ?? 'Unknown error'));
   }
+
+  List<EquippedItem> _mergeEquipmentIcons(
+    List<EquippedItem> primary,
+    List<EquippedItem> fallback,
+  ) {
+    if (primary.isEmpty || fallback.isEmpty) return primary;
+
+    final fallbackByItemId = <int, EquippedItem>{
+      for (final item in fallback)
+        if (item.itemId != null && !_isBlank(item.iconUrl)) item.itemId!: item,
+    };
+
+    final fallbackBySlot = <String, EquippedItem>{
+      for (final item in fallback)
+        if (!_isBlank(item.iconUrl)) item.slot: item,
+    };
+
+    return primary
+        .map((item) {
+          if (!_isBlank(item.iconUrl)) return item;
+
+          final byItemId = item.itemId != null
+              ? fallbackByItemId[item.itemId!]
+              : null;
+          final bySlot = fallbackBySlot[item.slot];
+          final iconSource = byItemId ?? bySlot;
+          if (iconSource == null || _isBlank(iconSource.iconUrl)) return item;
+
+          return EquippedItem(
+            slot: item.slot,
+            name: item.name,
+            itemLevel: item.itemLevel,
+            quality: item.quality,
+            itemId: item.itemId,
+            iconUrl: iconSource.iconUrl,
+            enchantments: item.enchantments,
+            gems: item.gems,
+            bonusIds: item.bonusIds,
+          );
+        })
+        .toList(growable: false);
+  }
+
+  bool _isBlank(String? value) => value == null || value.trim().isEmpty;
 }

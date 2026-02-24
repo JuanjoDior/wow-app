@@ -30,12 +30,31 @@ class _SpecRecommendationPanelState extends State<SpecRecommendationPanel> {
       buildWhen: (prev, next) {
         final prevRec = prev is BuildDetailLoaded ? prev.recommendation : null;
         final nextRec = next is BuildDetailLoaded ? next.recommendation : null;
-        return prevRec != nextRec;
+        final prevLookup = prev is BuildDetailLoaded
+            ? prev.recommendationLookupDone
+            : false;
+        final nextLookup = next is BuildDetailLoaded
+            ? next.recommendationLookupDone
+            : false;
+        final prevBuild = prev is BuildDetailLoaded ? prev.build : null;
+        final nextBuild = next is BuildDetailLoaded ? next.build : null;
+        return prevRec != nextRec ||
+            prevLookup != nextLookup ||
+            prevBuild != nextBuild;
       },
       builder: (context, state) {
         if (state is! BuildDetailLoaded) return const SizedBox.shrink();
+
+        final hasClassSpec =
+            (state.build.characterClass?.trim().isNotEmpty ?? false) &&
+            (state.build.characterSpec?.trim().isNotEmpty ?? false);
         final rec = state.recommendation;
-        if (rec == null) return const SizedBox.shrink();
+        if (rec == null) {
+          if (!state.recommendationLookupDone || !hasClassSpec) {
+            return const SizedBox.shrink();
+          }
+          return _NoLocalRecommendationCard(message: t.recPanelNoLocalData);
+        }
 
         return Container(
           margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -75,8 +94,9 @@ class _SpecRecommendationPanelState extends State<SpecRecommendationPanel> {
                               TextSpan(
                                 text: '${t.recPanelTitle}  ',
                                 style: TextStyle(
-                                  color: WowTheme.accentBlue
-                                      .withValues(alpha: 0.9),
+                                  color: WowTheme.accentBlue.withValues(
+                                    alpha: 0.9,
+                                  ),
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
                                 ),
@@ -84,8 +104,9 @@ class _SpecRecommendationPanelState extends State<SpecRecommendationPanel> {
                               TextSpan(
                                 text: _specLabel(rec),
                                 style: TextStyle(
-                                  color: WowTheme.textSecondary
-                                      .withValues(alpha: 0.7),
+                                  color: WowTheme.textSecondary.withValues(
+                                    alpha: 0.7,
+                                  ),
                                   fontSize: 11,
                                 ),
                               ),
@@ -107,10 +128,7 @@ class _SpecRecommendationPanelState extends State<SpecRecommendationPanel> {
 
               // ── Contenido ───────────────────────────────────────────────
               if (_expanded) ...[
-                const Divider(
-                  color: WowTheme.border,
-                  height: 1,
-                ),
+                const Divider(color: WowTheme.border, height: 1),
                 Padding(
                   padding: const EdgeInsets.all(14),
                   child: Column(
@@ -219,7 +237,7 @@ class _SpecRecommendationPanelState extends State<SpecRecommendationPanel> {
   }
 
   String _specLabel(SpecRecommendation rec) {
-    final cls  = WowTranslations.translateClass(_capitalize(rec.className));
+    final cls = WowTranslations.translateClass(_capitalize(rec.className));
     final spec = WowTranslations.translateSpec(_capitalize(rec.specName));
     return '$spec $cls';
   }
@@ -243,10 +261,19 @@ class _SourceBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (source) {
-      RecommendationSource.remote        => (t.recPanelSourceAI,     WowTheme.accentBlue),
-      RecommendationSource.cache         => (t.recPanelSourceCache,  const Color(0xFF2ECC71)),
-      RecommendationSource.workerStatic  => (t.recPanelSourceWorker, const Color(0xFFF39C12)),
-      RecommendationSource.local         => (t.recPanelSourceLocal,  WowTheme.textSecondary),
+      RecommendationSource.remote => (t.recPanelSourceAI, WowTheme.accentBlue),
+      RecommendationSource.cache => (
+        t.recPanelSourceCache,
+        const Color(0xFF2ECC71),
+      ),
+      RecommendationSource.workerStatic => (
+        t.recPanelSourceWorker,
+        const Color(0xFFF39C12),
+      ),
+      RecommendationSource.local => (
+        t.recPanelSourceLocal,
+        WowTheme.textSecondary,
+      ),
     };
 
     return Container(
@@ -258,7 +285,50 @@ class _SourceBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: color,
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _NoLocalRecommendationCard extends StatelessWidget {
+  final String message;
+
+  const _NoLocalRecommendationCard({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: WowTheme.surfaceDark,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: WowTheme.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.info_outline,
+            color: WowTheme.textSecondary,
+            size: 16,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: WowTheme.textSecondary.withValues(alpha: 0.85),
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -309,8 +379,7 @@ class _StatPriorityRow extends StatelessWidget {
                       ? WowTheme.primaryGold
                       : WowTheme.textSecondary,
                   fontSize: 11,
-                  fontWeight:
-                      isFirst ? FontWeight.bold : FontWeight.normal,
+                  fontWeight: isFirst ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
             ],
@@ -352,10 +421,7 @@ class _RecommendationRow extends StatelessWidget {
             ),
           ),
         ),
-        Text(
-          '$icon ',
-          style: TextStyle(color: iconColor, fontSize: 11),
-        ),
+        Text('$icon ', style: TextStyle(color: iconColor, fontSize: 11)),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

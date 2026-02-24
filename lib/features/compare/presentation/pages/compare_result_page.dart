@@ -4,6 +4,7 @@ import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/character/domain/entities/character.dart';
 import 'package:wow_companion/features/character/domain/repositories/character_repository.dart';
 import 'package:wow_companion/shared/widgets/common_widgets.dart';
+import 'package:wow_companion/shared/widgets/item_tooltip_trigger.dart';
 import 'package:wow_companion/core/l10n/wow_translations.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
@@ -483,11 +484,17 @@ class _CompareResultPageState extends State<CompareResultPage> {
         children: [
           Expanded(
             child: item1 != null
-                ? Text(
-                    '${item1.name} (${item1.itemLevel})',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: ilvlColor1, fontSize: 11),
-                    overflow: TextOverflow.ellipsis,
+                ? ItemTooltipTrigger.forEquippedItem(
+                    equippedItem: item1,
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Text(
+                        '${item1.name} (${item1.itemLevel})',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: ilvlColor1, fontSize: 11),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   )
                 : const Text(
                     '—',
@@ -509,11 +516,17 @@ class _CompareResultPageState extends State<CompareResultPage> {
           ),
           Expanded(
             child: item2 != null
-                ? Text(
-                    '${item2.name} (${item2.itemLevel})',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: ilvlColor2, fontSize: 11),
-                    overflow: TextOverflow.ellipsis,
+                ? ItemTooltipTrigger.forEquippedItem(
+                    equippedItem: item2,
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Text(
+                        '${item2.name} (${item2.itemLevel})',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: ilvlColor2, fontSize: 11),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   )
                 : const Text(
                     '—',

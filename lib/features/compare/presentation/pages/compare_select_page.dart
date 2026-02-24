@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wow_companion/core/wow/character_search_input.dart';
+import 'package:wow_companion/core/wow/supported_regions.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class CompareSelectPage extends StatefulWidget {
@@ -12,12 +14,12 @@ class CompareSelectPage extends StatefulWidget {
 
 class _CompareSelectPageState extends State<CompareSelectPage> {
   // Character 1
-  final _region1 = TextEditingController(text: 'eu');
+  final _region1 = TextEditingController(text: supportedRegionCodes.first);
   final _realm1 = TextEditingController();
   final _name1 = TextEditingController();
 
   // Character 2
-  final _region2 = TextEditingController(text: 'eu');
+  final _region2 = TextEditingController(text: supportedRegionCodes.first);
   final _realm2 = TextEditingController();
   final _name2 = TextEditingController();
 
@@ -40,13 +42,16 @@ class _CompareSelectPageState extends State<CompareSelectPage> {
 
   void _startCompare() {
     if (!_canCompare) return;
-    final r1 = _region1.text.trim().toLowerCase();
-    final s1 = _realm1.text.trim().toLowerCase();
-    final n1 = _name1.text.trim().toLowerCase();
-    final r2 = _region2.text.trim().toLowerCase();
-    final s2 = _realm2.text.trim().toLowerCase();
-    final n2 = _name2.text.trim().toLowerCase();
-    context.push('/compare/$r1/$s1/$n1/vs/$r2/$s2/$n2');
+    context.push(
+      buildCompareRoute(
+        region1: _region1.text,
+        realm1: _realm1.text,
+        name1: _name1.text,
+        region2: _region2.text,
+        realm2: _realm2.text,
+        name2: _name2.text,
+      ),
+    );
   }
 
   @override
@@ -152,13 +157,19 @@ class _CompareSelectPageState extends State<CompareSelectPage> {
                 ),
               ),
               dropdownColor: WowTheme.surfaceDark,
-              items: const [
-                DropdownMenuItem(value: 'eu', child: Text('EU')),
-                DropdownMenuItem(value: 'us', child: Text('US')),
-                DropdownMenuItem(value: 'kr', child: Text('KR')),
-                DropdownMenuItem(value: 'tw', child: Text('TW')),
-              ],
-              onChanged: (v) => setState(() => regionCtrl.text = v ?? 'eu'),
+              items: supportedRegionCodes
+                  .map(
+                    (regionCode) => DropdownMenuItem(
+                      value: regionCode,
+                      child: Text(
+                        '${regionFlag(regionCode)} ${regionLabel(regionCode, t)}',
+                      ),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: (v) => setState(
+                () => regionCtrl.text = v ?? supportedRegionCodes.first,
+              ),
             ),
             const SizedBox(height: 10),
             TextField(

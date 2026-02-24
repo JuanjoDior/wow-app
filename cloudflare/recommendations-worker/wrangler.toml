@@ -13,6 +13,8 @@ CACHE_TTL_SECONDS = "604800"
 BLIZZARD_CLIENT_ID = "078c6007e3954e70be67706d98cb818d"
 # TTL del caché de personaje en segundos (5 min). Los datos de equipo cambian poco.
 BLIZZARD_CHAR_CACHE_TTL = "300"
+# TTL del caché por icono de item (7 días).
+BLIZZARD_ITEM_ICON_CACHE_TTL = "604800"
 
 # Secrets — añadir via CLI, NUNCA en este archivo:
 #   wrangler secret put BLIZZARD_CLIENT_SECRET

@@ -1,8 +1,10 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wow_companion/core/di/injection.dart';
+import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/builds/domain/repositories/builds_repository.dart';
 import 'package:wow_companion/features/builds/domain/repositories/spec_recommendations_repository.dart';
+import 'package:wow_companion/features/builds/domain/entities/spec_recommendation.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/build_detail_state.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
 import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dart';
@@ -31,7 +33,10 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
         if (media?.avatarUrl != null) {
           final updated = build.copyWith(characterAvatarUrl: media!.avatarUrl);
           await _repository.saveBuild(updated);
-          emit(BuildDetailLoaded(updated));
+          final current = state;
+          if (current is BuildDetailLoaded) {
+            emit(current.copyWith(build: updated));
+          }
         }
       }
 
@@ -56,11 +61,32 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
       specName: specName ?? '',
     );
 
-    // Solo emitir si el estado actual sigue siendo Loaded (no fue destruido)
+    // Solo emitir si el estado actual sigue siendo Loaded (no fue destruido).
+    // Además, si hay recomendación y consumibles vacíos, pre-rellenar una vez.
     final current = state;
-    if (current is BuildDetailLoaded) {
-      emit(current.copyWith(recommendation: rec));
+    if (current is! BuildDetailLoaded) return;
+
+    var updatedBuild = current.build;
+    if (rec != null && current.build.guide.consumables.isEmpty) {
+      final prefetched = current.build.guide.copyWith(
+        consumables: BuildConsumables(
+          flask: _toGuideItem(rec.flask),
+          potion: _toGuideItem(rec.potion),
+          food: _toGuideItem(rec.food),
+        ),
+      );
+      updatedBuild = current.build.copyWith(guide: prefetched);
+      await _repository.saveBuild(updatedBuild);
     }
+
+    emit(
+      current.copyWith(
+        build: updatedBuild,
+        recommendation: rec,
+        clearRecommendation: rec == null,
+        recommendationLookupDone: true,
+      ),
+    );
   }
 
   // ─── Item / Enchantment / Gem ─────────────────────────────────────────────
@@ -71,7 +97,10 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
 
     Item enrichedItem = item;
     if (item.iconUrl == null) {
-      final result = await sl<GetItemDetail>()(item.id);
+      final result = await sl<GetItemDetail>()(
+        item.id,
+        locale: sl<LocaleNotifier>().blizzardLocale,
+      );
       result.fold((_) {}, (detail) => enrichedItem = detail);
     }
 
@@ -154,7 +183,9 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     if (current == null) return;
 
     final updatedSlots = current.slots.map((s) {
-      if (s.slot == slot) return s.copyWith(enchantmentObtained: !s.enchantmentObtained);
+      if (s.slot == slot) {
+        return s.copyWith(enchantmentObtained: !s.enchantmentObtained);
+      }
       return s;
     }).toList();
 
@@ -216,7 +247,9 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     final current = _currentBuild;
     if (current == null) return;
     final newRotation = [...current.guide.rotation]..removeAt(index);
-    await _save(current.copyWith(guide: current.guide.copyWith(rotation: newRotation)));
+    await _save(
+      current.copyWith(guide: current.guide.copyWith(rotation: newRotation)),
+    );
   }
 
   Future<void> reorderRotation(int oldIndex, int newIndex) async {
@@ -226,7 +259,9 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     final item = list.removeAt(oldIndex);
     final insertAt = newIndex > oldIndex ? newIndex - 1 : newIndex;
     list.insert(insertAt, item);
-    await _save(current.copyWith(guide: current.guide.copyWith(rotation: list)));
+    await _save(
+      current.copyWith(guide: current.guide.copyWith(rotation: list)),
+    );
   }
 
   Future<void> updateConsumable({
@@ -271,7 +306,16 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     await _repository.saveBuild(updated);
     final current = state;
     final rec = current is BuildDetailLoaded ? current.recommendation : null;
-    emit(BuildDetailLoaded(updated, recommendation: rec));
+    final lookupDone = current is BuildDetailLoaded
+        ? current.recommendationLookupDone
+        : false;
+    emit(
+      BuildDetailLoaded(
+        updated,
+        recommendation: rec,
+        recommendationLookupDone: lookupDone,
+      ),
+    );
   }
 
   Build? get _currentBuild {
@@ -301,5 +345,12 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     final name = parts.sublist(2).join('-');
 
     return _mediaDataSource.getMedia(region: region, realm: realm, name: name);
+  }
+
+  Item? _toGuideItem(ItemSuggestion? suggestion) {
+    if (suggestion == null) return null;
+    final name = suggestion.name.trim();
+    if (name.isEmpty) return null;
+    return Item(id: 0, name: name, quality: 'UNCOMMON');
   }
 }

@@ -180,6 +180,7 @@
   "@recPanelFootnote": {
     "placeholders": { "patch": { "type": "String" } }
   },
+  "recPanelNoLocalData": "Consulta en Icy Veins",
   "recEnchantSuggestedSpec": "Sugeridos para tu spec (TWW S3)",
   "recEnchantSuggestedGeneric": "Sugeridos (TWW S3)",
   "recEnchantApply": "Aplicar",

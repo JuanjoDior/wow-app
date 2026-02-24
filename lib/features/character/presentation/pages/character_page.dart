@@ -8,10 +8,11 @@ import 'package:wow_companion/features/character/presentation/cubit/character_cu
 import 'package:wow_companion/features/favorites/domain/favorites_repository.dart';
 import 'package:wow_companion/features/favorites/presentation/favorites_cubit.dart';
 import 'package:wow_companion/shared/widgets/common_widgets.dart';
-import 'package:wow_companion/shared/widgets/item_tooltip.dart';
+import 'package:wow_companion/shared/widgets/item_tooltip_trigger.dart';
 import 'package:wow_companion/core/l10n/wow_translations.dart';
 import 'package:wow_companion/features/analysis/presentation/widgets/character_insights_dashboard.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
+import 'package:wow_companion/features/character/presentation/utils/primary_stat_display.dart';
 
 class CharacterPage extends StatefulWidget {
   final String region;
@@ -149,7 +150,7 @@ class _CharacterPageState extends State<CharacterPage> {
           _buildCharacterInfo(char),
           const SizedBox(height: 16),
           _buildEquipmentPanel(char),
-          if (char.stats != null) ...[            
+          if (char.stats != null) ...[
             const SizedBox(height: 16),
             _buildStatsPanel(char.stats!),
           ],
@@ -434,20 +435,16 @@ class _CharacterPageState extends State<CharacterPage> {
       ),
     );
 
-    return GestureDetector(
-      onTapUp: (details) =>
-          showItemTooltip(context, item, details.globalPosition),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 3),
-          child: SizedBox(
-            height: 44,
-            child: Row(
-              children: alignRight
-                  ? [info, const SizedBox(width: 8), icon]
-                  : [icon, const SizedBox(width: 8), info],
-            ),
+    return ItemTooltipTrigger.forEquippedItem(
+      equippedItem: item,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: SizedBox(
+          height: 44,
+          child: Row(
+            children: alignRight
+                ? [info, const SizedBox(width: 8), icon]
+                : [icon, const SizedBox(width: 8), info],
           ),
         ),
       ),
@@ -455,56 +452,49 @@ class _CharacterPageState extends State<CharacterPage> {
   }
 
   Widget _buildItemRowMobile(EquippedItem item) {
-    return GestureDetector(
-      onTapUp: (details) =>
-          showItemTooltip(context, item, details.globalPosition),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 3),
-          child: Row(
-            children: [
-              _buildItemIcon(item),
-              const SizedBox(width: 10),
-              SizedBox(
-                width: 70,
-                child: Text(
-                  _formatSlotName(item.slot),
-                  style: const TextStyle(
-                    color: WowTheme.textSecondary,
-                    fontSize: 11,
-                  ),
+    return ItemTooltipTrigger.forEquippedItem(
+      equippedItem: item,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          children: [
+            _buildItemIcon(item),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 70,
+              child: Text(
+                _formatSlotName(item.slot),
+                style: const TextStyle(
+                  color: WowTheme.textSecondary,
+                  fontSize: 11,
                 ),
               ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    style: TextStyle(
+                      color: WowTheme.getQualityColor(item.quality),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (item.enchantments.isNotEmpty || item.gems.isNotEmpty)
                     Text(
-                      item.name,
-                      style: TextStyle(
-                        color: WowTheme.getQualityColor(item.quality),
-                        fontWeight: FontWeight.w500,
-                        fontSize: 13,
-                      ),
+                      [...item.enchantments, ...item.gems].join(' · '),
+                      style: const TextStyle(color: Colors.green, fontSize: 10),
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (item.enchantments.isNotEmpty || item.gems.isNotEmpty)
-                      Text(
-                        [...item.enchantments, ...item.gems].join(' · '),
-                        style: const TextStyle(
-                          color: Colors.green,
-                          fontSize: 10,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                  ],
-                ),
+                ],
               ),
-              const SizedBox(width: 8),
-              QualityBadge(quality: item.quality, itemLevel: item.itemLevel),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            QualityBadge(quality: item.quality, itemLevel: item.itemLevel),
+          ],
         ),
       ),
     );
@@ -550,14 +540,8 @@ class _CharacterPageState extends State<CharacterPage> {
   }
 
   Widget _buildStatsPanel(CharacterStats stats) {
-    // Stat primaria del personaje (la que tiene valor)
-    final primaryLabel = stats.strength != null
-        ? 'Fuerza'
-        : stats.agility != null
-            ? 'Agilidad'
-            : 'Intelecto';
-    final primaryValue =
-        stats.strength ?? stats.agility ?? stats.intellect ?? 0;
+    // Stat primaria real: la mayor entre Fuerza/Agilidad/Intelecto.
+    final primary = determinePrimaryStatDisplay(stats);
 
     return Card(
       child: Padding(
@@ -580,7 +564,7 @@ class _CharacterPageState extends State<CharacterPage> {
                           value: _formatLargeNumber(stats.health!),
                         ),
                       ),
-                    if (stats.mana != null) ...[  
+                    if (stats.mana != null) ...[
                       const SizedBox(width: 8),
                       Expanded(
                         child: _StatTile(
@@ -602,11 +586,11 @@ class _CharacterPageState extends State<CharacterPage> {
                   child: _StatTile(
                     icon: Icons.local_fire_department,
                     iconColor: WowTheme.primaryGold,
-                    label: primaryLabel,
-                    value: primaryValue.toString(),
+                    label: primary.label,
+                    value: primary.value.toString(),
                   ),
                 ),
-                if (stats.stamina != null) ...[  
+                if (stats.stamina != null) ...[
                   const SizedBox(width: 8),
                   Expanded(
                     child: _StatTile(
@@ -669,16 +653,16 @@ class _CharacterPageState extends State<CharacterPage> {
 
   String _powerLabel(String? powerType) {
     return switch (powerType?.toUpperCase()) {
-      'ENERGY'       => 'Energía',
-      'RAGE'         => 'Furia',
-      'RUNIC_POWER'  => 'Poder Rúnico',
-      'FOCUS'        => 'Concentración',
-      'MAELSTROM'    => 'Maelstrom',
-      'FURY'         => 'Furia del DH',
-      'PAIN'         => 'Dolor',
-      'ESSENCE'      => 'Esencia',
+      'ENERGY' => 'Energía',
+      'RAGE' => 'Furia',
+      'RUNIC_POWER' => 'Poder Rúnico',
+      'FOCUS' => 'Concentración',
+      'MAELSTROM' => 'Maelstrom',
+      'FURY' => 'Furia del DH',
+      'PAIN' => 'Dolor',
+      'ESSENCE' => 'Esencia',
       'ASTRAL_POWER' => 'Poder Astral',
-      _              => 'Maná',
+      _ => 'Maná',
     };
   }
 
@@ -1008,25 +992,28 @@ class _CharacterPageState extends State<CharacterPage> {
   String _formatSlotName(String slot) {
     final t = S.of(context)!;
     return switch (slot) {
-      'HEAD'      => t.wowSlotHead,
-      'NECK'      => t.wowSlotNeck,
-      'SHOULDER'  => t.wowSlotShoulder,
-      'BACK'      => t.wowSlotBack,
-      'CHEST'     => t.wowSlotChest,
-      'WRIST'     => t.wowSlotWrist,
-      'HANDS'     => t.wowSlotHands,
-      'WAIST'     => t.wowSlotWaist,
-      'LEGS'      => t.wowSlotLegs,
-      'FEET'      => t.wowSlotFeet,
-      'FINGER_1'  => t.wowSlotFinger1,
-      'FINGER_2'  => t.wowSlotFinger2,
+      'HEAD' => t.wowSlotHead,
+      'NECK' => t.wowSlotNeck,
+      'SHOULDER' => t.wowSlotShoulder,
+      'BACK' => t.wowSlotBack,
+      'CHEST' => t.wowSlotChest,
+      'WRIST' => t.wowSlotWrist,
+      'HANDS' => t.wowSlotHands,
+      'WAIST' => t.wowSlotWaist,
+      'LEGS' => t.wowSlotLegs,
+      'FEET' => t.wowSlotFeet,
+      'FINGER_1' => t.wowSlotFinger1,
+      'FINGER_2' => t.wowSlotFinger2,
       'TRINKET_1' => t.wowSlotTrinket1,
       'TRINKET_2' => t.wowSlotTrinket2,
       'MAIN_HAND' => t.wowSlotMainHand,
-      'OFF_HAND'  => t.wowSlotOffHand,
-      _ => slot.replaceAll('_', ' ').split(' ')
-              .map((w) => w[0].toUpperCase() + w.substring(1).toLowerCase())
-              .join(' '),
+      'OFF_HAND' => t.wowSlotOffHand,
+      _ =>
+        slot
+            .replaceAll('_', ' ')
+            .split(' ')
+            .map((w) => w[0].toUpperCase() + w.substring(1).toLowerCase())
+            .join(' '),
     };
   }
 

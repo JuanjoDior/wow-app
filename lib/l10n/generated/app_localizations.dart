@@ -997,6 +997,12 @@ abstract class S {
   /// **'Patch {patch} · Always sim on Raidbots to confirm'**
   String recPanelFootnote(String patch);
 
+  /// No description provided for @recPanelNoLocalData.
+  ///
+  /// In en, this message translates to:
+  /// **'Check Icy Veins'**
+  String get recPanelNoLocalData;
+
   /// No description provided for @recEnchantSuggestedSpec.
   ///
   /// In en, this message translates to:
