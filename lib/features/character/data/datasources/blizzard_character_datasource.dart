@@ -6,7 +6,7 @@ import 'package:wow_companion/features/character/domain/entities/character.dart'
 /// el cual consulta la Blizzard Battle.net API en nombre de la app.
 ///
 /// Devuelve: nombre, clase, spec, raza, nivel, guild, ilvl, equipo (con enchants y
-/// gemas exactos), stats exactas (%, valores), y avatar_url de Blizzard.
+/// gemas exactos), stats exactas (%, valores), avatar_url y thumbnail_url.
 /// NO devuelve M+ score ni raid progression (eso es de Raider.IO).
 class BlizzardCharacterDatasource {
   final Dio _dio;
@@ -112,6 +112,7 @@ class CharacterBlizzardData {
   final int? averageItemLevel;
   final int? equippedItemLevel;
   final String? avatarUrl;
+  final String? thumbnailUrl;
   final List<EquippedItem> equipment;
   final CharacterStats? stats;
 
@@ -128,6 +129,7 @@ class CharacterBlizzardData {
     this.averageItemLevel,
     this.equippedItemLevel,
     this.avatarUrl,
+    this.thumbnailUrl,
     this.equipment = const [],
     this.stats,
   });
@@ -169,6 +171,7 @@ class CharacterBlizzardData {
       averageItemLevel: (json['average_item_level'] as num?)?.toInt(),
       equippedItemLevel: (json['equipped_item_level'] as num?)?.toInt(),
       avatarUrl: json['avatar_url'] as String?,
+      thumbnailUrl: json['thumbnail_url'] as String?,
       equipment: equipment,
       stats: stats,
     );

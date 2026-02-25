@@ -29,15 +29,6 @@ import 'package:wow_companion/features/builds/domain/repositories/spells_reposit
 import 'package:wow_companion/features/builds/domain/usecases/search_spells.dart';
 import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dart';
 import 'package:wow_companion/features/builds/data/datasources/character_media_datasource.dart';
-// ── Analysis Feature ─────────────────────────────────────────────────────────
-import 'package:wow_companion/features/analysis/domain/services/character_analysis_service.dart';
-import 'package:wow_companion/features/analysis/domain/services/gear_progress_service.dart';
-import 'package:wow_companion/features/analysis/presentation/cubit/character_analysis_cubit.dart';
-// ── Spec Recommendations ──────────────────────────────────────────────────────
-import 'package:wow_companion/features/builds/data/datasources/spec_recommendations_datasource.dart';
-import 'package:wow_companion/features/builds/data/datasources/spec_recommendations_local_datasource.dart';
-import 'package:wow_companion/features/builds/data/repositories/spec_recommendations_repository_impl.dart';
-import 'package:wow_companion/features/builds/domain/repositories/spec_recommendations_repository.dart';
 
 final sl = GetIt.instance;
 
@@ -90,19 +81,7 @@ Future<void> initDependencies() async {
   // ── Builds Feature ────────────────────────────────────────────────────────
   sl.registerLazySingleton<BuildsRepository>(() => BuildsRepositoryImpl());
   sl.registerFactory(() => BuildsCubit(sl()));
-
-  // ── Spec Recommendations ──────────────────────────────────────────────────
-  sl.registerLazySingleton<SpecRecommendationsRemoteDatasource>(
-    () => SpecRecommendationsRemoteDatasource(),
-  );
-  sl.registerLazySingleton<SpecRecommendationsLocalDatasource>(
-    () => SpecRecommendationsLocalDatasource(),
-  );
-  sl.registerLazySingleton<SpecRecommendationsRepository>(
-    () => SpecRecommendationsRepositoryImpl(local: sl()),
-  );
-
-  sl.registerFactory(() => BuildDetailCubit(sl(), sl(), sl()));
+  sl.registerFactory(() => BuildDetailCubit(sl(), sl()));
 
   // ── Spells (Build Guide) ──────────────────────────────────────────────────
   sl.registerLazySingleton<SpellsDataSource>(() => SpellsDataSource(sl()));
@@ -110,13 +89,6 @@ Future<void> initDependencies() async {
     () => SpellsRepositoryImpl(remoteDataSource: sl()),
   );
   sl.registerLazySingleton(() => SearchSpells(sl()));
-
-  // ── Analysis Feature ─────────────────────────────────────────────────────
-  sl.registerLazySingleton<CharacterAnalysisService>(
-    () => const CharacterAnalysisService(),
-  );
-  sl.registerLazySingleton<GearProgressService>(() => GearProgressService());
-  sl.registerFactory(() => CharacterAnalysisCubit(sl(), sl()));
 
   // ── Character Media ───────────────────────────────────────────────────────
   sl.registerLazySingleton<CharacterMediaDataSource>(

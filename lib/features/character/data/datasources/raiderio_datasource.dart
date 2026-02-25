@@ -3,10 +3,35 @@ import 'package:wow_companion/core/error/exceptions.dart';
 import 'package:wow_companion/core/network/api_client.dart';
 import 'package:wow_companion/features/character/domain/entities/character.dart';
 
+class CurrentRaidInfo {
+  final String slug;
+  final String name;
+  final int totalBosses;
+
+  const CurrentRaidInfo({
+    required this.slug,
+    required this.name,
+    required this.totalBosses,
+  });
+}
+
+class _CachedCurrentRaid {
+  final CurrentRaidInfo raid;
+  final DateTime expiresAt;
+
+  const _CachedCurrentRaid({required this.raid, required this.expiresAt});
+}
+
 class RaiderIoDataSource {
   final ApiClient _client;
 
   static const _baseUrl = 'https://raider.io/api/v1';
+  static const _liveRaidCacheTtl = Duration(minutes: 30);
+  static const _expansionIds = [11, 10, 9, 8, 7, 6];
+  static const _supportedRegions = {'us', 'eu', 'kr', 'tw'};
+
+  final Map<String, _CachedCurrentRaid> _currentRaidCacheByRegion = {};
+  final Map<String, CurrentRaidInfo> _lastValidByRegion = {};
 
   RaiderIoDataSource(this._client);
 
@@ -25,6 +50,7 @@ class RaiderIoDataSource {
           'fields':
               'gear,mythic_plus_scores_by_season:current,mythic_plus_best_runs,raid_progression',
         },
+        expectedErrorStatusCodes: const {400, 404},
       );
 
       return _mapCharacter(data, region);
@@ -51,6 +77,55 @@ class RaiderIoDataSource {
         statusCode: e.response?.statusCode,
       );
     }
+  }
+
+  Future<CurrentRaidInfo?> getCurrentLiveRaid({required String region}) async {
+    final normalizedRegion = _normalizeRegion(region);
+    final now = DateTime.now().toUtc();
+    final cached = _currentRaidCacheByRegion[normalizedRegion];
+    if (cached != null && cached.expiresAt.isAfter(now)) {
+      return cached.raid;
+    }
+
+    CurrentRaidInfo? resolved;
+    for (final expansionId in _expansionIds) {
+      try {
+        final data = await _client.get(
+          '$_baseUrl/raiding/static-data',
+          queryParameters: {'expansion_id': expansionId},
+        );
+        final candidate = _selectCurrentRaidFromStaticData(
+          data,
+          normalizedRegion,
+          now,
+        );
+        if (candidate != null) {
+          resolved = candidate;
+          break;
+        }
+      } on DioException {
+        // Ignore this expansion and continue with others.
+      } on ServerException {
+        // Ignore this expansion and continue with others.
+      } on NetworkException {
+        // Ignore this expansion and continue with others.
+      } on FormatException {
+        // Ignore malformed responses for this expansion.
+      }
+    }
+
+    if (resolved != null) {
+      _rememberCurrentRaid(normalizedRegion, resolved, now);
+      return resolved;
+    }
+
+    final lastValid = _lastValidByRegion[normalizedRegion];
+    if (lastValid != null) {
+      _rememberCurrentRaid(normalizedRegion, lastValid, now);
+      return lastValid;
+    }
+
+    return null;
   }
 
   Character _mapCharacter(Map<String, dynamic> data, String region) {
@@ -107,6 +182,10 @@ class RaiderIoDataSource {
       raidSummary = raidDetails.first.summary;
     }
 
+    final rawThumbnailUrl = _normalizeThumbnailUrl(
+      data['thumbnail_url'] as String?,
+    );
+
     return Character(
       name: data['name'] as String? ?? '',
       realm: data['realm'] as String? ?? '',
@@ -127,7 +206,8 @@ class RaiderIoDataSource {
       mythicPlusProfile: mPlusProfile,
       raidProgression: raidSummary,
       raidProgressionDetails: raidDetails,
-      avatarUrl: _getFullRenderUrl(data['thumbnail_url'] as String?),
+      avatarUrl: _getFullRenderUrl(rawThumbnailUrl),
+      thumbnailUrl: rawThumbnailUrl,
     );
   }
 
@@ -143,6 +223,13 @@ class RaiderIoDataSource {
     }
 
     return thumbnailUrl;
+  }
+
+  String? _normalizeThumbnailUrl(String? thumbnailUrl) {
+    if (thumbnailUrl == null) return null;
+    final normalized = thumbnailUrl.trim();
+    if (normalized.isEmpty) return null;
+    return normalized;
   }
 
   List<EquippedItem> _mapEquipment(Map<String, dynamic> items) {
@@ -296,4 +383,108 @@ class RaiderIoDataSource {
             .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
             .join(' ');
   }
+
+  void _rememberCurrentRaid(
+    String region,
+    CurrentRaidInfo raid,
+    DateTime nowUtc,
+  ) {
+    _currentRaidCacheByRegion[region] = _CachedCurrentRaid(
+      raid: raid,
+      expiresAt: nowUtc.add(_liveRaidCacheTtl),
+    );
+    _lastValidByRegion[region] = raid;
+  }
+
+  CurrentRaidInfo? _selectCurrentRaidFromStaticData(
+    Map<String, dynamic> data,
+    String region,
+    DateTime nowUtc,
+  ) {
+    final raids = data['raids'] as List<dynamic>? ?? const [];
+    if (raids.isEmpty) return null;
+
+    final candidates = <_RaidDateCandidate>[];
+    for (final raid in raids) {
+      if (raid is! Map<String, dynamic>) continue;
+      final slug = (raid['slug'] as String?)?.trim();
+      if (slug == null || slug.isEmpty) continue;
+
+      final start = _parseRegionalDate(raid['starts'], region);
+      final end = _parseRegionalDate(raid['ends'], region);
+      if (start == null) continue;
+      if (end != null && !start.isBefore(end)) continue;
+
+      final name = ((raid['name'] as String?)?.trim().isNotEmpty ?? false)
+          ? (raid['name'] as String).trim()
+          : _formatRaidName(slug);
+      final encounters = raid['encounters'] as List<dynamic>? ?? const [];
+      final totalBosses = encounters.length;
+
+      candidates.add(
+        _RaidDateCandidate(
+          info: CurrentRaidInfo(
+            slug: slug,
+            name: name,
+            totalBosses: totalBosses,
+          ),
+          startsAt: start,
+          endsAt: end,
+        ),
+      );
+    }
+
+    if (candidates.isEmpty) return null;
+
+    final active =
+        candidates
+            .where(
+              (c) =>
+                  !c.startsAt.isAfter(nowUtc) &&
+                  (c.endsAt == null || nowUtc.isBefore(c.endsAt!)),
+            )
+            .toList()
+          ..sort((a, b) => b.startsAt.compareTo(a.startsAt));
+    if (active.isNotEmpty) return active.first.info;
+
+    final started =
+        candidates.where((c) => !c.startsAt.isAfter(nowUtc)).toList()
+          ..sort((a, b) => b.startsAt.compareTo(a.startsAt));
+    if (started.isNotEmpty) return started.first.info;
+
+    return null;
+  }
+
+  DateTime? _parseRegionalDate(dynamic value, String region) {
+    if (value is! Map<String, dynamic>) return null;
+    final raw =
+        value[region] ??
+        value[region.toUpperCase()] ??
+        value['us'] ??
+        value['US'];
+    if (raw is! String || raw.trim().isEmpty) return null;
+    try {
+      return DateTime.parse(raw).toUtc();
+    } on FormatException {
+      return null;
+    }
+  }
+
+  String _normalizeRegion(String region) {
+    final normalized = region.trim().toLowerCase();
+    if (_supportedRegions.contains(normalized)) return normalized;
+    return 'eu';
+  }
+}
+
+class _RaidDateCandidate {
+  final CurrentRaidInfo info;
+  final DateTime startsAt;
+  final DateTime? endsAt;
+
+  const _RaidDateCandidate({
+    required this.info,
+    required this.startsAt,
+    required this.endsAt,
+  });
 }

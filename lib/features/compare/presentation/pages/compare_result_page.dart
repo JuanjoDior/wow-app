@@ -246,11 +246,8 @@ class _CompareResultPageState extends State<CompareResultPage> {
                 higherIsBetter: true,
               ),
             ],
-            if (c1.raidProgressionDetails.isNotEmpty ||
-                c2.raidProgressionDetails.isNotEmpty) ...[
-              const Divider(height: 20, color: WowTheme.border),
-              _buildRaidCompare(c1, c2),
-            ],
+            const Divider(height: 20, color: WowTheme.border),
+            _buildRaidCompare(c1, c2),
           ],
         ),
       ),
@@ -262,6 +259,7 @@ class _CompareResultPageState extends State<CompareResultPage> {
     double? val1,
     double? val2, {
     required bool higherIsBetter,
+    bool showZero = false,
   }) {
     final v1 = val1 ?? 0;
     final v2 = val2 ?? 0;
@@ -276,7 +274,8 @@ class _CompareResultPageState extends State<CompareResultPage> {
     }
 
     String format(double? v) {
-      if (v == null || v == 0) return '—';
+      if (v == null) return showZero ? '0' : '—';
+      if (v == 0) return showZero ? '0' : '—';
       return v == v.roundToDouble()
           ? v.toInt().toString()
           : v.toStringAsFixed(1);
@@ -321,12 +320,8 @@ class _CompareResultPageState extends State<CompareResultPage> {
 
   Widget _buildRaidCompare(Character c1, Character c2) {
     final t = S.of(context)!;
-    final raid1 = c1.raidProgressionDetails.isNotEmpty
-        ? c1.raidProgressionDetails.first
-        : null;
-    final raid2 = c2.raidProgressionDetails.isNotEmpty
-        ? c2.raidProgressionDetails.first
-        : null;
+    final raid1 = _currentRaidOrFallback(c1);
+    final raid2 = _currentRaidOrFallback(c2);
 
     final raidName = raid1?.displayName ?? raid2?.displayName ?? t.raid;
 
@@ -346,6 +341,7 @@ class _CompareResultPageState extends State<CompareResultPage> {
           raid1?.normalKilled.toDouble(),
           raid2?.normalKilled.toDouble(),
           higherIsBetter: true,
+          showZero: true,
         ),
         const SizedBox(height: 4),
         _buildCompareRow(
@@ -353,6 +349,7 @@ class _CompareResultPageState extends State<CompareResultPage> {
           raid1?.heroicKilled.toDouble(),
           raid2?.heroicKilled.toDouble(),
           higherIsBetter: true,
+          showZero: true,
         ),
         const SizedBox(height: 4),
         _buildCompareRow(
@@ -360,9 +357,32 @@ class _CompareResultPageState extends State<CompareResultPage> {
           raid1?.mythicKilled.toDouble(),
           raid2?.mythicKilled.toDouble(),
           higherIsBetter: true,
+          showZero: true,
         ),
       ],
     );
+  }
+
+  RaidProgress? _currentRaidOrFallback(Character c) {
+    if (c.raidProgressionDetails.isNotEmpty) {
+      return c.raidProgressionDetails.first;
+    }
+
+    final summary = c.raidProgression?.trim();
+    if (summary == null || summary.isEmpty) return null;
+
+    return RaidProgress(
+      raidName: '',
+      slug: 'current-raid',
+      summary: summary,
+      totalBosses: _extractTotalBosses(summary),
+    );
+  }
+
+  int _extractTotalBosses(String summary) {
+    final match = RegExp(r'/(\d+)').firstMatch(summary);
+    if (match == null) return 0;
+    return int.tryParse(match.group(1) ?? '') ?? 0;
   }
 
   Widget _buildEquipmentCompare(Character c1, Character c2) {

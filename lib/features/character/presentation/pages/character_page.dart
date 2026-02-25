@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:wow_companion/core/di/injection.dart';
+import 'package:wow_companion/core/l10n/wow_translations.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
+import 'package:wow_companion/core/wow/character_search_input.dart';
 import 'package:wow_companion/features/character/domain/entities/character.dart';
 import 'package:wow_companion/features/character/presentation/cubit/character_cubit.dart';
 import 'package:wow_companion/features/favorites/domain/favorites_repository.dart';
 import 'package:wow_companion/features/favorites/presentation/favorites_cubit.dart';
-import 'package:wow_companion/shared/widgets/common_widgets.dart';
-import 'package:wow_companion/shared/widgets/item_tooltip_trigger.dart';
-import 'package:wow_companion/core/l10n/wow_translations.dart';
-import 'package:wow_companion/features/analysis/presentation/widgets/character_insights_dashboard.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
 import 'package:wow_companion/features/character/presentation/utils/primary_stat_display.dart';
+import 'package:wow_companion/shared/widgets/common_widgets.dart';
+import 'package:wow_companion/shared/widgets/item_tooltip_trigger.dart';
 
 class CharacterPage extends StatefulWidget {
   final String region;
@@ -155,8 +156,6 @@ class _CharacterPageState extends State<CharacterPage> {
             _buildStatsPanel(char.stats!),
           ],
           const SizedBox(height: 16),
-          CharacterInsightsDashboard(character: char),
-          const SizedBox(height: 16),
           _buildProgressionCard(char),
           const SizedBox(height: 24),
         ],
@@ -207,26 +206,51 @@ class _CharacterPageState extends State<CharacterPage> {
                 ],
               ),
             ),
-            if (char.equippedItemLevel != null)
-              Column(
-                children: [
-                  Text(
-                    '${char.equippedItemLevel}',
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: WowTheme.primaryGold,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _ExternalProfileButton(
+                      tooltip: 'Raider.IO',
+                      icon: Icons.auto_graph_rounded,
+                      onTap: () =>
+                          _openExternalProfile(_buildRaiderIoUrl(char)),
                     ),
-                  ),
-                  Text(
-                    S.of(context)!.ilvl,
-                    style: const TextStyle(
-                      color: WowTheme.textSecondary,
-                      fontSize: 12,
+                    const SizedBox(width: 8),
+                    _ExternalProfileButton(
+                      tooltip: 'World of Warcraft',
+                      icon: Icons.public,
+                      onTap: () =>
+                          _openExternalProfile(_buildWowProfileUrl(char)),
                     ),
+                  ],
+                ),
+                if (char.equippedItemLevel != null) ...[
+                  const SizedBox(height: 8),
+                  Column(
+                    children: [
+                      Text(
+                        '${char.equippedItemLevel}',
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: WowTheme.primaryGold,
+                        ),
+                      ),
+                      Text(
+                        S.of(context)!.ilvl,
+                        style: const TextStyle(
+                          color: WowTheme.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
+              ],
+            ),
           ],
         ),
       ),
@@ -313,16 +337,17 @@ class _CharacterPageState extends State<CharacterPage> {
   }
 
   Widget _buildCenterCharacter(Character char) {
+    final imageUrl = char.bestAvatarUrl;
     return SizedBox(
       width: 300,
       height: 440,
-      child: char.avatarUrl != null
+      child: imageUrl != null
           ? ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Transform.scale(
                 scale: 1.25, //Zoom al personaje no al contenedor
                 child: CachedNetworkImage(
-                  imageUrl: char.avatarUrl!,
+                  imageUrl: imageUrl,
                   fit: BoxFit.fitHeight,
                   alignment: Alignment.topCenter,
                   placeholder: (context, url) => Container(
@@ -609,35 +634,40 @@ class _CharacterPageState extends State<CharacterPage> {
             const SizedBox(height: 10),
 
             // Stats secundarias: Crítico, Celeridad, Maestría, Versatilidad
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (stats.criticalStrike != null)
-                  _SecondaryStatChip(
-                    label: 'Golpe Crítico',
-                    value: stats.criticalStrike!,
-                    color: const Color(0xFFE74C3C),
-                  ),
-                if (stats.haste != null)
-                  _SecondaryStatChip(
-                    label: 'Celeridad',
-                    value: stats.haste!,
-                    color: const Color(0xFF27AE60),
-                  ),
-                if (stats.mastery != null)
-                  _SecondaryStatChip(
-                    label: 'Maestría',
-                    value: stats.mastery!,
-                    color: const Color(0xFF9B59B6),
-                  ),
-                if (stats.versatility != null)
-                  _SecondaryStatChip(
-                    label: 'Versatilidad',
-                    value: stats.versatility!,
-                    color: const Color(0xFF2980B9),
-                  ),
-              ],
+            Align(
+              alignment: Alignment.center,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                runAlignment: WrapAlignment.center,
+                children: [
+                  if (stats.criticalStrike != null)
+                    _SecondaryStatChip(
+                      label: 'Golpe Crítico',
+                      value: stats.criticalStrike!,
+                      color: const Color(0xFFE74C3C),
+                    ),
+                  if (stats.haste != null)
+                    _SecondaryStatChip(
+                      label: 'Celeridad',
+                      value: stats.haste!,
+                      color: const Color(0xFF27AE60),
+                    ),
+                  if (stats.mastery != null)
+                    _SecondaryStatChip(
+                      label: 'Maestría',
+                      value: stats.mastery!,
+                      color: const Color(0xFF9B59B6),
+                    ),
+                  if (stats.versatility != null)
+                    _SecondaryStatChip(
+                      label: 'Versatilidad',
+                      value: stats.versatility!,
+                      color: const Color(0xFF2980B9),
+                    ),
+                ],
+              ),
             ),
           ],
         ),
@@ -666,12 +696,38 @@ class _CharacterPageState extends State<CharacterPage> {
     };
   }
 
-  Widget _buildProgressionCard(Character char) {
-    if (char.mythicPlusScore == null && char.raidProgression == null) {
-      return const SizedBox.shrink();
-    }
+  String _buildRaiderIoUrl(Character char) {
+    final region = Uri.encodeComponent(normalizeRegion(char.region));
+    final realm = Uri.encodeComponent(normalizeRealmForRequest(char.realm));
+    final name = Uri.encodeComponent(normalizeName(char.name));
+    return 'https://raider.io/characters/$region/$realm/$name';
+  }
 
+  String _buildWowProfileUrl(Character char) {
+    final locale = Localizations.localeOf(context).languageCode == 'es'
+        ? 'es-es'
+        : 'en-us';
+    final region = Uri.encodeComponent(normalizeRegion(char.region));
+    final realm = Uri.encodeComponent(normalizeRealmForRequest(char.realm));
+    final name = Uri.encodeComponent(normalizeName(char.name));
+    return 'https://worldofwarcraft.blizzard.com/$locale/character/$region/$realm/$name';
+  }
+
+  Future<void> _openExternalProfile(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Widget _buildProgressionCard(Character char) {
     final t = S.of(context)!;
+    final mythicScore = char.mythicPlusScore ?? 0;
+    final mythicProfile = char.mythicPlusProfile;
+    final currentRaid = char.raidProgressionDetails.firstOrNull;
+    final raidSummary = (char.raidProgression?.trim().isNotEmpty ?? false)
+        ? char.raidProgression!.trim()
+        : (currentRaid != null ? '0/${currentRaid.totalBosses}' : '0/0');
 
     return Column(
       children: [
@@ -680,98 +736,80 @@ class _CharacterPageState extends State<CharacterPage> {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                if (char.mythicPlusScore != null)
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          t.mythicPlus,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: WowTheme.primaryGold,
-                          ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Text(
+                        t.mythicPlus,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: WowTheme.primaryGold,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          char.mythicPlusScore!.toStringAsFixed(1),
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: _getMythicPlusColor(char.mythicPlusScore!),
-                          ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        mythicScore.toStringAsFixed(1),
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: _getMythicPlusColor(mythicScore),
                         ),
-                        Text(
-                          t.rating,
-                          style: const TextStyle(
-                            color: WowTheme.textSecondary,
-                            fontSize: 12,
-                          ),
+                      ),
+                      Text(
+                        t.rating,
+                        style: const TextStyle(
+                          color: WowTheme.textSecondary,
+                          fontSize: 12,
                         ),
-                        if (char.mythicPlusProfile != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: _buildRoleScores(char.mythicPlusProfile!),
-                          ),
-                      ],
-                    ),
+                      ),
+                      if (mythicProfile != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildRoleScores(mythicProfile),
+                        ),
+                    ],
                   ),
-                if (char.mythicPlusScore != null &&
-                    char.raidProgression != null)
-                  Container(width: 1, height: 80, color: WowTheme.border),
-                if (char.raidProgression != null)
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          t.raid,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: WowTheme.primaryGold,
-                          ),
+                ),
+                Container(width: 1, height: 80, color: WowTheme.border),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Text(
+                        t.raid,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: WowTheme.primaryGold,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          char.raidProgression!,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: WowTheme.textPrimary,
-                          ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        raidSummary,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: WowTheme.textPrimary,
                         ),
-                        if (char.raidProgressionDetails.isNotEmpty)
-                          Text(
-                            char.raidProgressionDetails.first.displayName,
-                            style: const TextStyle(
-                              color: WowTheme.textSecondary,
-                              fontSize: 12,
-                            ),
-                          )
-                        else
-                          Text(
-                            t.progression,
-                            style: const TextStyle(
-                              color: WowTheme.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                      ],
-                    ),
+                      ),
+                      Text(
+                        currentRaid?.displayName ?? t.progression,
+                        style: const TextStyle(
+                          color: WowTheme.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
+                ),
               ],
             ),
           ),
         ),
-        if (char.raidProgressionDetails.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          _buildRaidDetailCard(char.raidProgressionDetails),
-        ],
-        if (char.mythicPlusProfile != null &&
-            char.mythicPlusProfile!.bestRuns.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          _buildBestRunsCard(char.mythicPlusProfile!.bestRuns),
-        ],
+        const SizedBox(height: 16),
+        _buildRaidDetailCard(currentRaid),
+        const SizedBox(height: 16),
+        _buildBestRunsCard(char.mythicPlusProfile?.bestRuns ?? const []),
       ],
     );
   }
@@ -877,7 +915,16 @@ class _CharacterPageState extends State<CharacterPage> {
               ),
             ),
             const Divider(height: 1, color: WowTheme.border),
-            ...runs.map((run) => _buildRunRow(run)),
+            if (runs.isEmpty)
+              Text(
+                t.searchNoResults,
+                style: const TextStyle(
+                  color: WowTheme.textSecondary,
+                  fontSize: 12,
+                ),
+              )
+            else
+              ...runs.map((run) => _buildRunRow(run)),
           ],
         ),
       ),
@@ -963,7 +1010,8 @@ class _CharacterPageState extends State<CharacterPage> {
   }
 
   Widget _buildSmallAvatar(Character char) {
-    if (char.avatarUrl != null && char.avatarUrl!.isNotEmpty) {
+    final imageUrl = char.bestAvatarUrl;
+    if (imageUrl != null && imageUrl.isNotEmpty) {
       return Container(
         width: 56,
         height: 56,
@@ -976,7 +1024,7 @@ class _CharacterPageState extends State<CharacterPage> {
         ),
         child: ClipOval(
           child: CachedNetworkImage(
-            imageUrl: char.avatarUrl!,
+            imageUrl: imageUrl,
             fit: BoxFit.cover,
             placeholder: (context, url) =>
                 Container(color: WowTheme.surfaceLight),
@@ -1026,24 +1074,37 @@ class _CharacterPageState extends State<CharacterPage> {
     return const Color(0xFF9D9D9D);
   }
 
-  Widget _buildRaidDetailCard(List<RaidProgress> raids) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              S.of(context)!.raidProgression,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: WowTheme.primaryGold,
+  Widget _buildRaidDetailCard(RaidProgress? currentRaid) {
+    final t = S.of(context)!;
+    return SizedBox(
+      width: double.infinity,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                t.raidProgression,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: WowTheme.primaryGold,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            ...raids.map((raid) => _buildRaidRow(raid)),
-          ],
+              const SizedBox(height: 12),
+              if (currentRaid == null)
+                Text(
+                  t.searchNoResults,
+                  style: const TextStyle(
+                    color: WowTheme.textSecondary,
+                    fontSize: 12,
+                  ),
+                )
+              else
+                _buildRaidRow(currentRaid),
+            ],
+          ),
         ),
       ),
     );
@@ -1051,6 +1112,9 @@ class _CharacterPageState extends State<CharacterPage> {
 
   Widget _buildRaidRow(RaidProgress raid) {
     final t = S.of(context)!;
+    final summary = raid.summary.trim().isNotEmpty
+        ? raid.summary.trim()
+        : '0/${raid.totalBosses}';
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -1068,7 +1132,7 @@ class _CharacterPageState extends State<CharacterPage> {
                 ),
               ),
               Text(
-                raid.summary,
+                summary,
                 style: TextStyle(
                   color: _getRaidDifficultyColor(raid.currentTier),
                   fontSize: 13,
@@ -1199,12 +1263,14 @@ class _StatTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: iconColor.withValues(alpha: 0.25)),
       ),
-      child: Row(
-        children: [
-          Icon(icon, color: iconColor, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: iconColor, size: 20),
+            const SizedBox(width: 10),
+            Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -1226,8 +1292,8 @@ class _StatTile extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1255,10 +1321,11 @@ class _SecondaryStatChip extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             '${value.toStringAsFixed(1)}%',
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: color,
               fontSize: 20,
@@ -1267,6 +1334,7 @@ class _SecondaryStatChip extends StatelessWidget {
           ),
           Text(
             label.toUpperCase(),
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: WowTheme.textSecondary.withValues(alpha: 0.65),
               fontSize: 10,
@@ -1275,6 +1343,42 @@ class _SecondaryStatChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ExternalProfileButton extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _ExternalProfileButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Ink(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: WowTheme.surfaceLight,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: WowTheme.border),
+            ),
+            child: Icon(icon, size: 18, color: WowTheme.primaryGold),
+          ),
+        ),
       ),
     );
   }

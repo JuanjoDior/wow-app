@@ -437,7 +437,6 @@ User Input → Widget → Cubit → Use Case → Repository → Data Source → 
 #### 🔧 Baja Prioridad
 - [ ] Integración con Warcraft Logs
 - [ ] Análisis de talento builds
-- [ ] Recomendaciones de gemas/enchants basadas en spec
 - [ ] Compatibilidad con Classic/TBC/WotLK
 - [ ] Google Analytics
 - [ ] Modo claro (light theme)

@@ -33,6 +33,20 @@ class _StaticResponseAdapter implements HttpClientAdapter {
 
 void main() {
   group('CharacterBlizzardData equipment icon parsing', () {
+    test('reads thumbnail_url', () {
+      final data = CharacterBlizzardData.fromJson({
+        'name': 'Test',
+        'realm': 'Realm',
+        'region': 'eu',
+        'class': 'Mage',
+        'race': 'Human',
+        'thumbnail_url': 'https://cdn.example/avatar.jpg',
+        'equipment': const [],
+      });
+
+      expect(data.thumbnailUrl, 'https://cdn.example/avatar.jpg');
+    });
+
     test('reads icon_url (snake_case)', () {
       final data = CharacterBlizzardData.fromJson({
         'name': 'Test',

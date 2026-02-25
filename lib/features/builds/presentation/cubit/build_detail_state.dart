@@ -1,6 +1,5 @@
 import 'package:equatable/equatable.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
-import 'package:wow_companion/features/builds/domain/entities/spec_recommendation.dart';
 
 abstract class BuildDetailState extends Equatable {
   const BuildDetailState();
@@ -14,34 +13,13 @@ class BuildDetailLoading extends BuildDetailState {
 
 class BuildDetailLoaded extends BuildDetailState {
   final Build build;
+  const BuildDetailLoaded(this.build);
 
-  /// Recomendaciones por spec cargadas desde la fuente local.
-  /// null = sin spec vinculada o fallo de carga.
-  final SpecRecommendation? recommendation;
-  final bool recommendationLookupDone;
-
-  const BuildDetailLoaded(
-    this.build, {
-    this.recommendation,
-    this.recommendationLookupDone = false,
-  });
-
-  BuildDetailLoaded copyWith({
-    Build? build,
-    SpecRecommendation? recommendation,
-    bool clearRecommendation = false,
-    bool? recommendationLookupDone,
-  }) => BuildDetailLoaded(
-    build ?? this.build,
-    recommendation: clearRecommendation
-        ? null
-        : (recommendation ?? this.recommendation),
-    recommendationLookupDone:
-        recommendationLookupDone ?? this.recommendationLookupDone,
-  );
+  BuildDetailLoaded copyWith({Build? build}) =>
+      BuildDetailLoaded(build ?? this.build);
 
   @override
-  List<Object?> get props => [build, recommendation, recommendationLookupDone];
+  List<Object?> get props => [build];
 }
 
 class BuildDetailError extends BuildDetailState {

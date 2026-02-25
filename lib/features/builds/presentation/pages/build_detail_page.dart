@@ -10,10 +10,7 @@ import 'package:wow_companion/features/items/domain/entities/item.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
 import 'package:wow_companion/shared/widgets/item_tooltip_trigger.dart';
 import 'package:wow_companion/features/builds/presentation/widgets/build_guide_section.dart';
-import 'package:wow_companion/features/builds/presentation/widgets/spec_recommendation_panel.dart';
 import 'package:wow_companion/core/l10n/wow_translations.dart';
-import 'package:wow_companion/core/data/wow_enchant_suggestions.dart';
-import 'package:wow_companion/features/builds/domain/entities/spec_recommendation.dart';
 
 // ─── Slot icon mapping ────────────────────────────────────────────────────────
 IconData _slotIcon(WowSlot slot) => switch (slot) {
@@ -227,7 +224,6 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
                         hasCharacter: build.characterRefKey != null,
                       ),
                       const SizedBox(height: 8),
-                      const SpecRecommendationPanel(),
                       BuildGuideSection(guide: build.guide),
                     ]),
                   ),
@@ -459,9 +455,6 @@ class _MobileSliverContent extends StatelessWidget {
           ),
         );
       }),
-      // Panel de recomendaciones por spec — aparece si hay spec vinculada
-      const SizedBox(height: 4),
-      const SpecRecommendationPanel(),
       BuildGuideSection(guide: guide),
     ];
 
@@ -671,7 +664,7 @@ class _SlotButtonState extends State<_SlotButton> {
   Widget build(BuildContext context) {
     final cubit = context.read<BuildDetailCubit>();
     return BlocBuilder<BuildDetailCubit, BuildDetailState>(
-      // Solo rebuild cuando cambia este slot concreto O llegan recomendaciones
+      // Solo rebuild cuando cambia este slot concreto
       buildWhen: (prev, next) {
         final prevSlot = prev is BuildDetailLoaded
             ? prev.build.slots.firstWhere(
@@ -685,9 +678,7 @@ class _SlotButtonState extends State<_SlotButton> {
                 orElse: () => BuildSlot(slot: widget.wowSlot),
               )
             : BuildSlot(slot: widget.wowSlot);
-        final prevRec = prev is BuildDetailLoaded ? prev.recommendation : null;
-        final nextRec = next is BuildDetailLoaded ? next.recommendation : null;
-        return prevSlot != nextSlot || prevRec != nextRec;
+        return prevSlot != nextSlot;
       },
       builder: (context, state) {
         final slot = state is BuildDetailLoaded
@@ -696,8 +687,6 @@ class _SlotButtonState extends State<_SlotButton> {
                 orElse: () => BuildSlot(slot: widget.wowSlot),
               )
             : BuildSlot(slot: widget.wowSlot);
-        final rec = state is BuildDetailLoaded ? state.recommendation : null;
-
         final hasItem = slot.item != null;
         final qualityColor = hasItem
             ? WowTheme.getQualityColor(slot.item!.quality)
@@ -754,15 +743,7 @@ class _SlotButtonState extends State<_SlotButton> {
                 ),
                 padding: const EdgeInsets.fromLTRB(5, 6, 5, 6),
                 child: align == SlotAlign.left
-                    ? _leftContent(
-                        icon,
-                        hasItem,
-                        qualityColor,
-                        cubit,
-                        t,
-                        slot,
-                        rec,
-                      )
+                    ? _leftContent(icon, hasItem, qualityColor, cubit, t, slot)
                     : _rightContent(
                         icon,
                         hasItem,
@@ -770,7 +751,6 @@ class _SlotButtonState extends State<_SlotButton> {
                         cubit,
                         t,
                         slot,
-                        rec,
                       ),
               ),
             ),
@@ -814,7 +794,6 @@ class _SlotButtonState extends State<_SlotButton> {
     BuildDetailCubit cubit,
     S t,
     BuildSlot slot,
-    SpecRecommendation? rec,
   ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -829,7 +808,6 @@ class _SlotButtonState extends State<_SlotButton> {
             cubit,
             t,
             slot,
-            rec,
           ),
         ),
       ],
@@ -843,7 +821,6 @@ class _SlotButtonState extends State<_SlotButton> {
     BuildDetailCubit cubit,
     S t,
     BuildSlot slot,
-    SpecRecommendation? rec,
   ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -856,7 +833,6 @@ class _SlotButtonState extends State<_SlotButton> {
             cubit,
             t,
             slot,
-            rec,
           ),
         ),
         const SizedBox(width: 6),
@@ -872,7 +848,6 @@ class _SlotButtonState extends State<_SlotButton> {
     BuildDetailCubit cubit,
     S t,
     BuildSlot slot,
-    SpecRecommendation? rec,
   ) {
     if (!hasItem) {
       return Text(
@@ -958,15 +933,6 @@ class _SlotButtonState extends State<_SlotButton> {
             color: WowTheme.accentBlue,
             align: align,
             onToggle: () => cubit.toggleEnchantmentObtained(slot.slot),
-          )
-        else if (EnchantResolver.isEnchantable(slot.slot, recommendation: rec))
-          _enchantHint(
-            label: EnchantResolver.primaryForSlot(
-              slot.slot,
-              recommendation: rec,
-            )!.name,
-            align: align,
-            isSpecific: rec != null,
           ),
         ...slot.gems.asMap().entries.map((e) {
           final gemObtained = e.key < slot.gemsObtained.length
@@ -982,32 +948,6 @@ class _SlotButtonState extends State<_SlotButton> {
           );
         }),
       ],
-    );
-  }
-
-  /// Texto sutil en cursiva que sugiere el enchant BiS cuando el slot no tiene ninguno.
-  /// [isSpecific] = true si viene de datos por spec (vs. fallback genérico).
-  Widget _enchantHint({
-    required String label,
-    required TextAlign align,
-    bool isSpecific = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 2),
-      child: Text(
-        '\u2736 $label',
-        textAlign: align,
-        style: TextStyle(
-          // Un poco más visible cuando es spec-aware
-          color: WowTheme.accentBlue.withValues(
-            alpha: isSpecific ? 0.55 : 0.40,
-          ),
-          fontSize: 10,
-          fontStyle: FontStyle.italic,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
     );
   }
 
@@ -1082,11 +1022,7 @@ class _SlotSheet extends StatelessWidget {
               orElse: () => BuildSlot(slot: wowSlot),
             ) ??
             BuildSlot(slot: wowSlot);
-        return _SlotSheetContent(
-          slot: slot,
-          cubit: cubit,
-          recommendation: loaded?.recommendation,
-        );
+        return _SlotSheetContent(slot: slot, cubit: cubit);
       },
     );
   }
@@ -1095,12 +1031,7 @@ class _SlotSheet extends StatelessWidget {
 class _SlotSheetContent extends StatelessWidget {
   final BuildSlot slot;
   final BuildDetailCubit cubit;
-  final SpecRecommendation? recommendation;
-  const _SlotSheetContent({
-    required this.slot,
-    required this.cubit,
-    this.recommendation,
-  });
+  const _SlotSheetContent({required this.slot, required this.cubit});
 
   @override
   Widget build(BuildContext context) {
@@ -1109,14 +1040,6 @@ class _SlotSheetContent extends StatelessWidget {
     final qualityColor = hasItem
         ? WowTheme.getQualityColor(slot.item!.quality)
         : WowTheme.border;
-    // Usar EnchantResolver spec-aware (fallback a genérico si no hay recommendation)
-    final suggestions = EnchantResolver.suggestionsForSlot(
-      slot.slot,
-      recommendation: recommendation,
-    );
-    final hasSpecificRecForSlot =
-        recommendation != null &&
-        recommendation!.enchantsForSlot(slot.slot.slotKey).isNotEmpty;
 
     return DraggableScrollableSheet(
       expand: false,
@@ -1269,34 +1192,6 @@ class _SlotSheetContent extends StatelessWidget {
                 color: WowTheme.textSecondary,
                 onTap: () => _pickEnchant(context, cubit, t),
               ),
-              // Sugerencias de enchant para este slot
-              if (suggestions.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  hasSpecificRecForSlot
-                      ? t.recEnchantSuggestedSpec
-                      : t.recEnchantSuggestedGeneric,
-                  style: TextStyle(
-                    color: hasSpecificRecForSlot
-                        ? WowTheme.accentBlue.withValues(alpha: 0.7)
-                        : WowTheme.textSecondary.withValues(alpha: 0.6),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                ...suggestions.map(
-                  (s) => _SuggestionTile(
-                    suggestion: s,
-                    isPrimary: suggestions.first == s,
-                    onApply: () => cubit.assignEnchantment(
-                      slot.slot,
-                      Item(id: 0, name: s.name, quality: 'UNCOMMON'),
-                    ),
-                  ),
-                ),
-              ],
             ] else
               Row(
                 children: [
@@ -1443,97 +1338,6 @@ class _SlotSheetContent extends StatelessWidget {
       builder: (_) => ItemSearchDialog(slot: null, title: t.slotSearchGem),
     );
     if (item != null) cubit.addGem(slot.slot, item);
-  }
-}
-
-// ─── Suggestion tile (sheet) ─────────────────────────────────────────────────
-/// Fila de sugerencia de enchant con botón "Aplicar" de un tap.
-class _SuggestionTile extends StatelessWidget {
-  final EnchantSuggestion suggestion;
-  final bool isPrimary;
-  final VoidCallback onApply;
-
-  const _SuggestionTile({
-    required this.suggestion,
-    required this.isPrimary,
-    required this.onApply,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(6),
-        onTap: onApply,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(
-            color: WowTheme.accentBlue.withValues(
-              alpha: isPrimary ? 0.08 : 0.04,
-            ),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: WowTheme.accentBlue.withValues(
-                alpha: isPrimary ? 0.35 : 0.15,
-              ),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.auto_fix_high,
-                size: 14,
-                color: WowTheme.accentBlue.withValues(
-                  alpha: isPrimary ? 0.9 : 0.5,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      suggestion.name,
-                      style: TextStyle(
-                        color: WowTheme.accentBlue.withValues(
-                          alpha: isPrimary ? 1.0 : 0.7,
-                        ),
-                        fontSize: 12,
-                        fontWeight: isPrimary
-                            ? FontWeight.w600
-                            : FontWeight.normal,
-                      ),
-                    ),
-                    if (suggestion.note != null)
-                      Text(
-                        suggestion.note!,
-                        style: TextStyle(
-                          color: WowTheme.textSecondary.withValues(alpha: 0.6),
-                          fontSize: 10,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Builder(
-                builder: (ctx) => Text(
-                  S.of(ctx)!.recEnchantApply,
-                  style: TextStyle(
-                    color: WowTheme.accentBlue.withValues(
-                      alpha: isPrimary ? 0.9 : 0.5,
-                    ),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

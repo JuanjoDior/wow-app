@@ -749,9 +749,11 @@ async function handleCharacter(url, env) {
 
     const data = await fetchBlizzardCharacter(region, realmSlug, name, token, env);
     const result = { ...data, _source: 'blizzard' };
+    const hasMedia = Boolean(result.avatar_url || result.thumbnail_url);
+    const effectiveCacheTtl = hasMedia ? cacheTtl : 60;
 
     // Cachear resultado con clave canónica.
-    await env.RECS_CACHE.put(canonicalCacheKey, JSON.stringify(result), { expirationTtl: cacheTtl });
+    await env.RECS_CACHE.put(canonicalCacheKey, JSON.stringify(result), { expirationTtl: effectiveCacheTtl });
 
     return json(result);
   } catch (err) {
@@ -1083,11 +1085,12 @@ async function fetchBlizzardCharacter(region, realmSlug, name, token, env) {
   const headers  = { 'Authorization': `Bearer ${token}` };
 
   // 4 llamadas en paralelo → minimiza latencia
-  const [profileRes, equipRes, statsRes, mediaRes] = await Promise.all([
+  const mediaPromise = fetchCharacterMedia(base, charPath, qs, headers);
+  const [profileRes, equipRes, statsRes, media] = await Promise.all([
     fetch(`${base}${charPath}?${qs}`,                          { headers }),
     fetch(`${base}${charPath}/equipment?${qs}`,                { headers }),
     fetch(`${base}${charPath}/statistics?${qs}`,               { headers }),
-    fetch(`${base}${charPath}/character-media/summary?${qs}`,  { headers }),
+    mediaPromise,
   ]);
 
   // Profile es el endpoint crítico; si falla → error al cliente
@@ -1102,15 +1105,33 @@ async function fetchBlizzardCharacter(region, realmSlug, name, token, env) {
   }
 
   // Parsear respuestas (los demás endpoints son opcionales — si fallan, usamos null)
-  const [profile, equip, stats, media] = await Promise.all([
+  const [profile, equip, stats] = await Promise.all([
     profileRes.json(),
     equipRes.ok  ? equipRes.json()  : null,
     statsRes.ok  ? statsRes.json()  : null,
-    mediaRes.ok  ? mediaRes.json()  : null,
   ]);
 
   const iconUrlsByItemId = await resolveItemIcons(region, equip, token, env);
   return normalizeCharacter(profile, equip, stats, media, region, iconUrlsByItemId);
+}
+
+async function fetchCharacterMedia(base, charPath, qs, headers) {
+  const mediaEndpoints = [
+    `${base}${charPath}/character-media?${qs}`,
+    `${base}${charPath}/character-media/summary?${qs}`,
+  ];
+
+  for (const endpoint of mediaEndpoints) {
+    try {
+      const response = await fetch(endpoint, { headers });
+      if (!response.ok) continue;
+      return await response.json();
+    } catch (_) {
+      // Intentar siguiente endpoint.
+    }
+  }
+
+  return null;
 }
 
 // ─── Normalización del personaje ─────────────────────────────────────────────
@@ -1118,15 +1139,9 @@ async function fetchBlizzardCharacter(region, realmSlug, name, token, env) {
 function normalizeCharacter(profile, equip, stats, media, region, iconUrlsByItemId = {}) {
 
   // ── Avatar / render ──────────────────────────────────────────────────────
-  let avatarUrl = null;
-  if (media?.assets) {
-    // Preferencia: main-raw (PNG transparente) > main > avatar
-    const asset =
-      media.assets.find(a => a.key === 'main-raw') ||
-      media.assets.find(a => a.key === 'main')      ||
-      media.assets.find(a => a.key === 'avatar');
-    avatarUrl = asset?.value ?? null;
-  }
+  const mediaUrls = extractCharacterMediaUrls(media);
+  const avatarUrl = mediaUrls.renderUrl;
+  const thumbnailUrl = mediaUrls.thumbnailUrl;
 
   // ── Equipo ───────────────────────────────────────────────────────────────
   const equipment = [];
@@ -1218,9 +1233,53 @@ function normalizeCharacter(profile, equip, stats, media, region, iconUrlsByItem
     average_item_level: profile.average_item_level   ?? null,
     equipped_item_level: profile.equipped_item_level ?? null,
     avatar_url:        avatarUrl,
+    thumbnail_url:     thumbnailUrl,
     equipment:         equipment,
     stats:             normalizedStats,
   };
+}
+
+function extractCharacterMediaUrls(media) {
+  const renderUrl = findMediaAssetUrl(media, ['main-raw', 'main']);
+  const thumbnailUrl = findMediaAssetUrl(media, ['avatar', 'inset']) || renderUrl;
+
+  return { renderUrl, thumbnailUrl };
+}
+
+function findMediaAssetUrl(media, preferredKeys = []) {
+  const assets = Array.isArray(media?.assets) ? media.assets : [];
+  if (assets.length === 0) return null;
+
+  for (const key of preferredKeys) {
+    const matchedAsset = assets.find(asset => asset?.key === key);
+    const matchedUrl = extractMediaAssetUrl(matchedAsset);
+    if (matchedUrl) return matchedUrl;
+  }
+
+  for (const asset of assets) {
+    const assetUrl = extractMediaAssetUrl(asset);
+    if (assetUrl) return assetUrl;
+  }
+
+  return null;
+}
+
+function extractMediaAssetUrl(asset) {
+  if (!asset) return null;
+
+  const value = asset.value;
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value.trim();
+  }
+
+  if (value && typeof value === 'object') {
+    const href = value.href;
+    if (typeof href === 'string' && href.trim().length > 0) {
+      return href.trim();
+    }
+  }
+
+  return null;
 }
 
 async function resolveItemIcons(region, equip, token, env) {

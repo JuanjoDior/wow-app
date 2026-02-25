@@ -55,16 +55,24 @@ class CharacterRepositoryImpl implements CharacterRepository {
           .getCharacter(region: region, realm: realm, name: name)
           .then<Object?>((v) => v)
           .catchError((e) => e),
+      raiderIoDataSource
+          .getCurrentLiveRaid(region: region)
+          .then<Object?>((v) => v)
+          .catchError((e) => e),
     ]);
 
     final blizzardResult = futures[0];
     final raiderResult = futures[1];
+    final currentRaidResult = futures[2];
 
     // 3. Evaluar resultados
     final blizzardData = blizzardResult is CharacterBlizzardData
         ? blizzardResult
         : null;
     final raiderCharacter = raiderResult is Character ? raiderResult : null;
+    final currentRaid = currentRaidResult is CurrentRaidInfo
+        ? currentRaidResult
+        : null;
 
     Character? character;
 
@@ -72,6 +80,10 @@ class CharacterRepositoryImpl implements CharacterRepository {
       final mergedEquipment = _mergeEquipmentIcons(
         blizzardData.equipment,
         raiderCharacter?.equipment ?? const [],
+      );
+      final normalizedRaid = _normalizeCurrentRaidProgress(
+        raiderCharacter?.raidProgressionDetails ?? const [],
+        currentRaid,
       );
 
       // ── Blizzard OK: usar como base + fusionar M+ de Raider.IO ──────────
@@ -89,17 +101,27 @@ class CharacterRepositoryImpl implements CharacterRepository {
         equippedItemLevel: blizzardData.equippedItemLevel,
         // Fallback de imagen: Raider.IO tiene render siempre disponible
         avatarUrl: blizzardData.avatarUrl ?? raiderCharacter?.avatarUrl,
+        thumbnailUrl:
+            blizzardData.thumbnailUrl ?? raiderCharacter?.thumbnailUrl,
         equipment: mergedEquipment,
         stats: blizzardData.stats,
         // M+ data de Raider.IO (si disponible)
-        mythicPlusScore: raiderCharacter?.mythicPlusScore,
-        mythicPlusProfile: raiderCharacter?.mythicPlusProfile,
-        raidProgression: raiderCharacter?.raidProgression,
-        raidProgressionDetails: raiderCharacter?.raidProgressionDetails ?? [],
+        mythicPlusScore: raiderCharacter?.mythicPlusScore ?? 0,
+        mythicPlusProfile:
+            raiderCharacter?.mythicPlusProfile ??
+            const MythicPlusProfile(scoreAll: 0),
+        raidProgression: _raidSummary(normalizedRaid),
+        raidProgressionDetails: normalizedRaid == null
+            ? const []
+            : [normalizedRaid],
       );
     } else if (raiderCharacter != null) {
       // ── Blizzard falló, Raider.IO OK: fallback completo ─────────────────
-      character = raiderCharacter;
+      final normalizedRaid = _normalizeCurrentRaidProgress(
+        raiderCharacter.raidProgressionDetails,
+        currentRaid,
+      );
+      character = _withNormalizedRaidProgress(raiderCharacter, normalizedRaid);
     } else {
       // ── Ambas fallaron: devolver el error más informativo ────────────────
       return _handleError(blizzardResult, raiderResult);
@@ -177,4 +199,56 @@ class CharacterRepositoryImpl implements CharacterRepository {
   }
 
   bool _isBlank(String? value) => value == null || value.trim().isEmpty;
+
+  Character _withNormalizedRaidProgress(
+    Character base,
+    RaidProgress? normalizedRaid,
+  ) {
+    return base.copyWith(
+      mythicPlusScore: base.mythicPlusScore ?? 0,
+      mythicPlusProfile:
+          base.mythicPlusProfile ?? const MythicPlusProfile(scoreAll: 0),
+      raidProgression: _raidSummary(normalizedRaid),
+      raidProgressionDetails: normalizedRaid == null
+          ? const []
+          : [normalizedRaid],
+    );
+  }
+
+  RaidProgress? _normalizeCurrentRaidProgress(
+    List<RaidProgress> source,
+    CurrentRaidInfo? currentRaid,
+  ) {
+    if (currentRaid != null) {
+      final existing = source
+          .where((r) => r.slug == currentRaid.slug)
+          .firstOrNull;
+      if (existing != null) {
+        return RaidProgress(
+          raidName: currentRaid.name,
+          slug: currentRaid.slug,
+          summary: existing.summary,
+          totalBosses: currentRaid.totalBosses,
+          normalKilled: existing.normalKilled,
+          heroicKilled: existing.heroicKilled,
+          mythicKilled: existing.mythicKilled,
+        );
+      }
+      return RaidProgress(
+        raidName: currentRaid.name,
+        slug: currentRaid.slug,
+        summary: '',
+        totalBosses: currentRaid.totalBosses,
+      );
+    }
+
+    if (source.isNotEmpty) return source.first;
+    return null;
+  }
+
+  String _raidSummary(RaidProgress? raid) {
+    if (raid == null) return '0/0';
+    if (raid.summary.trim().isNotEmpty) return raid.summary.trim();
+    return '0/${raid.totalBosses}';
+  }
 }

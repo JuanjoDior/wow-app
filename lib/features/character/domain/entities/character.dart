@@ -12,8 +12,10 @@ class Character extends Equatable {
   final int? achievementPoints;
   final int? averageItemLevel;
   final int? equippedItemLevel;
+
   /// URL del render 3D del personaje (main-raw.png — puede ser null si no está disponible).
   final String? avatarUrl;
+
   /// URL del avatar en miniatura (JPEG pequeño — siempre disponible si hay datos).
   final String? thumbnailUrl;
   final List<EquippedItem> equipment;
@@ -50,6 +52,51 @@ class Character extends Equatable {
 
   String get displayName => '$name - $realm ($region)';
   String get realmSlug => realm.toLowerCase().replaceAll(' ', '-');
+
+  Character copyWith({
+    String? name,
+    String? realm,
+    String? region,
+    int? level,
+    String? race,
+    String? characterClass,
+    String? specialization,
+    String? guild,
+    int? achievementPoints,
+    int? averageItemLevel,
+    int? equippedItemLevel,
+    String? avatarUrl,
+    String? thumbnailUrl,
+    List<EquippedItem>? equipment,
+    CharacterStats? stats,
+    double? mythicPlusScore,
+    String? raidProgression,
+    MythicPlusProfile? mythicPlusProfile,
+    List<RaidProgress>? raidProgressionDetails,
+  }) {
+    return Character(
+      name: name ?? this.name,
+      realm: realm ?? this.realm,
+      region: region ?? this.region,
+      level: level ?? this.level,
+      race: race ?? this.race,
+      characterClass: characterClass ?? this.characterClass,
+      specialization: specialization ?? this.specialization,
+      guild: guild ?? this.guild,
+      achievementPoints: achievementPoints ?? this.achievementPoints,
+      averageItemLevel: averageItemLevel ?? this.averageItemLevel,
+      equippedItemLevel: equippedItemLevel ?? this.equippedItemLevel,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      equipment: equipment ?? this.equipment,
+      stats: stats ?? this.stats,
+      mythicPlusScore: mythicPlusScore ?? this.mythicPlusScore,
+      raidProgression: raidProgression ?? this.raidProgression,
+      mythicPlusProfile: mythicPlusProfile ?? this.mythicPlusProfile,
+      raidProgressionDetails:
+          raidProgressionDetails ?? this.raidProgressionDetails,
+    );
+  }
 
   @override
   List<Object?> get props => [name, realm, region];
