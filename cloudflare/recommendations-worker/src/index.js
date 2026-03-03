@@ -5,6 +5,9 @@
  *   GET  /health
  *   GET  /recommendations?class=druid&spec=feral[&patch=12.0.1][&force=1]
  *   GET  /character?region=eu&realm=sanguino&name=apastar[&force=1]
+ *   GET  /v1/character/snapshot?region=eu&realm=sanguino&name=apastar[&force=1]
+ *   GET  /v1/build/gap-analysis      (reservado)
+ *   GET  /v1/planner/weekly          (reservado)
  *   POST /invalidate   body: { class, spec, patch? }
  *   GET  /specs
  *
@@ -26,6 +29,15 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, X-Invalidate-Secret',
   'Access-Control-Expose-Headers': 'X-Request-Id',
 };
+
+const CACHE_TTLS = Object.freeze({
+  recommendations: { envKey: 'CACHE_TTL_SECONDS', fallback: 604800 },
+  character: { envKey: 'BLIZZARD_CHAR_CACHE_TTL', fallback: 300 },
+  characterNoMedia: { envKey: null, fallback: 60 },
+  oauthToken: { envKey: 'BLIZZARD_TOKEN_CACHE_TTL', fallback: 23 * 60 * 60 },
+  realmSlug: { envKey: 'BLIZZARD_REALM_CACHE_TTL', fallback: 2592000 },
+  itemIcon: { envKey: 'BLIZZARD_ITEM_ICON_CACHE_TTL', fallback: 604800 },
+});
 
 // ─── Blizzard API base URLs ───────────────────────────────────────────────────
 const BLIZZARD_API_BASE = {
@@ -649,6 +661,12 @@ export default {
         response = await handleRecommendations(url, env);
       } else if (url.pathname === '/character' && request.method === 'GET') {
         response = await handleCharacter(url, env);
+      } else if (url.pathname === '/v1/character/snapshot' && request.method === 'GET') {
+        response = await handleCharacterSnapshotV1(url, env);
+      } else if (url.pathname === '/v1/build/gap-analysis' && request.method === 'GET') {
+        response = notImplementedV1('/v1/build/gap-analysis');
+      } else if (url.pathname === '/v1/planner/weekly' && request.method === 'GET') {
+        response = notImplementedV1('/v1/planner/weekly');
       } else if (url.pathname === '/invalidate' && request.method === 'POST') {
         response = await handleInvalidate(request, env);
       } else if (url.pathname === '/specs' && request.method === 'GET') {
@@ -708,7 +726,7 @@ async function handleRecommendations(url, env) {
       ...staticData,
       _source: 'static',
     };
-    const ttl = parseInt(env.CACHE_TTL_SECONDS || '604800', 10);
+    const ttl = getCacheTtlSeconds(env, 'recommendations');
     await env.RECS_CACHE.put(cacheKey, JSON.stringify(result), { expirationTtl: ttl });
     return json(result);
   }
@@ -748,8 +766,8 @@ async function handleCharacter(url, env) {
     return json({ error: `Unknown region: ${region}. Use: us, eu, kr, tw` }, 400);
   }
 
-  const legacyCacheKey = `char:${region}:${realmLegacyKeyPart}:${name}`;
-  const cacheTtl = parseInt(env.BLIZZARD_CHAR_CACHE_TTL || '300', 10);
+  const legacyCacheKey = buildCharacterLegacyKey(region, realmLegacyKeyPart, name);
+  const cacheTtl = getCacheTtlSeconds(env, 'character');
 
   // 1. Legacy cache alias (pre-realm-canonicalization).
   if (!force) {
@@ -767,7 +785,7 @@ async function handleCharacter(url, env) {
   try {
     const token = await getBlizzardToken(region, env);
     const realmSlug = await resolveRealmSlug(region, realmInput, token, env);
-    const canonicalCacheKey = `char:${region}:${realmSlug}:${name}`;
+    const canonicalCacheKey = buildCharacterCanonicalKey(region, realmSlug, name);
 
     if (!force) {
       const cachedCanonical = await env.RECS_CACHE.get(canonicalCacheKey, 'json');
@@ -779,7 +797,9 @@ async function handleCharacter(url, env) {
     const data = await fetchBlizzardCharacter(region, realmSlug, name, token, env);
     const result = { ...data, _source: 'blizzard' };
     const hasMedia = Boolean(result.avatar_url || result.thumbnail_url);
-    const effectiveCacheTtl = hasMedia ? cacheTtl : 60;
+    const effectiveCacheTtl = hasMedia
+      ? cacheTtl
+      : getCacheTtlSeconds(env, 'characterNoMedia');
 
     // Cachear resultado con clave canónica.
     await env.RECS_CACHE.put(canonicalCacheKey, JSON.stringify(result), { expirationTtl: effectiveCacheTtl });
@@ -791,6 +811,41 @@ async function handleCharacter(url, env) {
   }
 }
 
+// ─── /v1/character/snapshot ──────────────────────────────────────────────────
+//
+// Contrato estable v1 para consumo de la app.
+// Conserva el payload de /character dentro de "snapshot" para no romper clientes
+// actuales y añadir versionado explícito.
+
+async function handleCharacterSnapshotV1(url, env) {
+  const response = await handleCharacter(url, env);
+  const contentType = response.headers.get('Content-Type') || '';
+  if (!contentType.includes('application/json')) return response;
+
+  let payload;
+  try {
+    payload = await response.clone().json();
+  } catch {
+    return response;
+  }
+
+  if (!response.ok) {
+    return json({
+      version: 'v1',
+      endpoint: '/v1/character/snapshot',
+      error: payload?.error || 'Unknown error',
+    }, response.status);
+  }
+
+  const source = payload?._source ?? null;
+  return json({
+    version: 'v1',
+    source,
+    generated_at: new Date().toISOString(),
+    snapshot: payload,
+  });
+}
+
 // ─── Blizzard: token OAuth2 (client_credentials) ─────────────────────────────
 //
 // El token dura 24h. Lo cacheamos en KV 23h para renovar con margen.
@@ -798,7 +853,7 @@ async function handleCharacter(url, env) {
 // client_credentials, pero usamos clave por región por si cambia en el futuro).
 
 async function getBlizzardToken(region, env) {
-  const tokenKey = `btoken:${region}`;
+  const tokenKey = buildTokenKey(region);
 
   // Intentar desde KV
   const cached = await env.RECS_CACHE.get(tokenKey, 'json');
@@ -826,7 +881,7 @@ async function getBlizzardToken(region, env) {
   const tokenData = await response.json();
 
   // Cachear 23h (el token dura 24h)
-  const ttl23h = 23 * 60 * 60;
+  const ttl23h = getCacheTtlSeconds(env, 'oauthToken');
   await env.RECS_CACHE.put(tokenKey, JSON.stringify({
     access_token: tokenData.access_token,
     expires_at:   Date.now() + ttl23h * 1000,
@@ -891,7 +946,7 @@ async function resolveRealmSlug(region, realmInput, token, env) {
     throw err;
   }
 
-  const cacheKey = `realm_slug:${region}:${normalizedRealm}`;
+  const cacheKey = buildRealmSlugKey(region, normalizedRealm);
   try {
     const cached = await env.RECS_CACHE.get(cacheKey);
     if (cached && isSafeRealmSlug(cached)) return cached;
@@ -905,7 +960,7 @@ async function resolveRealmSlug(region, realmInput, token, env) {
     if (!resolved) continue;
 
     try {
-      const ttl = parseInt(env.BLIZZARD_REALM_CACHE_TTL || '2592000', 10);
+      const ttl = getCacheTtlSeconds(env, 'realmSlug');
       await env.RECS_CACHE.put(cacheKey, resolved, { expirationTtl: ttl });
     } catch (_) {
       // Ignore cache failures.
@@ -916,7 +971,7 @@ async function resolveRealmSlug(region, realmInput, token, env) {
   const fromSearch = await searchRealmByName(region, realmInput, token);
   if (fromSearch) {
     try {
-      const ttl = parseInt(env.BLIZZARD_REALM_CACHE_TTL || '2592000', 10);
+      const ttl = getCacheTtlSeconds(env, 'realmSlug');
       await env.RECS_CACHE.put(cacheKey, fromSearch, { expirationTtl: ttl });
     } catch (_) {
       // Ignore cache failures.
@@ -1328,14 +1383,14 @@ async function resolveItemIcons(region, equip, token, env) {
     return iconUrlsByItemId;
   }
 
-  const ttl = parseInt(env.BLIZZARD_ITEM_ICON_CACHE_TTL || '604800', 10);
+  const ttl = getCacheTtlSeconds(env, 'itemIcon');
   const base = BLIZZARD_API_BASE[region];
   const namespace = `static-${region}`;
   const locale = 'en_US';
   const headers = { 'Authorization': `Bearer ${token}` };
 
   await Promise.all(itemIds.map(async (itemId) => {
-    const cacheKey = `itemicon:${region}:${itemId}`;
+    const cacheKey = buildItemIconKey(region, itemId);
 
     try {
       const cachedUrl = await env.RECS_CACHE.get(cacheKey);
@@ -1448,8 +1503,49 @@ async function handleSpecs(url, env) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function parsePositiveInt(value, fallback) {
+  const parsed = parseInt(String(value ?? ''), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getCacheTtlSeconds(env, cacheType) {
+  const config = CACHE_TTLS[cacheType];
+  if (!config) return 300;
+  if (!config.envKey) return config.fallback;
+  return parsePositiveInt(env[config.envKey], config.fallback);
+}
+
 function buildRecsKey(cls, spec, patch) {
   return `recs:${cls}:${spec.replace(' ', '_')}:${patch}`;
+}
+
+function buildCharacterLegacyKey(region, realmInput, name) {
+  return `char:${region}:${realmInput}:${name}`;
+}
+
+function buildCharacterCanonicalKey(region, realmSlug, name) {
+  return `char:${region}:${realmSlug}:${name}`;
+}
+
+function buildTokenKey(region) {
+  return `btoken:${region}`;
+}
+
+function buildRealmSlugKey(region, normalizedRealm) {
+  return `realm_slug:${region}:${normalizedRealm}`;
+}
+
+function buildItemIconKey(region, itemId) {
+  return `itemicon:${region}:${itemId}`;
+}
+
+function notImplementedV1(endpoint) {
+  return json({
+    version: 'v1',
+    endpoint,
+    status: 'not_implemented',
+    message: 'Endpoint reserved for upcoming phase.',
+  }, 501);
 }
 
 function json(data, status = 200) {

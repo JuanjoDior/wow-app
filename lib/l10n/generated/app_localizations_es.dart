@@ -85,7 +85,7 @@ class SEs extends S {
   String get equipment => 'Equipamiento';
 
   @override
-  String get mythicPlus => 'Mítica+';
+  String get mythicPlus => 'Mythic+';
 
   @override
   String get rating => 'Puntuación';
@@ -97,7 +97,7 @@ class SEs extends S {
   String get raidProgression => 'Progreso de Banda';
 
   @override
-  String get bestMythicRuns => 'Mejores Míticas+';
+  String get bestMythicRuns => 'Mejores runs de Mythic+';
 
   @override
   String get dungeon => 'Mazmorra';

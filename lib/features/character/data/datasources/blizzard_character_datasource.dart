@@ -13,6 +13,8 @@ class BlizzardCharacterDatasource {
 
   static const String _workerBaseUrl =
       'https://wow-recommendations.wow-comp-app.workers.dev';
+  static const String _characterSnapshotPath = '/v1/character/snapshot';
+  static const String _characterLegacyPath = '/character';
 
   BlizzardCharacterDatasource({Dio? dio})
     : _dio =
@@ -30,67 +32,131 @@ class BlizzardCharacterDatasource {
     required String name,
     bool force = false,
   }) async {
-    try {
-      final params = <String, String>{
-        'region': region.toLowerCase(),
-        'realm': realm.toLowerCase(),
-        'name': name.toLowerCase(),
-        if (force) 'force': '1',
-      };
+    final params = <String, String>{
+      'region': region.toLowerCase(),
+      'realm': realm.toLowerCase(),
+      'name': name.toLowerCase(),
+      if (force) 'force': '1',
+    };
 
+    final payload = await _fetchCharacterPayload(params);
+    return CharacterBlizzardData.fromJson(payload);
+  }
+
+  Future<Map<String, dynamic>> _fetchCharacterPayload(
+    Map<String, String> params,
+  ) async {
+    try {
       final response = await _dio.get(
-        '$_workerBaseUrl/character',
+        '$_workerBaseUrl$_characterSnapshotPath',
         queryParameters: params,
       );
-
-      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
-        return CharacterBlizzardData.fromJson(
-          response.data as Map<String, dynamic>,
-        );
+      return _extractCharacterPayload(response.data);
+    } on DioException catch (error) {
+      if (_shouldFallbackToLegacy(error)) {
+        try {
+          final legacyResponse = await _dio.get(
+            '$_workerBaseUrl$_characterLegacyPath',
+            queryParameters: params,
+          );
+          return _extractCharacterPayload(legacyResponse.data);
+        } on DioException catch (legacyError) {
+          _throwMappedException(legacyError);
+        }
       }
+      _throwMappedException(error);
+    }
+  }
 
+  Map<String, dynamic> _extractCharacterPayload(dynamic data) {
+    if (data is! Map) {
       throw const ServerException(message: 'Unexpected response from Worker');
-    } on DioException catch (e) {
-      final statusCode = e.response?.statusCode;
-      final workerErrorMessage = (e.response?.data is Map)
-          ? (e.response?.data as Map)['error'] as String?
-          : null;
+    }
 
-      if (statusCode == 400) {
-        throw ServerException(
-          message: workerErrorMessage ?? 'Invalid character query parameters.',
-          statusCode: 400,
-        );
-      }
+    final mapData = Map<String, dynamic>.from(data);
+    final snapshot = mapData['snapshot'];
+    if (snapshot is Map) {
+      return Map<String, dynamic>.from(snapshot);
+    }
+    return mapData;
+  }
 
-      if (statusCode == 404) {
-        final msg = (e.response?.data is Map)
-            ? (e.response?.data as Map)['error'] as String? ??
-                  'Character not found. Check region, realm and name.'
-            : 'Character not found. Check region, realm and name.';
-        throw NotFoundException(message: msg);
-      }
-      if (statusCode == 503) {
-        throw const ServerException(
-          message: 'Blizzard API not configured on Worker.',
-          statusCode: 503,
-        );
-      }
-      if (e.type == DioExceptionType.connectionTimeout ||
-          e.type == DioExceptionType.receiveTimeout) {
-        throw const NetworkException(
-          message: 'Request timed out. Check your connection.',
-        );
-      }
-      if (e.type == DioExceptionType.connectionError) {
-        throw const NetworkException();
+  bool _shouldFallbackToLegacy(DioException error) {
+    final statusCode = error.response?.statusCode;
+    if (statusCode != 404 && statusCode != 405 && statusCode != 501) {
+      return false;
+    }
+
+    final data = error.response?.data;
+    if (data is Map) {
+      final mapData = Map<String, dynamic>.from(data);
+      final endpoint = mapData['endpoint']?.toString();
+      final workerError =
+          mapData['error']?.toString().toLowerCase().trim() ?? '';
+
+      if (endpoint == _characterSnapshotPath) {
+        return false;
       }
 
+      if (workerError.contains('character not found') ||
+          workerError.contains('unknown region') ||
+          workerError.contains('missing required params')) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  Never _throwMappedException(DioException error) {
+    final statusCode = error.response?.statusCode;
+    final workerErrorMessage = _extractWorkerError(error.response?.data);
+
+    if (statusCode == 400) {
       throw ServerException(
-        message: e.message ?? 'Unknown Worker error',
-        statusCode: statusCode,
+        message: workerErrorMessage ?? 'Invalid character query parameters.',
+        statusCode: 400,
       );
     }
+
+    if (statusCode == 404) {
+      throw NotFoundException(
+        message:
+            workerErrorMessage ??
+            'Character not found. Check region, realm and name.',
+      );
+    }
+
+    if (statusCode == 503) {
+      throw ServerException(
+        message: workerErrorMessage ?? 'Blizzard API not configured on Worker.',
+        statusCode: 503,
+      );
+    }
+
+    if (error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout) {
+      throw const NetworkException(
+        message: 'Request timed out. Check your connection.',
+      );
+    }
+
+    if (error.type == DioExceptionType.connectionError) {
+      throw const NetworkException();
+    }
+
+    throw ServerException(
+      message: workerErrorMessage ?? error.message ?? 'Unknown Worker error',
+      statusCode: statusCode,
+    );
+  }
+
+  String? _extractWorkerError(dynamic data) {
+    if (data is! Map) return null;
+    final raw = data['error'];
+    if (raw is! String) return null;
+    final trimmed = raw.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 }
 

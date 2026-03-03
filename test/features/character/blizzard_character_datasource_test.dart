@@ -31,6 +31,26 @@ class _StaticResponseAdapter implements HttpClientAdapter {
   }
 }
 
+class _RouteAwareAdapter implements HttpClientAdapter {
+  final Future<ResponseBody> Function(RequestOptions options) responder;
+  final List<String> requestedPaths = <String>[];
+
+  _RouteAwareAdapter({required this.responder});
+
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    requestedPaths.add(options.path);
+    return responder(options);
+  }
+}
+
 void main() {
   group('CharacterBlizzardData equipment icon parsing', () {
     test('reads thumbnail_url', () {
@@ -117,6 +137,160 @@ void main() {
       expect(data.equipment, hasLength(1));
       expect(data.equipment.first.iconUrl, isNull);
     });
+  });
+
+  group('BlizzardCharacterDatasource v1 snapshot', () {
+    test('reads snapshot payload when Worker returns v1 envelope', () async {
+      final dio = Dio();
+      dio.httpClientAdapter = _StaticResponseAdapter(
+        statusCode: 200,
+        body: {
+          'version': 'v1',
+          'source': 'blizzard',
+          'generated_at': '2026-03-03T10:00:00Z',
+          'snapshot': {
+            'name': 'Apastar',
+            'realm': 'Sanguino',
+            'region': 'eu',
+            'class': 'Druid',
+            'race': 'Night Elf',
+            'level': 80,
+            'equipment': const [],
+          },
+        },
+      );
+
+      final datasource = BlizzardCharacterDatasource(dio: dio);
+      final result = await datasource.getCharacter(
+        region: 'eu',
+        realm: 'sanguino',
+        name: 'apastar',
+      );
+
+      expect(result.name, 'Apastar');
+      expect(result.realm, 'Sanguino');
+      expect(result.region, 'EU');
+      expect(result.characterClass, 'Druid');
+    });
+
+    test(
+      'falls back to legacy /character when v1 endpoint is unavailable',
+      () async {
+        final adapter = _RouteAwareAdapter(
+          responder: (options) async {
+            if (options.path.endsWith('/v1/character/snapshot')) {
+              return ResponseBody.fromString(
+                'Not Found',
+                404,
+                headers: {
+                  Headers.contentTypeHeader: ['text/plain'],
+                },
+              );
+            }
+
+            if (options.path.endsWith('/character')) {
+              return ResponseBody.fromString(
+                jsonEncode({
+                  'name': 'Apastar',
+                  'realm': 'Sanguino',
+                  'region': 'eu',
+                  'class': 'Druid',
+                  'race': 'Night Elf',
+                  'level': 80,
+                  'equipment': const [],
+                }),
+                200,
+                headers: {
+                  Headers.contentTypeHeader: [Headers.jsonContentType],
+                },
+              );
+            }
+
+            return ResponseBody.fromString(
+              jsonEncode({'error': 'Unexpected path: ${options.path}'}),
+              500,
+              headers: {
+                Headers.contentTypeHeader: [Headers.jsonContentType],
+              },
+            );
+          },
+        );
+
+        final dio = Dio()..httpClientAdapter = adapter;
+        final datasource = BlizzardCharacterDatasource(dio: dio);
+
+        final result = await datasource.getCharacter(
+          region: 'eu',
+          realm: 'sanguino',
+          name: 'apastar',
+        );
+
+        expect(result.name, 'Apastar');
+        expect(
+          adapter.requestedPaths
+              .where((p) => p.endsWith('/v1/character/snapshot'))
+              .length,
+          1,
+        );
+        expect(
+          adapter.requestedPaths.where((p) => p.endsWith('/character')).length,
+          1,
+        );
+      },
+    );
+
+    test(
+      'does not fallback when v1 returns character-not-found error',
+      () async {
+        final adapter = _RouteAwareAdapter(
+          responder: (options) async {
+            if (options.path.endsWith('/v1/character/snapshot')) {
+              return ResponseBody.fromString(
+                jsonEncode({
+                  'version': 'v1',
+                  'endpoint': '/v1/character/snapshot',
+                  'error': 'Character not found. Check region, realm and name.',
+                }),
+                404,
+                headers: {
+                  Headers.contentTypeHeader: [Headers.jsonContentType],
+                },
+              );
+            }
+
+            return ResponseBody.fromString(
+              jsonEncode({
+                'name': 'ShouldNotBeCalled',
+                'realm': 'Sanguino',
+                'region': 'eu',
+                'class': 'Druid',
+                'race': 'Night Elf',
+              }),
+              200,
+              headers: {
+                Headers.contentTypeHeader: [Headers.jsonContentType],
+              },
+            );
+          },
+        );
+
+        final dio = Dio()..httpClientAdapter = adapter;
+        final datasource = BlizzardCharacterDatasource(dio: dio);
+
+        expect(
+          () => datasource.getCharacter(
+            region: 'eu',
+            realm: 'sanguino',
+            name: 'missing',
+          ),
+          throwsA(isA<NotFoundException>()),
+        );
+        expect(
+          adapter.requestedPaths.where((p) => p.endsWith('/character')).length,
+          0,
+        );
+      },
+    );
   });
 
   group('BlizzardCharacterDatasource errors', () {
