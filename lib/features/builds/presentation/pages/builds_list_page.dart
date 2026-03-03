@@ -104,6 +104,7 @@ class _BuildCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = S.of(context)!;
+    final localeCode = Localizations.localeOf(context).languageCode;
     final hasClass = buildData.characterClass != null;
     final classColor = hasClass
         ? WowTheme.getClassColor(buildData.characterClass!)
@@ -173,7 +174,7 @@ class _BuildCard extends StatelessWidget {
                       ),
                     if (hasClass)
                       _InfoLine(
-                        text: _detailLine(),
+                        text: _detailLine(localeCode),
                         icon: Icons.person_outline,
                       ),
                     const SizedBox(height: 8),
@@ -232,13 +233,13 @@ class _BuildCard extends StatelessWidget {
     return [realm, region].where((s) => s.isNotEmpty).join(' · ');
   }
 
-  String _detailLine() {
+  String _detailLine(String localeCode) {
     final parts = <String>[
       if (buildData.characterRace != null)
-        WowTranslations.translateRace(buildData.characterRace!),
-      WowTranslations.translateClass(buildData.characterClass!),
+        WowTranslations.translateRace(buildData.characterRace!, localeCode),
+      WowTranslations.translateClass(buildData.characterClass!, localeCode),
       if (buildData.characterSpec != null)
-        WowTranslations.translateSpec(buildData.characterSpec!),
+        WowTranslations.translateSpec(buildData.characterSpec!, localeCode),
     ];
     return parts.join('  ·  ');
   }
@@ -329,10 +330,11 @@ class _ContentBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = S.of(context)!;
     final (label, color, icon) = switch (content) {
-      BuildContent.raid     => ('Raid', const Color(0xFFA335EE), Icons.shield_outlined),
+      BuildContent.raid     => (t.guideContentRaid, const Color(0xFFA335EE), Icons.shield_outlined),
       BuildContent.mythicPlus => ('M+', const Color(0xFF0070DD), Icons.timer_outlined),
-      BuildContent.both     => ('Raid · M+', WowTheme.primaryGold, Icons.auto_awesome_outlined),
+      BuildContent.both     => ('${t.guideContentRaid} · M+', WowTheme.primaryGold, Icons.auto_awesome_outlined),
     };
 
     return Container(

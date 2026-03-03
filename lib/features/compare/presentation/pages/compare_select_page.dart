@@ -176,7 +176,7 @@ class _CompareSelectPageState extends State<CompareSelectPage> {
               controller: realmCtrl,
               decoration: InputDecoration(
                 labelText: t.realm,
-                hintText: 'e.g. sanguino',
+                hintText: t.compareRealmExample,
                 border: const OutlineInputBorder(),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -190,7 +190,7 @@ class _CompareSelectPageState extends State<CompareSelectPage> {
               controller: nameCtrl,
               decoration: InputDecoration(
                 labelText: t.characterName,
-                hintText: 'e.g. iidrexii',
+                hintText: t.compareNameExample,
                 border: const OutlineInputBorder(),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,

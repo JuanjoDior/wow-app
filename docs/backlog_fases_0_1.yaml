@@ -1,0 +1,100 @@
+version: 1
+updated_at: "2026-03-03"
+project: "wow_companion"
+phases:
+  - id: "F0"
+    name: "Foundation"
+    duration_weeks: 1
+    goals:
+      - "Observabilidad y trazabilidad en Workers"
+      - "Contratos v1 estables para nuevos agregados"
+      - "Cache policy centralizada"
+      - "Feature flags para despliegue progresivo"
+      - "Governanza i18n ES/EN + glosario WoW"
+    tasks:
+      - id: "F0-01"
+        title: "Structured logging y health versionado"
+        owner: "backend"
+        dependencies: []
+        acceptance:
+          - "Logs con request_id, endpoint, status, latency_ms, cache_hit, source"
+          - "GET /health devuelve service_version"
+      - id: "F0-02"
+        title: "Definir contratos /v1"
+        owner: "backend"
+        dependencies: ["F0-01"]
+        acceptance:
+          - "Rutas: /v1/character/snapshot, /v1/build/gap-analysis, /v1/planner/weekly"
+          - "Tests de schema JSON en CI"
+      - id: "F0-03"
+        title: "TTL y keys KV unificadas"
+        owner: "backend"
+        dependencies: ["F0-02"]
+        acceptance:
+          - "Tabla TTL por tipo de dato"
+          - "Sin duplicacion de claves por formato"
+      - id: "F0-04"
+        title: "Feature flags por modulo"
+        owner: "backend+app"
+        dependencies: ["F0-02"]
+        acceptance:
+          - "Flags: build_intelligence, weekly_planner, economy_assistant"
+      - id: "F0-05"
+        title: "Reglas i18n + glosario de terminos bloqueados"
+        owner: "app"
+        dependencies: []
+        acceptance:
+          - "Glosario con terminos no traducibles (ej: iLvl, Mythic+)"
+          - "Check CI para textos hardcodeados"
+
+  - id: "F1"
+    name: "Build Intelligence"
+    duration_weeks: 2
+    goals:
+      - "Comparar build objetivo vs personaje real"
+      - "Priorizar acciones por impacto"
+      - "Mostrar recomendaciones accionables en Build Detail"
+    tasks:
+      - id: "F1-01"
+        title: "Endpoint /v1/character/snapshot"
+        owner: "backend"
+        dependencies: ["F0-02", "F0-03"]
+        data_sources:
+          - "Blizzard profile/equipment/stats/media"
+          - "Raider.IO score, runs, raid progression"
+        acceptance:
+          - "Una sola llamada agrega el estado completo del personaje"
+      - id: "F1-02"
+        title: "Endpoint /v1/build/gap-analysis"
+        owner: "backend"
+        dependencies: ["F1-01"]
+        acceptance:
+          - "Detecta faltantes por slot, enchant y gem"
+          - "Devuelve priority_score y next_best_actions"
+      - id: "F1-03"
+        title: "UI panel Build Intelligence"
+        owner: "app"
+        dependencies: ["F1-02"]
+        acceptance:
+          - "Resumen + Top 3 acciones en BuildDetailPage"
+          - "Compatible movil/desktop"
+          - "ES/EN correcto sin traducir terminos bloqueados"
+      - id: "F1-04"
+        title: "Tests de regresion fase 1"
+        owner: "backend+app"
+        dependencies: ["F1-03"]
+        acceptance:
+          - "Unit tests de scoring y normalizacion"
+          - "Widget tests de panel"
+          - "Cobertura >= 80% en modulos nuevos"
+
+kpis:
+  - name: "worker_p95_ms"
+    target: "< 800ms con cache hit"
+  - name: "cache_hit_ratio"
+    target: "> 0.70 en endpoints agregados"
+  - name: "http_429_rate"
+    target: "< 1%"
+  - name: "translation_regressions"
+    target: "0 por release"
+

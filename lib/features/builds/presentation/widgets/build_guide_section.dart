@@ -216,7 +216,7 @@ class _BuildGuideSectionState extends State<BuildGuideSection> {
   String _summaryLabel(BuildGuide g, S t) {
     final parts = <String>[];
     if (g.content != null) parts.add(_contentLabel(g.content!, t));
-    if (g.rotation.isNotEmpty) parts.add('${g.rotation.length} spells');
+    if (g.rotation.isNotEmpty) parts.add(t.guideSpellsCount(g.rotation.length));
     if (!g.consumables.isEmpty) parts.add(t.guideConsumables);
     return parts.join(' · ');
   }

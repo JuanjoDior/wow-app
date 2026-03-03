@@ -42,6 +42,12 @@ class SEs extends S {
   String get compare => 'Comparar';
 
   @override
+  String get compareRealmExample => 'ej: sanguino';
+
+  @override
+  String get compareNameExample => 'ej: iidrexii';
+
+  @override
   String get recentSearches => 'Búsquedas Recientes';
 
   @override
@@ -124,6 +130,37 @@ class SEs extends S {
   String get loadingGuide => 'Cargando guía...';
 
   @override
+  String unexpectedError(String error) {
+    return 'Error inesperado: $error';
+  }
+
+  @override
+  String get serverError => 'Algo salió mal en el servidor.';
+
+  @override
+  String get serverErrorSuggestion => 'Vuelve a intentarlo en unos segundos.';
+
+  @override
+  String get networkError => 'No se pudo conectar a internet.';
+
+  @override
+  String get networkErrorSuggestion =>
+      'Revisa tu conexión e inténtalo de nuevo.';
+
+  @override
+  String get cacheError => 'No se pudieron cargar datos en caché.';
+
+  @override
+  String get cacheErrorSuggestion => 'Prueba a recargar.';
+
+  @override
+  String get rateLimitError => 'Demasiadas solicitudes.';
+
+  @override
+  String get rateLimitErrorSuggestion =>
+      'Espera un momento e inténtalo de nuevo.';
+
+  @override
   String get characterNotFound =>
       'Personaje no encontrado. Revisa la región, reino y nombre.';
 
@@ -176,6 +213,69 @@ class SEs extends S {
 
   @override
   String get tips => 'Consejos';
+
+  @override
+  String get health => 'Salud';
+
+  @override
+  String get stamina => 'Aguante';
+
+  @override
+  String get strength => 'Fuerza';
+
+  @override
+  String get agility => 'Agilidad';
+
+  @override
+  String get intellect => 'Intelecto';
+
+  @override
+  String get criticalStrike => 'Golpe Crítico';
+
+  @override
+  String get haste => 'Celeridad';
+
+  @override
+  String get mastery => 'Maestría';
+
+  @override
+  String get versatility => 'Versatilidad';
+
+  @override
+  String get mana => 'Maná';
+
+  @override
+  String get energy => 'Energía';
+
+  @override
+  String get rage => 'Furia';
+
+  @override
+  String get runicPower => 'Poder Rúnico';
+
+  @override
+  String get focus => 'Concentración';
+
+  @override
+  String get maelstrom => 'Maelstrom';
+
+  @override
+  String get demonHunterFury => 'Furia del DH';
+
+  @override
+  String get pain => 'Dolor';
+
+  @override
+  String get essence => 'Esencia';
+
+  @override
+  String get astralPower => 'Poder Astral';
+
+  @override
+  String get externalRaiderIo => 'Raider.IO';
+
+  @override
+  String get externalWorldOfWarcraft => 'World of Warcraft';
 
   @override
   String lastUpdated(String date) {
@@ -255,6 +355,15 @@ class SEs extends S {
   String get buildsLinkCharacter => 'Vincular a personaje (opcional)';
 
   @override
+  String get buildsClassAndSpec => 'Clase y Spec';
+
+  @override
+  String get buildsSelectClass => 'Selecciona clase';
+
+  @override
+  String get buildsSelectSpec => 'Selecciona spec';
+
+  @override
   String get buildsCreate => 'Crear';
 
   @override
@@ -316,6 +425,9 @@ class SEs extends S {
 
   @override
   String get searchLoading => 'Buscando...';
+
+  @override
+  String get unknownItem => 'Objeto desconocido';
 
   @override
   String get tooltipItemLevel => 'Nivel de Objeto';
@@ -400,6 +512,11 @@ class SEs extends S {
 
   @override
   String get guideRotation => 'Rotación';
+
+  @override
+  String guideSpellsCount(int count) {
+    return '$count habilidades';
+  }
 
   @override
   String get guideRotationEmpty =>

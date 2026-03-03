@@ -98,12 +98,22 @@ class WowTranslations {
     'Vulpera': 'Vulpera',
   };
 
-  /// Translate a value using the given map. Returns original if no translation found.
-  static String translate(String value, Map<String, String> map) {
+  /// Traduce solo cuando el idioma activo es español.
+  /// En inglés y otros idiomas se deja el texto original.
+  static String _translateForLocale(
+    String value,
+    Map<String, String> map,
+    String languageCode,
+  ) {
+    final normalized = languageCode.toLowerCase();
+    if (normalized != 'es') return value;
     return map[value] ?? value;
   }
 
-  static String translateClass(String name) => translate(name, classes);
-  static String translateSpec(String name) => translate(name, specs);
-  static String translateRace(String name) => translate(name, races);
+  static String translateClass(String name, String languageCode) =>
+      _translateForLocale(name, classes, languageCode);
+  static String translateSpec(String name, String languageCode) =>
+      _translateForLocale(name, specs, languageCode);
+  static String translateRace(String name, String languageCode) =>
+      _translateForLocale(name, races, languageCode);
 }

@@ -104,12 +104,12 @@ class _BuildDetailView extends StatelessWidget {
           );
         }
         if (state is BuildDetailError) {
-          final t = S.of(context);
+          final t = S.of(context)!;
           return Scaffold(
-            appBar: AppBar(title: Text(t?.builds ?? 'Builds')),
+            appBar: AppBar(title: Text(t.builds)),
             body: Center(
               child: Text(
-                t?.buildNotFound ?? state.message,
+                t.buildNotFound,
                 style: const TextStyle(color: WowTheme.textSecondary),
               ),
             ),
@@ -155,14 +155,17 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
 
   Future<void> _loadImage() async {
     if (!mounted) return;
-    setState(() => _loadingImage = true);
+    setState(() {
+      _loadingImage = true;
+      _avatarUrl ??= widget.buildData.characterAvatarUrl;
+    });
     final cubit = context.read<BuildDetailCubit>();
     final render = await cubit.fetchCharacterRenderUrl();
     final avatar = await cubit.fetchCharacterAvatarUrl();
     if (mounted) {
       setState(() {
         _renderUrl = render;
-        _avatarUrl = avatar;
+        _avatarUrl = avatar ?? render ?? widget.buildData.characterAvatarUrl;
         _loadingImage = false;
       });
     }
@@ -189,7 +192,7 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
                 SliverToBoxAdapter(
                   child: _BuildCharacterHeader(
                     buildData: build,
-                    avatarUrl: _avatarUrl,
+                    avatarUrl: _avatarUrl ?? build.characterAvatarUrl,
                     loadingAvatar: _loadingImage,
                   ),
                 ),
@@ -275,6 +278,7 @@ class _BuildCharacterHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final localeCode = Localizations.localeOf(context).languageCode;
     final classColor = WowTheme.getClassColor(buildData.characterClass!);
 
     final displayParts = buildData.characterRefDisplay?.split(' - ') ?? [];
@@ -285,10 +289,10 @@ class _BuildCharacterHeader extends StatelessWidget {
 
     final detailParts = <String>[
       if (buildData.characterRace != null)
-        WowTranslations.translateRace(buildData.characterRace!),
-      WowTranslations.translateClass(buildData.characterClass!),
+        WowTranslations.translateRace(buildData.characterRace!, localeCode),
+      WowTranslations.translateClass(buildData.characterClass!, localeCode),
       if (buildData.characterSpec != null)
-        WowTranslations.translateSpec(buildData.characterSpec!),
+        WowTranslations.translateSpec(buildData.characterSpec!, localeCode),
     ];
 
     return Card(
@@ -478,51 +482,127 @@ class _PaperdollLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final maxW = constraints.maxWidth;
-        final available = maxW - 64 - 24;
-        final centerW = (available * 0.45).clamp(150.0, 240.0);
-        final sideW = ((available - centerW) / 2) * 0.65;
+        final cfg = _paperdollConfigForWidth(constraints.maxWidth);
 
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: cfg.outerHorizontalPadding),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(
-                width: sideW,
-                child: Column(
-                  children: _leftSlots
-                      .map(
-                        (s) => _SlotButton(wowSlot: s, align: SlotAlign.left),
-                      )
-                      .toList(),
+              Expanded(
+                flex: cfg.sideFlex,
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: cfg.sideMaxWidth),
+                    child: Column(
+                      children: _leftSlots
+                          .map(
+                            (s) =>
+                                _SlotButton(wowSlot: s, align: SlotAlign.left),
+                          )
+                          .toList(),
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: centerW,
-                child: _CharacterImage(
-                  renderUrl: renderUrl,
-                  loading: loadingImage,
-                  hasCharacter: hasCharacter,
+              SizedBox(width: cfg.gap),
+              Expanded(
+                flex: cfg.centerFlex,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: cfg.centerInnerHorizontalPadding,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minWidth: cfg.centerMinWidth,
+                      maxWidth: cfg.centerMaxWidth,
+                    ),
+                    child: _CharacterImage(
+                      renderUrl: renderUrl,
+                      loading: loadingImage,
+                      hasCharacter: hasCharacter,
+                      aspectRatio: cfg.centerAspectRatio,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: sideW,
-                child: Column(
-                  children: _rightSlots
-                      .map(
-                        (s) => _SlotButton(wowSlot: s, align: SlotAlign.right),
-                      )
-                      .toList(),
+              SizedBox(width: cfg.gap),
+              Expanded(
+                flex: cfg.sideFlex,
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: cfg.sideMaxWidth),
+                    child: Column(
+                      children: _rightSlots
+                          .map(
+                            (s) =>
+                                _SlotButton(wowSlot: s, align: SlotAlign.right),
+                          )
+                          .toList(),
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  _PaperdollResponsiveConfig _paperdollConfigForWidth(double width) {
+    if (width >= 1700) {
+      return const _PaperdollResponsiveConfig(
+        outerHorizontalPadding: 20,
+        sideFlex: 34,
+        centerFlex: 32,
+        gap: 28,
+        sideMaxWidth: 390,
+        centerMinWidth: 260,
+        centerMaxWidth: 380,
+        centerInnerHorizontalPadding: 10,
+        centerAspectRatio: 0.64,
+      );
+    }
+    if (width >= 1400) {
+      return const _PaperdollResponsiveConfig(
+        outerHorizontalPadding: 18,
+        sideFlex: 35,
+        centerFlex: 30,
+        gap: 24,
+        sideMaxWidth: 360,
+        centerMinWidth: 240,
+        centerMaxWidth: 340,
+        centerInnerHorizontalPadding: 8,
+        centerAspectRatio: 0.6,
+      );
+    }
+    if (width >= 1150) {
+      return const _PaperdollResponsiveConfig(
+        outerHorizontalPadding: 16,
+        sideFlex: 36,
+        centerFlex: 28,
+        gap: 20,
+        sideMaxWidth: 330,
+        centerMinWidth: 220,
+        centerMaxWidth: 310,
+        centerInnerHorizontalPadding: 6,
+        centerAspectRatio: 0.57,
+      );
+    }
+    return const _PaperdollResponsiveConfig(
+      outerHorizontalPadding: 12,
+      sideFlex: 37,
+      centerFlex: 26,
+      gap: 12,
+      sideMaxWidth: 285,
+      centerMinWidth: 190,
+      centerMaxWidth: 260,
+      centerInnerHorizontalPadding: 2,
+      centerAspectRatio: 0.53,
     );
   }
 }
@@ -582,11 +662,13 @@ class _CharacterImage extends StatelessWidget {
   final String? renderUrl;
   final bool loading;
   final bool hasCharacter;
+  final double aspectRatio;
 
   const _CharacterImage({
     required this.renderUrl,
     required this.loading,
     required this.hasCharacter,
+    required this.aspectRatio,
   });
 
   @override
@@ -601,18 +683,32 @@ class _CharacterImage extends StatelessWidget {
         ),
       );
     } else if (renderUrl != null) {
-      content = Image.network(
-        renderUrl!,
-        fit: BoxFit.cover,
+      final imageUrl = renderUrl!;
+      final avatarLike =
+          imageUrl.contains('avatar') && !imageUrl.contains('main-raw');
+      final zoom = avatarLike ? 1.48 : 1.2;
+
+      content = Align(
         alignment: Alignment.topCenter,
-        errorBuilder: (_, _, _) => _silhouette(),
+        child: Transform.scale(
+          scale: zoom,
+          alignment: Alignment.topCenter,
+          child: Image.network(
+            imageUrl,
+            width: double.infinity,
+            height: double.infinity,
+            fit: BoxFit.fitHeight,
+            alignment: Alignment.topCenter,
+            errorBuilder: (_, _, _) => _silhouette(),
+          ),
+        ),
       );
     } else {
       content = _silhouette();
     }
 
     return AspectRatio(
-      aspectRatio: 0.45,
+      aspectRatio: aspectRatio,
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -640,6 +736,30 @@ class _CharacterImage extends StatelessWidget {
       color: WowTheme.textSecondary.withValues(alpha: 0.3),
     ),
   );
+}
+
+class _PaperdollResponsiveConfig {
+  final double outerHorizontalPadding;
+  final int sideFlex;
+  final int centerFlex;
+  final double gap;
+  final double sideMaxWidth;
+  final double centerMinWidth;
+  final double centerMaxWidth;
+  final double centerInnerHorizontalPadding;
+  final double centerAspectRatio;
+
+  const _PaperdollResponsiveConfig({
+    required this.outerHorizontalPadding,
+    required this.sideFlex,
+    required this.centerFlex,
+    required this.gap,
+    required this.sideMaxWidth,
+    required this.centerMinWidth,
+    required this.centerMaxWidth,
+    required this.centerInnerHorizontalPadding,
+    required this.centerAspectRatio,
+  });
 }
 
 // ─── Slot button ──────────────────────────────────────────────────────────────

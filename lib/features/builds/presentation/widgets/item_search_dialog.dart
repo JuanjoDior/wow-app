@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:wow_companion/core/di/injection.dart';
+import 'package:wow_companion/core/l10n/failure_localizer.dart';
 import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
@@ -72,14 +73,20 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
 
       result.fold(
         (failure) {
-          if (mounted) setState(() => _error = failure.toString());
+          if (mounted) {
+            final t = S.of(context)!;
+            setState(() => _error = localizeFailureMessage(t, failure.message));
+          }
         },
         (items) {
           if (mounted) setState(() => _results = items);
         },
       );
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) {
+        final t = S.of(context)!;
+        setState(() => _error = t.unexpectedError('$e'));
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -42,6 +42,12 @@ class SEn extends S {
   String get compare => 'Compare';
 
   @override
+  String get compareRealmExample => 'e.g. sanguino';
+
+  @override
+  String get compareNameExample => 'e.g. iidrexii';
+
+  @override
   String get recentSearches => 'Recent Searches';
 
   @override
@@ -124,6 +130,35 @@ class SEn extends S {
   String get loadingGuide => 'Loading guide...';
 
   @override
+  String unexpectedError(String error) {
+    return 'Unexpected error: $error';
+  }
+
+  @override
+  String get serverError => 'Something went wrong on the server.';
+
+  @override
+  String get serverErrorSuggestion => 'Try again in a few seconds.';
+
+  @override
+  String get networkError => 'Could not connect to the internet.';
+
+  @override
+  String get networkErrorSuggestion => 'Check your connection and try again.';
+
+  @override
+  String get cacheError => 'Could not load cached data.';
+
+  @override
+  String get cacheErrorSuggestion => 'Try refreshing.';
+
+  @override
+  String get rateLimitError => 'Too many requests.';
+
+  @override
+  String get rateLimitErrorSuggestion => 'Wait a moment and try again.';
+
+  @override
   String get characterNotFound =>
       'Character not found. Check region, realm and name.';
 
@@ -176,6 +211,69 @@ class SEn extends S {
 
   @override
   String get tips => 'Tips';
+
+  @override
+  String get health => 'Health';
+
+  @override
+  String get stamina => 'Stamina';
+
+  @override
+  String get strength => 'Strength';
+
+  @override
+  String get agility => 'Agility';
+
+  @override
+  String get intellect => 'Intellect';
+
+  @override
+  String get criticalStrike => 'Critical Strike';
+
+  @override
+  String get haste => 'Haste';
+
+  @override
+  String get mastery => 'Mastery';
+
+  @override
+  String get versatility => 'Versatility';
+
+  @override
+  String get mana => 'Mana';
+
+  @override
+  String get energy => 'Energy';
+
+  @override
+  String get rage => 'Rage';
+
+  @override
+  String get runicPower => 'Runic Power';
+
+  @override
+  String get focus => 'Focus';
+
+  @override
+  String get maelstrom => 'Maelstrom';
+
+  @override
+  String get demonHunterFury => 'Demon Hunter Fury';
+
+  @override
+  String get pain => 'Pain';
+
+  @override
+  String get essence => 'Essence';
+
+  @override
+  String get astralPower => 'Astral Power';
+
+  @override
+  String get externalRaiderIo => 'Raider.IO';
+
+  @override
+  String get externalWorldOfWarcraft => 'World of Warcraft';
 
   @override
   String lastUpdated(String date) {
@@ -255,6 +353,15 @@ class SEn extends S {
   String get buildsLinkCharacter => 'Link to character (optional)';
 
   @override
+  String get buildsClassAndSpec => 'Class & Spec';
+
+  @override
+  String get buildsSelectClass => 'Select class';
+
+  @override
+  String get buildsSelectSpec => 'Select spec';
+
+  @override
   String get buildsCreate => 'Create';
 
   @override
@@ -316,6 +423,9 @@ class SEn extends S {
 
   @override
   String get searchLoading => 'Searching...';
+
+  @override
+  String get unknownItem => 'Unknown Item';
 
   @override
   String get tooltipItemLevel => 'Item Level';
@@ -400,6 +510,11 @@ class SEn extends S {
 
   @override
   String get guideRotation => 'Rotation';
+
+  @override
+  String guideSpellsCount(int count) {
+    return '$count spells';
+  }
 
   @override
   String get guideRotationEmpty =>

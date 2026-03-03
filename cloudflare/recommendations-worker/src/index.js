@@ -24,6 +24,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, X-Invalidate-Secret',
+  'Access-Control-Expose-Headers': 'X-Request-Id',
 };
 
 // ─── Blizzard API base URLs ───────────────────────────────────────────────────
@@ -626,29 +627,57 @@ const STATIC_DATA = {
 
 export default {
   async fetch(request, env) {
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: CORS_HEADERS });
-    }
-
+    const startedAt = Date.now();
+    const requestId = buildRequestId(request);
     const url = new URL(request.url);
+    let response;
+    let status = 500;
+    let source = null;
+    let cacheHit = null;
 
-    if (url.pathname === '/health') {
-      return json({ status: 'ok', patch: env.CURRENT_PATCH, specs: SUPPORTED_SPECS.length });
-    }
-    if (url.pathname === '/recommendations' && request.method === 'GET') {
-      return handleRecommendations(url, env);
-    }
-    if (url.pathname === '/character' && request.method === 'GET') {
-      return handleCharacter(url, env);
-    }
-    if (url.pathname === '/invalidate' && request.method === 'POST') {
-      return handleInvalidate(request, env);
-    }
-    if (url.pathname === '/specs' && request.method === 'GET') {
-      return handleSpecs(url, env);
+    try {
+      if (request.method === 'OPTIONS') {
+        response = new Response(null, { headers: CORS_HEADERS });
+      } else if (url.pathname === '/health') {
+        response = json({
+          status: 'ok',
+          patch: env.CURRENT_PATCH,
+          specs: SUPPORTED_SPECS.length,
+          service_version: env.SERVICE_VERSION || 'v5',
+        });
+      } else if (url.pathname === '/recommendations' && request.method === 'GET') {
+        response = await handleRecommendations(url, env);
+      } else if (url.pathname === '/character' && request.method === 'GET') {
+        response = await handleCharacter(url, env);
+      } else if (url.pathname === '/invalidate' && request.method === 'POST') {
+        response = await handleInvalidate(request, env);
+      } else if (url.pathname === '/specs' && request.method === 'GET') {
+        response = await handleSpecs(url, env);
+      } else {
+        response = new Response('Not Found', { status: 404, headers: CORS_HEADERS });
+      }
+
+      status = response.status;
+      ({ source, cacheHit } = await inferResponseSource(response));
+    } catch (error) {
+      source = 'error';
+      cacheHit = false;
+      response = json({ error: 'Internal server error', request_id: requestId }, 500);
+      status = 500;
+      logWorkerError({ requestId, endpoint: url.pathname, method: request.method, error });
     }
 
-    return new Response('Not Found', { status: 404, headers: CORS_HEADERS });
+    response.headers.set('X-Request-Id', requestId);
+    logRequestTelemetry({
+      requestId,
+      endpoint: url.pathname,
+      method: request.method,
+      status,
+      latencyMs: Date.now() - startedAt,
+      source,
+      cacheHit,
+    });
+    return response;
   },
 };
 
@@ -1428,4 +1457,66 @@ function json(data, status = 200) {
     status,
     headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   });
+}
+
+function buildRequestId(request) {
+  const cfRay = request.headers.get('cf-ray');
+  if (cfRay && cfRay.trim()) return cfRay;
+  if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function inferResponseSource(response) {
+  const contentType = response.headers.get('Content-Type') || '';
+  if (!contentType.includes('application/json')) {
+    return { source: null, cacheHit: null };
+  }
+
+  try {
+    const payload = await response.clone().json();
+    const source = payload?._source ?? payload?.source ?? null;
+    if (source === 'cache') {
+      return { source, cacheHit: true };
+    }
+    if (source === 'static' || source === 'blizzard') {
+      return { source, cacheHit: false };
+    }
+    return { source, cacheHit: null };
+  } catch {
+    return { source: null, cacheHit: null };
+  }
+}
+
+function logRequestTelemetry({
+  requestId,
+  endpoint,
+  method,
+  status,
+  latencyMs,
+  source,
+  cacheHit,
+}) {
+  console.log(JSON.stringify({
+    event: 'request_summary',
+    request_id: requestId,
+    endpoint,
+    method,
+    status,
+    latency_ms: latencyMs,
+    source,
+    cache_hit: cacheHit,
+    timestamp: new Date().toISOString(),
+  }));
+}
+
+function logWorkerError({ requestId, endpoint, method, error }) {
+  console.error(JSON.stringify({
+    event: 'request_error',
+    request_id: requestId,
+    endpoint,
+    method,
+    error_message: error?.message || 'Unknown error',
+    error_stack: error?.stack || null,
+    timestamp: new Date().toISOString(),
+  }));
 }

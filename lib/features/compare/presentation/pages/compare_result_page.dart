@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:wow_companion/core/di/injection.dart';
+import 'package:wow_companion/core/l10n/failure_localizer.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/character/domain/entities/character.dart';
 import 'package:wow_companion/features/character/domain/repositories/character_repository.dart';
@@ -61,30 +62,38 @@ class _CompareResultPageState extends State<CompareResultPage> {
 
       Character? c1;
       Character? c2;
-      String? err;
+      String? err1;
+      String? err2;
 
       results[0].fold(
-        (f) => err = '${S.of(context)!.character1}: ${f.message}',
+        (f) => err1 = f.message,
         (c) => c1 = c,
       );
       results[1].fold(
-        (f) => err =
-            '${err != null ? "$err\n" : ""}${S.of(context)!.character2}: ${f.message}',
+        (f) => err2 = f.message,
         (c) => c2 = c,
       );
 
       if (mounted) {
+        final t = S.of(context)!;
+        final errors = <String>[
+          if (err1 != null)
+            '${t.character1}: ${localizeFailureMessage(t, err1!)}',
+          if (err2 != null)
+            '${t.character2}: ${localizeFailureMessage(t, err2!)}',
+        ];
         setState(() {
           _char1 = c1;
           _char2 = c2;
-          _error = err;
+          _error = errors.isEmpty ? null : errors.join('\n');
           _loading = false;
         });
       }
     } catch (e) {
       if (mounted) {
+        final t = S.of(context)!;
         setState(() {
-          _error = 'Unexpected error: $e';
+          _error = t.unexpectedError('$e');
           _loading = false;
         });
       }
@@ -160,6 +169,7 @@ class _CompareResultPageState extends State<CompareResultPage> {
   }
 
   Widget _buildCharHeader(Character c, Color accentColor) {
+    final localeCode = Localizations.localeOf(context).languageCode;
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -189,7 +199,7 @@ class _CompareResultPageState extends State<CompareResultPage> {
               textAlign: TextAlign.center,
             ),
             Text(
-              '${WowTranslations.translateSpec(c.specialization ?? c.characterClass)} · ${WowTranslations.translateRace(c.race)}',
+              '${WowTranslations.translateSpec(c.specialization ?? c.characterClass, localeCode)} · ${WowTranslations.translateRace(c.race, localeCode)}',
               style: const TextStyle(
                 color: WowTheme.textSecondary,
                 fontSize: 11,
@@ -226,7 +236,7 @@ class _CompareResultPageState extends State<CompareResultPage> {
                 c2.mythicPlusProfile != null) ...[
               const Divider(height: 20, color: WowTheme.border),
               _buildCompareRow(
-                'M+ DPS',
+                'M+ ${t.dps}',
                 c1.mythicPlusProfile?.scoreDps,
                 c2.mythicPlusProfile?.scoreDps,
                 higherIsBetter: true,
@@ -466,7 +476,7 @@ class _CompareResultPageState extends State<CompareResultPage> {
               final item2 = c2.equipment
                   .where((e) => e.slot == slot)
                   .firstOrNull;
-              return _buildEquipRow(slot, item1, item2);
+              return _buildEquipRow(context, slot, item1, item2);
             }),
           ],
         ),
@@ -474,7 +484,12 @@ class _CompareResultPageState extends State<CompareResultPage> {
     );
   }
 
-  Widget _buildEquipRow(String slot, EquippedItem? item1, EquippedItem? item2) {
+  Widget _buildEquipRow(
+    BuildContext context,
+    String slot,
+    EquippedItem? item1,
+    EquippedItem? item2,
+  ) {
     final ilvl1 = item1?.itemLevel ?? 0;
     final ilvl2 = item2?.itemLevel ?? 0;
 
@@ -489,14 +504,7 @@ class _CompareResultPageState extends State<CompareResultPage> {
           : const Color(0xFFFF4444);
     }
 
-    String slotLabel = slot
-        .replaceAll('_', ' ')
-        .split(' ')
-        .map(
-          (w) =>
-              w.isEmpty ? w : w[0].toUpperCase() + w.substring(1).toLowerCase(),
-        )
-        .join(' ');
+    final slotLabel = _slotLabel(context, slot);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -557,5 +565,28 @@ class _CompareResultPageState extends State<CompareResultPage> {
         ],
       ),
     );
+  }
+
+  String _slotLabel(BuildContext context, String slot) {
+    final t = S.of(context)!;
+    return switch (slot) {
+      'HEAD' => t.wowSlotHead,
+      'NECK' => t.wowSlotNeck,
+      'SHOULDER' => t.wowSlotShoulder,
+      'BACK' => t.wowSlotBack,
+      'CHEST' => t.wowSlotChest,
+      'WRIST' => t.wowSlotWrist,
+      'HANDS' => t.wowSlotHands,
+      'WAIST' => t.wowSlotWaist,
+      'LEGS' => t.wowSlotLegs,
+      'FEET' => t.wowSlotFeet,
+      'FINGER_1' => t.wowSlotFinger1,
+      'FINGER_2' => t.wowSlotFinger2,
+      'TRINKET_1' => t.wowSlotTrinket1,
+      'TRINKET_2' => t.wowSlotTrinket2,
+      'MAIN_HAND' => t.wowSlotMainHand,
+      'OFF_HAND' => t.wowSlotOffHand,
+      _ => slot,
+    };
   }
 }

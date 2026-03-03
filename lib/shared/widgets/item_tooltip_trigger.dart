@@ -52,7 +52,7 @@ class ItemTooltipDisplayData {
     final name = _bestText(
       equippedItem?.name,
       itemDetail?.name,
-      fallback: 'Unknown Item',
+      fallback: '',
       disallowUnknown: true,
     );
 
@@ -227,7 +227,7 @@ class ItemTooltipOverlayCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        data.name,
+                        data.name.isEmpty ? t.unknownItem : data.name,
                         style: TextStyle(
                           color: qualityColor,
                           fontSize: 15,

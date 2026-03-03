@@ -1,20 +1,20 @@
 import 'package:wow_companion/features/character/domain/entities/character.dart';
 
 class PrimaryStatDisplay {
-  final String label;
+  final String statKey;
   final int value;
 
-  const PrimaryStatDisplay({required this.label, required this.value});
+  const PrimaryStatDisplay({required this.statKey, required this.value});
 }
 
 PrimaryStatDisplay determinePrimaryStatDisplay(CharacterStats stats) {
   final candidates = <PrimaryStatDisplay>[
     if ((stats.strength ?? 0) > 0)
-      PrimaryStatDisplay(label: 'Fuerza', value: stats.strength!),
+      PrimaryStatDisplay(statKey: 'strength', value: stats.strength!),
     if ((stats.agility ?? 0) > 0)
-      PrimaryStatDisplay(label: 'Agilidad', value: stats.agility!),
+      PrimaryStatDisplay(statKey: 'agility', value: stats.agility!),
     if ((stats.intellect ?? 0) > 0)
-      PrimaryStatDisplay(label: 'Intelecto', value: stats.intellect!),
+      PrimaryStatDisplay(statKey: 'intellect', value: stats.intellect!),
   ];
 
   if (candidates.isNotEmpty) {
@@ -22,14 +22,14 @@ PrimaryStatDisplay determinePrimaryStatDisplay(CharacterStats stats) {
   }
 
   if (stats.agility != null) {
-    return PrimaryStatDisplay(label: 'Agilidad', value: stats.agility!);
+    return PrimaryStatDisplay(statKey: 'agility', value: stats.agility!);
   }
   if (stats.intellect != null) {
-    return PrimaryStatDisplay(label: 'Intelecto', value: stats.intellect!);
+    return PrimaryStatDisplay(statKey: 'intellect', value: stats.intellect!);
   }
   if (stats.strength != null) {
-    return PrimaryStatDisplay(label: 'Fuerza', value: stats.strength!);
+    return PrimaryStatDisplay(statKey: 'strength', value: stats.strength!);
   }
 
-  return const PrimaryStatDisplay(label: 'Fuerza', value: 0);
+  return const PrimaryStatDisplay(statKey: 'strength', value: 0);
 }

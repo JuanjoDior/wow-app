@@ -9,7 +9,7 @@ void main() {
 
       final result = determinePrimaryStatDisplay(stats);
 
-      expect(result.label, 'Agilidad');
+      expect(result.statKey, 'agility');
       expect(result.value, 429);
     });
 
@@ -22,7 +22,7 @@ void main() {
 
       final result = determinePrimaryStatDisplay(stats);
 
-      expect(result.label, 'Fuerza');
+      expect(result.statKey, 'strength');
       expect(result.value, 74500);
     });
 
@@ -31,7 +31,7 @@ void main() {
 
       final result = determinePrimaryStatDisplay(stats);
 
-      expect(result.label, 'Intelecto');
+      expect(result.statKey, 'intellect');
       expect(result.value, 12000);
     });
   });

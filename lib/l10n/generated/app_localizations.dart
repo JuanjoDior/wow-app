@@ -163,6 +163,18 @@ abstract class S {
   /// **'Compare'**
   String get compare;
 
+  /// No description provided for @compareRealmExample.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. sanguino'**
+  String get compareRealmExample;
+
+  /// No description provided for @compareNameExample.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. iidrexii'**
+  String get compareNameExample;
+
   /// No description provided for @recentSearches.
   ///
   /// In en, this message translates to:
@@ -319,6 +331,60 @@ abstract class S {
   /// **'Loading guide...'**
   String get loadingGuide;
 
+  /// No description provided for @unexpectedError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unexpected error: {error}'**
+  String unexpectedError(String error);
+
+  /// No description provided for @serverError.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong on the server.'**
+  String get serverError;
+
+  /// No description provided for @serverErrorSuggestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again in a few seconds.'**
+  String get serverErrorSuggestion;
+
+  /// No description provided for @networkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not connect to the internet.'**
+  String get networkError;
+
+  /// No description provided for @networkErrorSuggestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Check your connection and try again.'**
+  String get networkErrorSuggestion;
+
+  /// No description provided for @cacheError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load cached data.'**
+  String get cacheError;
+
+  /// No description provided for @cacheErrorSuggestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Try refreshing.'**
+  String get cacheErrorSuggestion;
+
+  /// No description provided for @rateLimitError.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many requests.'**
+  String get rateLimitError;
+
+  /// No description provided for @rateLimitErrorSuggestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait a moment and try again.'**
+  String get rateLimitErrorSuggestion;
+
   /// No description provided for @characterNotFound.
   ///
   /// In en, this message translates to:
@@ -420,6 +486,132 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Tips'**
   String get tips;
+
+  /// No description provided for @health.
+  ///
+  /// In en, this message translates to:
+  /// **'Health'**
+  String get health;
+
+  /// No description provided for @stamina.
+  ///
+  /// In en, this message translates to:
+  /// **'Stamina'**
+  String get stamina;
+
+  /// No description provided for @strength.
+  ///
+  /// In en, this message translates to:
+  /// **'Strength'**
+  String get strength;
+
+  /// No description provided for @agility.
+  ///
+  /// In en, this message translates to:
+  /// **'Agility'**
+  String get agility;
+
+  /// No description provided for @intellect.
+  ///
+  /// In en, this message translates to:
+  /// **'Intellect'**
+  String get intellect;
+
+  /// No description provided for @criticalStrike.
+  ///
+  /// In en, this message translates to:
+  /// **'Critical Strike'**
+  String get criticalStrike;
+
+  /// No description provided for @haste.
+  ///
+  /// In en, this message translates to:
+  /// **'Haste'**
+  String get haste;
+
+  /// No description provided for @mastery.
+  ///
+  /// In en, this message translates to:
+  /// **'Mastery'**
+  String get mastery;
+
+  /// No description provided for @versatility.
+  ///
+  /// In en, this message translates to:
+  /// **'Versatility'**
+  String get versatility;
+
+  /// No description provided for @mana.
+  ///
+  /// In en, this message translates to:
+  /// **'Mana'**
+  String get mana;
+
+  /// No description provided for @energy.
+  ///
+  /// In en, this message translates to:
+  /// **'Energy'**
+  String get energy;
+
+  /// No description provided for @rage.
+  ///
+  /// In en, this message translates to:
+  /// **'Rage'**
+  String get rage;
+
+  /// No description provided for @runicPower.
+  ///
+  /// In en, this message translates to:
+  /// **'Runic Power'**
+  String get runicPower;
+
+  /// No description provided for @focus.
+  ///
+  /// In en, this message translates to:
+  /// **'Focus'**
+  String get focus;
+
+  /// No description provided for @maelstrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Maelstrom'**
+  String get maelstrom;
+
+  /// No description provided for @demonHunterFury.
+  ///
+  /// In en, this message translates to:
+  /// **'Demon Hunter Fury'**
+  String get demonHunterFury;
+
+  /// No description provided for @pain.
+  ///
+  /// In en, this message translates to:
+  /// **'Pain'**
+  String get pain;
+
+  /// No description provided for @essence.
+  ///
+  /// In en, this message translates to:
+  /// **'Essence'**
+  String get essence;
+
+  /// No description provided for @astralPower.
+  ///
+  /// In en, this message translates to:
+  /// **'Astral Power'**
+  String get astralPower;
+
+  /// No description provided for @externalRaiderIo.
+  ///
+  /// In en, this message translates to:
+  /// **'Raider.IO'**
+  String get externalRaiderIo;
+
+  /// No description provided for @externalWorldOfWarcraft.
+  ///
+  /// In en, this message translates to:
+  /// **'World of Warcraft'**
+  String get externalWorldOfWarcraft;
 
   /// No description provided for @lastUpdated.
   ///
@@ -571,6 +763,24 @@ abstract class S {
   /// **'Link to character (optional)'**
   String get buildsLinkCharacter;
 
+  /// No description provided for @buildsClassAndSpec.
+  ///
+  /// In en, this message translates to:
+  /// **'Class & Spec'**
+  String get buildsClassAndSpec;
+
+  /// No description provided for @buildsSelectClass.
+  ///
+  /// In en, this message translates to:
+  /// **'Select class'**
+  String get buildsSelectClass;
+
+  /// No description provided for @buildsSelectSpec.
+  ///
+  /// In en, this message translates to:
+  /// **'Select spec'**
+  String get buildsSelectSpec;
+
   /// No description provided for @buildsCreate.
   ///
   /// In en, this message translates to:
@@ -684,6 +894,12 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Searching...'**
   String get searchLoading;
+
+  /// No description provided for @unknownItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown Item'**
+  String get unknownItem;
 
   /// No description provided for @tooltipItemLevel.
   ///
@@ -852,6 +1068,12 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Rotation'**
   String get guideRotation;
+
+  /// No description provided for @guideSpellsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} spells'**
+  String guideSpellsCount(int count);
 
   /// No description provided for @guideRotationEmpty.
   ///

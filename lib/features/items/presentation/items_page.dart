@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:wow_companion/core/di/injection.dart';
+import 'package:wow_companion/core/l10n/failure_localizer.dart';
 import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
@@ -127,7 +128,9 @@ class _ItemsViewState extends State<_ItemsView> {
                   );
                 }
                 if (state is ItemsEmpty) return _buildEmpty(context);
-                if (state is ItemsError) return _buildError(state.message);
+                if (state is ItemsError) {
+                  return _buildError(context, state.message);
+                }
                 if (state is ItemsLoaded) return _buildList(state.items);
                 return const SizedBox.shrink();
               },
@@ -174,7 +177,9 @@ class _ItemsViewState extends State<_ItemsView> {
     );
   }
 
-  Widget _buildError(String message) => Center(
+  Widget _buildError(BuildContext context, String message) {
+    final t = S.of(context)!;
+    return Center(
     child: Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -183,7 +188,7 @@ class _ItemsViewState extends State<_ItemsView> {
           const Icon(Icons.error_outline, size: 56, color: WowTheme.accentRed),
           const SizedBox(height: 12),
           Text(
-            message,
+            localizeFailureMessage(t, message),
             textAlign: TextAlign.center,
             style: const TextStyle(color: WowTheme.textSecondary),
           ),
@@ -191,6 +196,7 @@ class _ItemsViewState extends State<_ItemsView> {
       ),
     ),
   );
+  }
 
   Widget _buildList(List<Item> items) => ListView.builder(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),

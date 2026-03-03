@@ -8,6 +8,7 @@ id = "bf433eaa4bf948da9b555646f5b287d8"
 
 [vars]
 CURRENT_PATCH = "12.0.1"
+SERVICE_VERSION = "5.1.0"
 CACHE_TTL_SECONDS = "604800"
 # Blizzard API — client_id es público, va aquí. El secret va como wrangler secret.
 BLIZZARD_CLIENT_ID = "078c6007e3954e70be67706d98cb818d"

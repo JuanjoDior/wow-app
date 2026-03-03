@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wow_companion/core/di/injection.dart';
+import 'package:wow_companion/core/l10n/failure_localizer.dart';
 import 'package:wow_companion/core/l10n/wow_translations.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/core/wow/character_search_input.dart';
@@ -123,13 +124,14 @@ class _CharacterPageState extends State<CharacterPage> {
   }
 
   Widget _buildBody(CharacterState state) {
+    final t = S.of(context)!;
     if (state is CharacterLoading) {
-      return WowLoadingWidget(message: S.of(context)!.loadingCharacter);
+      return WowLoadingWidget(message: t.loadingCharacter);
     }
     if (state is CharacterError) {
       return WowErrorWidget(
-        message: state.message,
-        suggestion: state.suggestion,
+        message: localizeFailureMessage(t, state.message),
+        suggestion: localizeFailureSuggestion(t, state.suggestion),
         onRetry: () => _cubit.fetchCharacter(
           region: widget.region,
           realm: widget.realm,
@@ -164,6 +166,8 @@ class _CharacterPageState extends State<CharacterPage> {
   }
 
   Widget _buildCharacterInfo(Character char) {
+    final t = S.of(context)!;
+    final localeCode = Localizations.localeOf(context).languageCode;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -191,11 +195,17 @@ class _CharacterPageState extends State<CharacterPage> {
                   const SizedBox(height: 4),
                   Text(
                     [
-                      (S.of(context)!.level(char.level)),
-                      WowTranslations.translateRace(char.race),
-                      WowTranslations.translateClass(char.characterClass),
+                      t.level(char.level),
+                      WowTranslations.translateRace(char.race, localeCode),
+                      WowTranslations.translateClass(
+                        char.characterClass,
+                        localeCode,
+                      ),
                       if (char.specialization != null)
-                        WowTranslations.translateSpec(char.specialization!),
+                        WowTranslations.translateSpec(
+                          char.specialization!,
+                          localeCode,
+                        ),
                       if (char.guild != null) '< ${char.guild} >',
                     ].join('  ·  '),
                     style: const TextStyle(
@@ -213,14 +223,14 @@ class _CharacterPageState extends State<CharacterPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _ExternalProfileButton(
-                      tooltip: 'Raider.IO',
+                      tooltip: t.externalRaiderIo,
                       icon: Icons.auto_graph_rounded,
                       onTap: () =>
                           _openExternalProfile(_buildRaiderIoUrl(char)),
                     ),
                     const SizedBox(width: 8),
                     _ExternalProfileButton(
-                      tooltip: 'World of Warcraft',
+                      tooltip: t.externalWorldOfWarcraft,
                       icon: Icons.public,
                       onTap: () =>
                           _openExternalProfile(_buildWowProfileUrl(char)),
@@ -240,7 +250,7 @@ class _CharacterPageState extends State<CharacterPage> {
                         ),
                       ),
                       Text(
-                        S.of(context)!.ilvl,
+                        t.ilvl,
                         style: const TextStyle(
                           color: WowTheme.textSecondary,
                           fontSize: 12,
@@ -565,6 +575,7 @@ class _CharacterPageState extends State<CharacterPage> {
   }
 
   Widget _buildStatsPanel(CharacterStats stats) {
+    final t = S.of(context)!;
     // Stat primaria real: la mayor entre Fuerza/Agilidad/Intelecto.
     final primary = determinePrimaryStatDisplay(stats);
 
@@ -585,7 +596,7 @@ class _CharacterPageState extends State<CharacterPage> {
                         child: _StatTile(
                           icon: Icons.favorite,
                           iconColor: const Color(0xFF2ECC71),
-                          label: 'Salud',
+                          label: t.health,
                           value: _formatLargeNumber(stats.health!),
                         ),
                       ),
@@ -595,7 +606,7 @@ class _CharacterPageState extends State<CharacterPage> {
                         child: _StatTile(
                           icon: Icons.water_drop,
                           iconColor: const Color(0xFF3498DB),
-                          label: _powerLabel(stats.powerType),
+                          label: _powerLabel(stats.powerType, t),
                           value: _formatLargeNumber(stats.mana!),
                         ),
                       ),
@@ -611,7 +622,7 @@ class _CharacterPageState extends State<CharacterPage> {
                   child: _StatTile(
                     icon: Icons.local_fire_department,
                     iconColor: WowTheme.primaryGold,
-                    label: primary.label,
+                    label: _localizedPrimaryLabel(primary.statKey, t),
                     value: primary.value.toString(),
                   ),
                 ),
@@ -621,7 +632,7 @@ class _CharacterPageState extends State<CharacterPage> {
                     child: _StatTile(
                       icon: Icons.shield_outlined,
                       iconColor: const Color(0xFFF39C12),
-                      label: 'Aguante',
+                      label: t.stamina,
                       value: stats.stamina!.toString(),
                     ),
                   ),
@@ -644,25 +655,25 @@ class _CharacterPageState extends State<CharacterPage> {
                 children: [
                   if (stats.criticalStrike != null)
                     _SecondaryStatChip(
-                      label: 'Golpe Crítico',
+                      label: t.criticalStrike,
                       value: stats.criticalStrike!,
                       color: const Color(0xFFE74C3C),
                     ),
                   if (stats.haste != null)
                     _SecondaryStatChip(
-                      label: 'Celeridad',
+                      label: t.haste,
                       value: stats.haste!,
                       color: const Color(0xFF27AE60),
                     ),
                   if (stats.mastery != null)
                     _SecondaryStatChip(
-                      label: 'Maestría',
+                      label: t.mastery,
                       value: stats.mastery!,
                       color: const Color(0xFF9B59B6),
                     ),
                   if (stats.versatility != null)
                     _SecondaryStatChip(
-                      label: 'Versatilidad',
+                      label: t.versatility,
                       value: stats.versatility!,
                       color: const Color(0xFF2980B9),
                     ),
@@ -681,18 +692,27 @@ class _CharacterPageState extends State<CharacterPage> {
     return n.toString();
   }
 
-  String _powerLabel(String? powerType) {
+  String _powerLabel(String? powerType, S t) {
     return switch (powerType?.toUpperCase()) {
-      'ENERGY' => 'Energía',
-      'RAGE' => 'Furia',
-      'RUNIC_POWER' => 'Poder Rúnico',
-      'FOCUS' => 'Concentración',
-      'MAELSTROM' => 'Maelstrom',
-      'FURY' => 'Furia del DH',
-      'PAIN' => 'Dolor',
-      'ESSENCE' => 'Esencia',
-      'ASTRAL_POWER' => 'Poder Astral',
-      _ => 'Maná',
+      'ENERGY' => t.energy,
+      'RAGE' => t.rage,
+      'RUNIC_POWER' => t.runicPower,
+      'FOCUS' => t.focus,
+      'MAELSTROM' => t.maelstrom,
+      'FURY' => t.demonHunterFury,
+      'PAIN' => t.pain,
+      'ESSENCE' => t.essence,
+      'ASTRAL_POWER' => t.astralPower,
+      _ => t.mana,
+    };
+  }
+
+  String _localizedPrimaryLabel(String statKey, S t) {
+    return switch (statKey.toLowerCase()) {
+      'strength' => t.strength,
+      'agility' => t.agility,
+      'intellect' => t.intellect,
+      _ => t.strength,
     };
   }
 
@@ -815,9 +835,10 @@ class _CharacterPageState extends State<CharacterPage> {
   }
 
   Widget _buildRoleScores(MythicPlusProfile profile) {
+    final t = S.of(context)!;
     final roles = <MapEntry<String, double>>[];
     if (profile.scoreDps > 0) {
-      roles.add(MapEntry('DPS', profile.scoreDps));
+      roles.add(MapEntry(t.dps, profile.scoreDps));
     }
     if (profile.scoreHealer > 0) {
       roles.add(MapEntry(S.of(context)!.healer, profile.scoreHealer));

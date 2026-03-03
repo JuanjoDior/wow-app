@@ -43,7 +43,7 @@ class _MainAppState extends State<MainApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'WoW Companion',
+      onGenerateTitle: (context) => S.of(context)?.appTitle ?? 'WoW Companion',
       debugShowCheckedModeBanner: false,
       theme: WowTheme.darkTheme,
       routerConfig: appRouter,

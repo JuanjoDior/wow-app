@@ -181,17 +181,17 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
           if (_selectedCharacter == null) ...[  
             const Divider(color: WowTheme.textSecondary),
             const SizedBox(height: 4),
-            const Text(
-              'Class & Spec',
-              style: TextStyle(color: WowTheme.textSecondary, fontSize: 12),
+            Text(
+              t.buildsClassAndSpec,
+              style: const TextStyle(color: WowTheme.textSecondary, fontSize: 12),
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               initialValue: _manualClass,
               dropdownColor: WowTheme.surfaceDark,
-              decoration: const InputDecoration(
-                hintText: 'Select class',
-                hintStyle: TextStyle(color: WowTheme.textSecondary),
+              decoration: InputDecoration(
+                hintText: t.buildsSelectClass,
+                hintStyle: const TextStyle(color: WowTheme.textSecondary),
               ),
               style: const TextStyle(color: WowTheme.textPrimary),
               items: _classes
@@ -204,9 +204,9 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
               DropdownButtonFormField<String>(
                 initialValue: _manualSpec,
                 dropdownColor: WowTheme.surfaceDark,
-                decoration: const InputDecoration(
-                  hintText: 'Select spec',
-                  hintStyle: TextStyle(color: WowTheme.textSecondary),
+                decoration: InputDecoration(
+                  hintText: t.buildsSelectSpec,
+                  hintStyle: const TextStyle(color: WowTheme.textSecondary),
                 ),
                 style: const TextStyle(color: WowTheme.textPrimary),
                 items: (_specsByClass[_manualClass] ?? <String>[])
