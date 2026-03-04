@@ -1021,6 +1021,84 @@ abstract class S {
   /// **'Build not found'**
   String get buildNotFound;
 
+  /// No description provided for @buildIntelligenceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Build Verification'**
+  String get buildIntelligenceTitle;
+
+  /// No description provided for @buildIntelligenceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Objective comparison of character vs your target build'**
+  String get buildIntelligenceSubtitle;
+
+  /// No description provided for @buildIntelligenceNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No analysis data available.'**
+  String get buildIntelligenceNoData;
+
+  /// No description provided for @buildIntelligenceMissingCharacter.
+  ///
+  /// In en, this message translates to:
+  /// **'Link a character to run analysis.'**
+  String get buildIntelligenceMissingCharacter;
+
+  /// No description provided for @buildIntelligenceCharacterStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Verifiable character status'**
+  String get buildIntelligenceCharacterStatus;
+
+  /// No description provided for @buildIntelligenceNoTargetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add enchants and gems to your build to enable target actions.'**
+  String get buildIntelligenceNoTargetHint;
+
+  /// No description provided for @buildIntelligenceEquippedItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Equipped slots'**
+  String get buildIntelligenceEquippedItems;
+
+  /// No description provided for @buildIntelligenceEnchantedItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Items with enchant'**
+  String get buildIntelligenceEnchantedItems;
+
+  /// No description provided for @buildIntelligenceSockets.
+  ///
+  /// In en, this message translates to:
+  /// **'Sockets with gem'**
+  String get buildIntelligenceSockets;
+
+  /// No description provided for @buildIntelligenceCompletion.
+  ///
+  /// In en, this message translates to:
+  /// **'Completion'**
+  String get buildIntelligenceCompletion;
+
+  /// No description provided for @buildIntelligenceMissingEnchants.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing enchants'**
+  String get buildIntelligenceMissingEnchants;
+
+  /// No description provided for @buildIntelligenceMissingGems.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing gems'**
+  String get buildIntelligenceMissingGems;
+
+  /// No description provided for @buildIntelligenceTopActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Top actions'**
+  String get buildIntelligenceTopActions;
+
   /// No description provided for @guideTitle.
   ///
   /// In en, this message translates to:

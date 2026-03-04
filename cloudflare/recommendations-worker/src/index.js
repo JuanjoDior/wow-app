@@ -3,18 +3,14 @@
  *
  * Endpoints:
  *   GET  /health
- *   GET  /recommendations?class=druid&spec=feral[&patch=12.0.1][&force=1]
  *   GET  /character?region=eu&realm=sanguino&name=apastar[&force=1]
  *   GET  /v1/character/snapshot?region=eu&realm=sanguino&name=apastar[&force=1]
- *   GET  /v1/build/gap-analysis      (reservado)
+ *   GET  /v1/build/gap-analysis      (v1, compatibility alias)
+ *   GET  /v2/build/verification      (objective verification)
  *   GET  /v1/planner/weekly          (reservado)
- *   POST /invalidate   body: { class, spec, patch? }
- *   GET  /specs
- *
- * Flujo /recommendations:
- *  1. Static data embebido → prioridad máxima, siempre disponible y gratuito
- *  2. KV cache            → para specs sin datos estáticos (raro)
- *  3. 404                 → spec no soportada
+ *   GET  /recommendations            (deprecated)
+ *   GET  /specs                      (deprecated)
+ *   POST /invalidate                 (deprecated)
  *
  * Flujo /character:
  *  1. KV cache (TTL=5min)
@@ -31,7 +27,6 @@ const CORS_HEADERS = {
 };
 
 const CACHE_TTLS = Object.freeze({
-  recommendations: { envKey: 'CACHE_TTL_SECONDS', fallback: 604800 },
   character: { envKey: 'BLIZZARD_CHAR_CACHE_TTL', fallback: 300 },
   characterNoMedia: { envKey: null, fallback: 60 },
   oauthToken: { envKey: 'BLIZZARD_TOKEN_CACHE_TTL', fallback: 23 * 60 * 60 },
@@ -54,586 +49,8 @@ const REALM_SEARCH_LOCALES = {
   tw: ['zh_TW', 'en_US'],
 };
 
-// ─── Supported specs (for /specs endpoint) ───────────────────────────────────
-export const SUPPORTED_SPECS = [
-  // DPS
-  { class: 'druid',        spec: 'feral' },
-  { class: 'druid',        spec: 'balance' },
-  { class: 'evoker',       spec: 'devastation' },
-  { class: 'hunter',       spec: 'beast mastery' },
-  { class: 'mage',         spec: 'fire' },
-  { class: 'paladin',      spec: 'retribution' },
-  { class: 'warrior',      spec: 'arms' },
-  { class: 'warrior',      spec: 'fury' },
-  // Tanks
-  { class: 'death knight', spec: 'blood' },
-  { class: 'demon hunter', spec: 'vengeance' },
-  { class: 'druid',        spec: 'guardian' },
-  { class: 'monk',         spec: 'brewmaster' },
-  { class: 'paladin',      spec: 'protection' },
-  { class: 'warrior',      spec: 'protection' },
-  // Healers
-  { class: 'druid',        spec: 'restoration' },
-  { class: 'evoker',       spec: 'preservation' },
-  { class: 'monk',         spec: 'mistweaver' },
-  { class: 'priest',       spec: 'discipline' },
-  { class: 'priest',       spec: 'holy' },
-  { class: 'shaman',       spec: 'restoration' },
-];
-
-// ─── Static recommendations data ─────────────────────────────────────────────
-// Fuente: Icy Veins Pre-Patch Midnight / Patch 12.0.1 — Febrero 2026
-const STATIC_DATA = {
-
-  // ─── DPS ──────────────────────────────────────────────────────────────────
-
-  'druid:feral': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS survivability + movement", is_primary: true },
-                 { name: "Chant of Winged Grace",       note: "Movement alternative",         is_primary: false }],
-      chest:    [{ name: "Stormrider's Agility",        note: "BiS Agility",                  is_primary: true }],
-      wrist:    [{ name: "Chant of Armored Speed",      note: "BiS physical",                 is_primary: true },
-                 { name: "Chant of Powerful Rituals",   note: "Alternative",                  is_primary: false }],
-      legs:     [{ name: "Stormbound Armor Kit",        note: "BiS physical",                 is_primary: true }],
-      feet:     [{ name: "Scout's March",               note: "Movement + stats",             is_primary: true },
-                 { name: "Cavalry's March",             note: "Alternative",                  is_primary: false }],
-      finger1:  [{ name: "Glimmering Mastery",          note: "Sim to confirm",               is_primary: true },
-                 { name: "Radiant Haste",               note: "Haste alternative",            is_primary: false },
-                 { name: "Glimmering Critical Strike",  note: "Crit alternative",             is_primary: false }],
-      finger2:  [{ name: "Glimmering Mastery",          note: "Sim to confirm",               is_primary: true },
-                 { name: "Radiant Haste",               note: "Haste alternative",            is_primary: false },
-                 { name: "Glimmering Critical Strike",  note: "Crit alternative",             is_primary: false }],
-      mainHand: [{ name: "Authority of Radiant Power",  note: "BiS Agility/physical",         is_primary: true },
-                 { name: "Authority of Fiery Resolve",  note: "Caster alternative",           is_primary: false }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Culminating Blasphemite", note: "Meta BiS" },
-      generic: { name: "Radiant Mastery",         note: "Sim — Crit/Mastery close" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",        note: "More RNG, net positive" },
-      food:    { name: "Feast of the Midnight Masquerade", note: "Group feast (Agility)" },
-      potion:  { name: "Tempered Potion",                  note: "With CDs + Bloodlust" },
-      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste bonus" },
-    },
-    stat_priority: ["Agility", "Critical Strike", "Mastery", "Haste", "Versatility"],
-  },
-
-  'druid:balance': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity",  note: "Survivability",       is_primary: true }],
-      chest:    [{ name: "Stormrider's Intellect",       note: "BiS Intellect",       is_primary: true }],
-      wrist:    [{ name: "Chant of Powerful Rituals",    note: "BiS caster",          is_primary: true }],
-      legs:     [{ name: "Daybreak Spellthread",         note: "BiS caster",          is_primary: true }],
-      feet:     [{ name: "Scout's March",                note: "Movement + stats",    is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",                note: "BiS",                 is_primary: true },
-                 { name: "Glimmering Critical Strike",   note: "Alternative",         is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",                note: "BiS",                 is_primary: true },
-                 { name: "Glimmering Critical Strike",   note: "Alternative",         is_primary: false }],
-      mainHand: [{ name: "Authority of Fiery Resolve",   note: "BiS caster",          is_primary: true }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Culminating Blasphemite", note: "Meta BiS" },
-      generic: { name: "Energized Ysemerald",     note: "Haste/Crit" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
-      food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                  note: "With major CDs" },
-      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
-    },
-    stat_priority: ["Intellect", "Haste", "Critical Strike", "Mastery", "Versatility"],
-  },
-
-  'warrior:arms': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity",  note: "Survivability",       is_primary: true }],
-      chest:    [{ name: "Stormrider's Strength",        note: "BiS Strength",        is_primary: true }],
-      wrist:    [{ name: "Chant of Armored Speed",       note: "BiS physical",        is_primary: true }],
-      legs:     [{ name: "Stormbound Armor Kit",         note: "BiS physical",        is_primary: true }],
-      feet:     [{ name: "Scout's March",                note: "Movement + stats",    is_primary: true }],
-      finger1:  [{ name: "Glimmering Critical Strike",   note: "BiS",                 is_primary: true },
-                 { name: "Glimmering Mastery",           note: "Alternative",         is_primary: false }],
-      finger2:  [{ name: "Glimmering Critical Strike",   note: "BiS",                 is_primary: true },
-                 { name: "Glimmering Mastery",           note: "Alternative",         is_primary: false }],
-      mainHand: [{ name: "Authority of Radiant Power",   note: "BiS physical",        is_primary: true }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Culminating Blasphemite",  note: "Meta BiS" },
-      generic: { name: "Radiant Critical Strike",  note: "BiS" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
-      food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                  note: "With major CDs" },
-      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
-    },
-    stat_priority: ["Strength", "Critical Strike", "Mastery", "Haste", "Versatility"],
-  },
-
-  'warrior:fury': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity",  note: "Survivability",       is_primary: true }],
-      chest:    [{ name: "Stormrider's Strength",        note: "BiS Strength",        is_primary: true }],
-      wrist:    [{ name: "Chant of Armored Speed",       note: "BiS physical",        is_primary: true }],
-      legs:     [{ name: "Stormbound Armor Kit",         note: "BiS physical",        is_primary: true }],
-      feet:     [{ name: "Scout's March",                note: "Movement + stats",    is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",                note: "BiS",                 is_primary: true }],
-      finger2:  [{ name: "Radiant Haste",                note: "BiS",                 is_primary: true }],
-      mainHand: [{ name: "Authority of Radiant Power",   note: "BiS physical",        is_primary: true }],
-      offHand:  [{ name: "Authority of Radiant Power",   note: "Dual wield",          is_primary: true }],
-    },
-    gems: {
-      meta:    { name: "Culminating Blasphemite", note: "Meta BiS" },
-      generic: { name: "Energized Ysemerald",     note: "Haste" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
-      food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                  note: "With major CDs" },
-      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
-    },
-    stat_priority: ["Strength", "Haste", "Critical Strike", "Mastery", "Versatility"],
-  },
-
-  'paladin:retribution': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity",  note: "Survivability",       is_primary: true }],
-      chest:    [{ name: "Stormrider's Strength",        note: "BiS Strength",        is_primary: true }],
-      wrist:    [{ name: "Chant of Armored Speed",       note: "BiS physical",        is_primary: true }],
-      legs:     [{ name: "Stormbound Armor Kit",         note: "BiS physical",        is_primary: true }],
-      feet:     [{ name: "Scout's March",                note: "Movement + stats",    is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",                note: "BiS",                 is_primary: true }],
-      finger2:  [{ name: "Radiant Haste",                note: "BiS",                 is_primary: true }],
-      mainHand: [{ name: "Authority of Radiant Power",   note: "BiS physical",        is_primary: true }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Culminating Blasphemite", note: "Meta BiS" },
-      generic: { name: "Energized Ysemerald",     note: "Haste" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
-      food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                  note: "With major CDs" },
-      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
-    },
-    stat_priority: ["Strength", "Haste", "Critical Strike", "Versatility", "Mastery"],
-  },
-
-  'mage:fire': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity",  note: "Survivability",       is_primary: true }],
-      chest:    [{ name: "Stormrider's Intellect",       note: "BiS Intellect",       is_primary: true }],
-      wrist:    [{ name: "Chant of Powerful Rituals",    note: "BiS caster",          is_primary: true }],
-      legs:     [{ name: "Daybreak Spellthread",         note: "BiS caster",          is_primary: true }],
-      feet:     [{ name: "Scout's March",                note: "Movement + stats",    is_primary: true }],
-      finger1:  [{ name: "Glimmering Critical Strike",   note: "BiS",                 is_primary: true }],
-      finger2:  [{ name: "Glimmering Critical Strike",   note: "BiS",                 is_primary: true }],
-      mainHand: [{ name: "Authority of Fiery Resolve",   note: "BiS caster",          is_primary: true }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Culminating Blasphemite",  note: "Meta BiS" },
-      generic: { name: "Radiant Critical Strike",  note: "BiS" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
-      food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                  note: "With major CDs" },
-      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
-    },
-    stat_priority: ["Intellect", "Critical Strike", "Mastery", "Haste", "Versatility"],
-  },
-
-  'hunter:beast mastery': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity",  note: "Survivability",       is_primary: true }],
-      chest:    [{ name: "Stormrider's Agility",         note: "BiS Agility",         is_primary: true }],
-      wrist:    [{ name: "Chant of Armored Speed",       note: "BiS physical",        is_primary: true }],
-      legs:     [{ name: "Stormbound Armor Kit",         note: "BiS physical",        is_primary: true }],
-      feet:     [{ name: "Scout's March",                note: "Movement + stats",    is_primary: true }],
-      finger1:  [{ name: "Glimmering Critical Strike",   note: "BiS",                 is_primary: true }],
-      finger2:  [{ name: "Glimmering Critical Strike",   note: "BiS",                 is_primary: true }],
-      mainHand: [{ name: "Authority of Radiant Power",   note: "BiS physical",        is_primary: true }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Culminating Blasphemite",  note: "Meta BiS" },
-      generic: { name: "Radiant Critical Strike",  note: "BiS" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
-      food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                  note: "With major CDs" },
-      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
-    },
-    stat_priority: ["Agility", "Critical Strike", "Haste", "Mastery", "Versatility"],
-  },
-
-  'evoker:devastation': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS movement",      is_primary: true }],
-      chest:    [{ name: "Stormrider's Intellect",      note: "BiS Intellect",     is_primary: true }],
-      wrist:    [{ name: "Chant of Powerful Rituals",   note: "BiS caster",        is_primary: true }],
-      legs:     [{ name: "Daybreak Spellthread",        note: "BiS caster",        is_primary: true }],
-      feet:     [{ name: "Scout's March",               note: "Movement + stats",  is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "BiS",               is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",       is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "BiS",               is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",       is_primary: false }],
-      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",        is_primary: true }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Culminating Blasphemite", note: "Meta BiS" },
-      generic: { name: "Quick Ruby",              note: "Fill remaining sockets" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
-      food:    { name: "Beledar's Bounty",                 note: "Secondary stat food" },
-      potion:  { name: "Tempered Potion",                  note: "With major CDs" },
-      weapon:  { name: "Crystallized Augment Rune",        note: "Primary stat boost" },
-    },
-    stat_priority: ["Intellect", "Haste", "Critical Strike", "Mastery", "Versatility"],
-  },
-
-  // ─── TANKS ────────────────────────────────────────────────────────────────
-
-  'paladin:protection': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS survivability",  is_primary: true }],
-      chest:    [{ name: "Stormrider's Strength",       note: "BiS Strength",       is_primary: true }],
-      wrist:    [{ name: "Chant of Armored Speed",      note: "BiS physical",       is_primary: true }],
-      legs:     [{ name: "Stormbound Armor Kit",        note: "BiS physical",       is_primary: true }],
-      feet:     [{ name: "Scout's March",               note: "Movement + stats",   is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "BiS (Templar)",      is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Lightsmith alt",     is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "BiS (Templar)",      is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Lightsmith alt",     is_primary: false }],
-      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",           is_primary: true },
-                 { name: "Authority of Radiant Power",  note: "Offensive alt",      is_primary: false }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Culminating Blasphemite", note: "Meta BiS" },
-      generic: { name: "Masterful Emerald",       note: "Fill remaining sockets" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
-      food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                  note: "With CDs" },
-      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
-    },
-    stat_priority: ["Strength", "Haste", "Mastery", "Versatility", "Critical Strike"],
-  },
-
-  'warrior:protection': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS survivability",  is_primary: true }],
-      chest:    [{ name: "Stormrider's Strength",       note: "BiS Strength",       is_primary: true }],
-      wrist:    [{ name: "Chant of Armored Speed",      note: "BiS physical",       is_primary: true }],
-      legs:     [{ name: "Stormbound Armor Kit",        note: "BiS physical",       is_primary: true }],
-      feet:     [{ name: "Scout's March",               note: "Movement + stats",   is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "BiS",                is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",        is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "BiS",                is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",        is_primary: false }],
-      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",           is_primary: true },
-                 { name: "Authority of Radiant Power",  note: "Offensive alt",      is_primary: false }],
-      offHand:  [{ name: "Authority of the Depths",     note: "Shield",             is_primary: true }],
-    },
-    gems: {
-      meta:    { name: "Culminating Blasphemite", note: "Meta BiS" },
-      generic: { name: "Deadly Emerald",          note: "Fill remaining sockets" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
-      food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                  note: "Damage / mit CDs" },
-      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
-    },
-    stat_priority: ["Strength", "Haste", "Critical Strike", "Versatility", "Mastery"],
-  },
-
-  'death knight:blood': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS survivability",  is_primary: true }],
-      chest:    [{ name: "Stormrider's Strength",       note: "BiS Strength",       is_primary: true }],
-      wrist:    [{ name: "Chant of Armored Speed",      note: "BiS physical",       is_primary: true }],
-      legs:     [{ name: "Stormbound Armor Kit",        note: "BiS physical",       is_primary: true }],
-      feet:     [{ name: "Scout's March",               note: "Movement + stats",   is_primary: true }],
-      finger1:  [{ name: "Glimmering Critical Strike",  note: "Deathbringer BiS",   is_primary: true },
-                 { name: "Radiant Haste",               note: "San'layn alt",       is_primary: false }],
-      finger2:  [{ name: "Glimmering Critical Strike",  note: "Deathbringer BiS",   is_primary: true },
-                 { name: "Radiant Haste",               note: "San'layn alt",       is_primary: false }],
-      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",           is_primary: true },
-                 { name: "Authority of Radiant Power",  note: "Offensive alt",      is_primary: false }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Culminating Blasphemite", note: "Meta BiS (damage focus)" },
-      generic: { name: "Deadly Emerald",          note: "Sim to confirm" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",        note: "Generic BiS" },
-      food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                  note: "Damage CDs" },
-      weapon:  { name: "Algari Mana Oil",                  note: "Or Ironclaw Whetstone" },
-    },
-    stat_priority: ["Strength", "Critical Strike", "Versatility", "Mastery", "Haste"],
-  },
-
-  'druid:guardian': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS survivability",  is_primary: true }],
-      chest:    [{ name: "Stormrider's Agility",        note: "BiS Agility",        is_primary: true }],
-      wrist:    [{ name: "Chant of Armored Speed",      note: "BiS physical",       is_primary: true }],
-      legs:     [{ name: "Stormbound Armor Kit",        note: "BiS physical",       is_primary: true }],
-      feet:     [{ name: "Scout's March",               note: "Movement + stats",   is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "BiS survival",       is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Damage alt",         is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "BiS survival",       is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Damage alt",         is_primary: false }],
-      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",           is_primary: true },
-                 { name: "Authority of Radiant Power",  note: "Damage alt",         is_primary: false }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Culminating Blasphemite", note: "Meta BiS" },
-      generic: { name: "Versatile Emerald",       note: "Fill remaining sockets" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",        note: "Always keep active" },
-      food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                  note: "With CDs" },
-      weapon:  { name: "Crystallized Augment Rune",        note: "Primary stat boost" },
-    },
-    stat_priority: ["Agility", "Haste", "Versatility", "Mastery", "Critical Strike"],
-  },
-
-  'monk:brewmaster': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS survivability",  is_primary: true }],
-      chest:    [{ name: "Stormrider's Agility",        note: "BiS Agility",        is_primary: true }],
-      wrist:    [{ name: "Chant of Armored Speed",      note: "BiS physical",       is_primary: true }],
-      legs:     [{ name: "Stormbound Armor Kit",        note: "BiS physical",       is_primary: true }],
-      feet:     [{ name: "Scout's March",               note: "Movement + stats",   is_primary: true }],
-      finger1:  [{ name: "Glimmering Critical Strike",  note: "BiS offensive",      is_primary: true },
-                 { name: "Radiant Versatility",         note: "Defensive alt",      is_primary: false }],
-      finger2:  [{ name: "Glimmering Critical Strike",  note: "BiS offensive",      is_primary: true },
-                 { name: "Radiant Versatility",         note: "Defensive alt",      is_primary: false }],
-      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",           is_primary: true },
-                 { name: "Authority of Radiant Power",  note: "Offensive alt",      is_primary: false }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Culminating Blasphemite", note: "Meta BiS" },
-      generic: { name: "Deadly Sapphire",         note: "Fill remaining sockets" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",        note: "Recommended" },
-      food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Tempered Potion",                  note: "With CDs" },
-      weapon:  { name: "Ironclaw Weightstone",             note: "Or Algari Mana Oil" },
-    },
-    stat_priority: ["Agility", "Critical Strike", "Versatility", "Mastery", "Haste"],
-  },
-
-  'demon hunter:vengeance': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS survivability",  is_primary: true }],
-      chest:    [{ name: "Stormrider's Agility",        note: "BiS Agility",        is_primary: true }],
-      wrist:    [{ name: "Chant of Armored Speed",      note: "BiS physical",       is_primary: true }],
-      legs:     [{ name: "Stormbound Armor Kit",        note: "BiS physical",       is_primary: true }],
-      feet:     [{ name: "Scout's March",               note: "Movement + stats",   is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "BiS",                is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",        is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "BiS",                is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",        is_primary: false }],
-      mainHand: [{ name: "Authority of the Depths",     note: "BiS tank",           is_primary: true },
-                 { name: "Oil of Deep Toxins",          note: "Offensive alt",      is_primary: false }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Elusive Blasphemite",    note: "Movement speed BiS" },
-      generic: { name: "Deadly Emerald",         note: "Fill remaining sockets" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Alchemical Chaos",        note: "Generic BiS" },
-      food:    { name: "Beledar's Bounty",                 note: "Secondary stat food" },
-      potion:  { name: "Tempered Potion",                  note: "With CDs" },
-      weapon:  { name: "Oil of Deep Toxins",               note: "Or Ironclaw Whetstone" },
-    },
-    stat_priority: ["Agility", "Haste", "Versatility", "Critical Strike", "Mastery"],
-  },
-
-  // ─── HEALERS ──────────────────────────────────────────────────────────────
-
-  'monk:mistweaver': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS movement",      is_primary: true }],
-      chest:    [{ name: "Stormrider's Intellect",      note: "BiS Intellect",     is_primary: true }],
-      wrist:    [{ name: "Chant of Powerful Rituals",   note: "BiS caster",        is_primary: true }],
-      legs:     [{ name: "Daybreak Spellthread",        note: "BiS caster",        is_primary: true }],
-      feet:     [{ name: "Scout's March",               note: "Movement + stats",  is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "BiS",               is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",       is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "BiS",               is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Alternative",       is_primary: false }],
-      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",        is_primary: true }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Elusive Blasphemite", note: "Movement speed BiS" },
-      generic: { name: "Deadly Emerald",      note: "Fill remaining sockets" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Tempered Swiftness",      note: "BiS for Mistweaver" },
-      food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Slumbering Soul Serum",            note: "Mana; or Algari Mana Potion" },
-      weapon:  { name: "Algari Mana Oil",                  note: "Crit + Haste" },
-    },
-    stat_priority: ["Intellect", "Haste", "Critical Strike", "Versatility", "Mastery"],
-  },
-
-  'priest:discipline': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS movement",         is_primary: true }],
-      chest:    [{ name: "Stormrider's Intellect",      note: "BiS Intellect",        is_primary: true }],
-      wrist:    [{ name: "Chant of Powerful Rituals",   note: "BiS caster",           is_primary: true }],
-      legs:     [{ name: "Daybreak Spellthread",        note: "BiS caster",           is_primary: true }],
-      feet:     [{ name: "Scout's March",               note: "Movement + stats",     is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "Until 20-25% Haste",   is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Above haste cap",      is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "Until 20-25% Haste",   is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "Above haste cap",      is_primary: false }],
-      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",           is_primary: true }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Elusive Blasphemite", note: "Movement speed BiS" },
-      generic: { name: "Quick Sapphire",      note: "One of each color for Blasphemite" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Tempered Swiftness",  note: "BiS; or Aggression/Mastery" },
-      food:    { name: "Hearty Salt Baked Seafood",    note: "Personal BiS food" },
-      potion:  { name: "Slumbering Soul Serum",        note: "Mana; or Algari Mana Potion" },
-      weapon:  { name: "Algari Mana Oil",              note: "Crit + Haste" },
-    },
-    stat_priority: ["Intellect", "Haste", "Critical Strike", "Mastery", "Versatility"],
-  },
-
-  'druid:restoration': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS movement",      is_primary: true }],
-      chest:    [{ name: "Stormrider's Intellect",      note: "BiS Intellect",     is_primary: true }],
-      wrist:    [{ name: "Chant of Powerful Rituals",   note: "BiS caster",        is_primary: true }],
-      legs:     [{ name: "Daybreak Spellthread",        note: "BiS caster",        is_primary: true }],
-      feet:     [{ name: "Scout's March",               note: "Movement + stats",  is_primary: true }],
-      finger1:  [{ name: "Radiant Haste",               note: "Raid BiS",          is_primary: true },
-                 { name: "Glimmering Mastery",          note: "M+ alt",            is_primary: false }],
-      finger2:  [{ name: "Radiant Haste",               note: "Raid BiS",          is_primary: true },
-                 { name: "Glimmering Mastery",          note: "M+ alt",            is_primary: false }],
-      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",        is_primary: true }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Elusive Blasphemite", note: "Movement speed BiS" },
-      generic: { name: "Masterful Emerald",   note: "Fill remaining sockets" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Tempered Swiftness",  note: "BiS; or Tempered Mastery" },
-      food:    { name: "Beledar's Bounty",             note: "Personal BiS food" },
-      potion:  { name: "Algari Mana Potion",           note: "Mana; Tempered Potion for stats" },
-      weapon:  { name: "Algari Mana Oil",              note: "Crit + Haste" },
-    },
-    stat_priority: ["Intellect", "Haste", "Mastery", "Versatility", "Critical Strike"],
-  },
-
-  'evoker:preservation': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS movement",      is_primary: true }],
-      chest:    [{ name: "Stormrider's Intellect",      note: "BiS Intellect",     is_primary: true }],
-      wrist:    [{ name: "Chant of Powerful Rituals",   note: "BiS caster",        is_primary: true }],
-      legs:     [{ name: "Daybreak Spellthread",        note: "BiS caster",        is_primary: true }],
-      feet:     [{ name: "Scout's March",               note: "Movement + stats",  is_primary: true }],
-      finger1:  [{ name: "Glimmering Mastery",          note: "Raid BiS",          is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "M+ alt",            is_primary: false }],
-      finger2:  [{ name: "Glimmering Mastery",          note: "Raid BiS",          is_primary: true },
-                 { name: "Glimmering Critical Strike",  note: "M+ alt",            is_primary: false }],
-      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",        is_primary: true }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Elusive Blasphemite", note: "Movement speed BiS" },
-      generic: { name: "Deadly Onyx",         note: "Raid: Masterful alts; M+: Quick alts" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Tempered Mastery",        note: "Healing BiS; Aggression for M+" },
-      food:    { name: "Feast of the Midnight Masquerade", note: "Group feast" },
-      potion:  { name: "Slumbering Soul Serum",            note: "Mana; Invigorating Healing alt" },
-      weapon:  { name: "Crystallized Augment Rune",        note: "Or Ethereal Augment Rune" },
-    },
-    stat_priority: ["Intellect", "Mastery", "Critical Strike", "Haste", "Versatility"],
-  },
-
-  'shaman:restoration': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS movement",      is_primary: true }],
-      chest:    [{ name: "Stormrider's Intellect",      note: "BiS Intellect",     is_primary: true }],
-      wrist:    [{ name: "Chant of Powerful Rituals",   note: "BiS caster",        is_primary: true }],
-      legs:     [{ name: "Daybreak Spellthread",        note: "BiS caster",        is_primary: true }],
-      feet:     [{ name: "Scout's March",               note: "Movement + stats",  is_primary: true }],
-      finger1:  [{ name: "Glimmering Critical Strike",  note: "Raid BiS",          is_primary: true },
-                 { name: "Radiant Versatility",         note: "M+ alt",            is_primary: false }],
-      finger2:  [{ name: "Glimmering Critical Strike",  note: "Raid BiS",          is_primary: true },
-                 { name: "Radiant Versatility",         note: "M+ alt",            is_primary: false }],
-      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",        is_primary: true }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Elusive Blasphemite", note: "Movement speed BiS" },
-      generic: { name: "Versatile Ruby",      note: "Fill remaining sockets" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Tempered Aggression",  note: "Raid; Tempered Versatility for M+" },
-      food:    { name: "Feast of the Divine Day",       note: "Group feast" },
-      potion:  { name: "Slumbering Soul Serum",         note: "Mana; Invigorating Healing alt" },
-      weapon:  { name: "Algari Mana Oil",               note: "Crit + Haste" },
-    },
-    stat_priority: ["Intellect", "Critical Strike", "Versatility", "Haste", "Mastery"],
-  },
-
-  'priest:holy': {
-    enchants: {
-      back:     [{ name: "Chant of Burrowing Rapidity", note: "BiS movement",      is_primary: true }],
-      chest:    [{ name: "Stormrider's Intellect",      note: "BiS Intellect",     is_primary: true }],
-      wrist:    [{ name: "Chant of Powerful Rituals",   note: "BiS caster",        is_primary: true }],
-      legs:     [{ name: "Daybreak Spellthread",        note: "BiS caster",        is_primary: true }],
-      feet:     [{ name: "Scout's March",               note: "Movement + stats",  is_primary: true }],
-      finger1:  [{ name: "Glimmering Critical Strike",  note: "BiS",               is_primary: true }],
-      finger2:  [{ name: "Glimmering Critical Strike",  note: "BiS",               is_primary: true }],
-      mainHand: [{ name: "Authority of Fiery Resolve",  note: "BiS caster",        is_primary: true }],
-      offHand:  [],
-    },
-    gems: {
-      meta:    { name: "Elusive Blasphemite",  note: "Movement; Insightful for mana" },
-      generic: { name: "Masterful Ruby",       note: "Fill remaining sockets" },
-    },
-    consumables: {
-      flask:   { name: "Flask of Tempered Aggression",  note: "Raid and M+ BiS" },
-      food:    { name: "Hearty Salt Baked Seafood",     note: "Personal BiS food" },
-      potion:  { name: "Algari Mana Potion",            note: "Mana; Tempered for damage" },
-      weapon:  { name: "Algari Mana Oil",               note: "Crit + Haste" },
-    },
-    stat_priority: ["Intellect", "Critical Strike", "Versatility", "Mastery", "Haste"],
-  },
-
-};
+// ─── Legacy recommendation catalog (disabled in v2 objective mode) ──────────
+export const SUPPORTED_SPECS = [];
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
@@ -656,7 +73,12 @@ export default {
           patch: env.CURRENT_PATCH,
           specs: SUPPORTED_SPECS.length,
           service_version: env.SERVICE_VERSION || 'v5',
+          capabilities: {
+            build_verification_v2: true,
+          },
         });
+      } else if (url.pathname === '/v2/build/verification' && request.method === 'GET') {
+        response = await handleBuildVerificationV2(url, env);
       } else if (url.pathname === '/recommendations' && request.method === 'GET') {
         response = await handleRecommendations(url, env);
       } else if (url.pathname === '/character' && request.method === 'GET') {
@@ -664,7 +86,7 @@ export default {
       } else if (url.pathname === '/v1/character/snapshot' && request.method === 'GET') {
         response = await handleCharacterSnapshotV1(url, env);
       } else if (url.pathname === '/v1/build/gap-analysis' && request.method === 'GET') {
-        response = notImplementedV1('/v1/build/gap-analysis');
+        response = await handleBuildGapAnalysisV1(url, env);
       } else if (url.pathname === '/v1/planner/weekly' && request.method === 'GET') {
         response = notImplementedV1('/v1/planner/weekly');
       } else if (url.pathname === '/invalidate' && request.method === 'POST') {
@@ -702,44 +124,9 @@ export default {
 // ─── /recommendations ─────────────────────────────────────────────────────────
 
 async function handleRecommendations(url, env) {
-  const classParam = (url.searchParams.get('class') || '').toLowerCase().trim();
-  const specParam  = (url.searchParams.get('spec')  || '').toLowerCase().trim();
-  const patch      = url.searchParams.get('patch') || env.CURRENT_PATCH || '12.0.1';
-  const force      = url.searchParams.get('force') === '1';
-
-  if (!classParam || !specParam) {
-    return json({ error: 'Missing required params: class, spec' }, 400);
-  }
-
-  const cacheKey = buildRecsKey(classParam, specParam, patch);
-
-  // 1. Static data — prioridad máxima.
-  const staticKey = `${classParam}:${specParam}`;
-  const staticData = STATIC_DATA[staticKey];
-
-  if (staticData && !force) {
-    const result = {
-      class_name: classParam,
-      spec_name:  specParam,
-      patch,
-      generated_at: new Date().toISOString(),
-      ...staticData,
-      _source: 'static',
-    };
-    const ttl = getCacheTtlSeconds(env, 'recommendations');
-    await env.RECS_CACHE.put(cacheKey, JSON.stringify(result), { expirationTtl: ttl });
-    return json(result);
-  }
-
-  // 2. KV cache
-  if (!force) {
-    const cached = await env.RECS_CACHE.get(cacheKey, 'json');
-    if (cached) {
-      return json({ ...cached, _source: 'cache' });
-    }
-  }
-
-  return json({ error: `No data available for ${classParam}:${specParam}` }, 404);
+  return json({
+    error: 'Deprecated endpoint. Use /v2/build/verification for objective analysis.',
+  }, 410);
 }
 
 // ─── /character ───────────────────────────────────────────────────────────────
@@ -748,8 +135,8 @@ async function handleRecommendations(url, env) {
 // Datos devueltos: perfil, equipo (con enchants+gemas exactos), estadísticas,
 // y URL de render del personaje.
 //
-// Nota sobre locale: se usa en_US para que los nombres de encantamientos y gemas
-// coincidan con nuestra static data de recomendaciones (necesario para el análisis).
+// Nota sobre locale: se usa en_US para normalizar nombres e IDs de enchants/gemas
+// y permitir comparación estable entre respuestas Blizzard y build local.
 
 async function handleCharacter(url, env) {
   const region = (url.searchParams.get('region') || 'eu').toLowerCase().trim();
@@ -843,6 +230,84 @@ async function handleCharacterSnapshotV1(url, env) {
     source,
     generated_at: new Date().toISOString(),
     snapshot: payload,
+  });
+}
+
+// ─── /v1/build/gap-analysis (compat) + /v2/build/verification ───────────────
+//
+// Política actual:
+// - No usa recomendaciones estáticas/manuales.
+// - Compara únicamente datos oficiales Blizzard del personaje contra target local.
+// - Si no hay target local, devuelve facts objetivos del personaje.
+
+async function handleBuildGapAnalysisV1(url, env) {
+  return handleBuildVerificationV2(url, env, {
+    version: 'v1',
+    endpoint: '/v1/build/gap-analysis',
+  });
+}
+
+async function handleBuildVerificationV2(url, env, compat = null) {
+  const region = (url.searchParams.get('region') || '').toLowerCase().trim();
+  const realm = (url.searchParams.get('realm') || '').trim();
+  const name = (url.searchParams.get('name') || '').trim();
+
+  const version = compat?.version || 'v2';
+  const endpoint = compat?.endpoint || '/v2/build/verification';
+
+  if (!region || !realm || !name) {
+    return json({
+      version,
+      endpoint,
+      error: 'Missing required params: region, realm, name',
+    }, 400);
+  }
+
+  const characterResponse = await handleCharacter(url, env);
+  const contentType = characterResponse.headers.get('Content-Type') || '';
+  if (!contentType.includes('application/json')) return characterResponse;
+
+  let characterPayload;
+  try {
+    characterPayload = await characterResponse.clone().json();
+  } catch {
+    return json({
+      version,
+      endpoint,
+      error: 'Invalid character payload',
+    }, 502);
+  }
+
+  if (!characterResponse.ok) {
+    return json({
+      version,
+      endpoint,
+      error: characterPayload?.error || 'Character lookup failed',
+    }, characterResponse.status);
+  }
+
+  const localBuildSlots = parseBuildSlotsQuery(url.searchParams.get('build_slots'));
+  const analysis = computeObjectiveBuildVerification(characterPayload, localBuildSlots);
+
+  return json({
+    version,
+    endpoint,
+    generated_at: new Date().toISOString(),
+    source: {
+      character: characterPayload?._source ?? null,
+      policy: 'official_only',
+    },
+    context: {
+      region,
+      realm,
+      name: name.toLowerCase(),
+      class_name: normalizeSpecToken(characterPayload?.class || ''),
+      spec_name: normalizeSpecToken(characterPayload?.spec || ''),
+      local_build_slots: localBuildSlots.length,
+    },
+    facts: analysis.facts,
+    summary: analysis.summary,
+    actions: analysis.actions,
   });
 }
 
@@ -1158,7 +623,7 @@ function extractPowerTypeValue(source) {
 async function fetchBlizzardCharacter(region, realmSlug, name, token, env) {
   const base      = BLIZZARD_API_BASE[region];
   const namespace = `profile-${region}`;
-  // en_US para que los nombres de encantamientos/gemas coincidan con nuestra static data
+  // en_US para tener nomenclatura estable en el payload normalizado
   const locale    = 'en_US';
 
   // Character name: lowercase + URL-encode (maneja caracteres especiales: Ä, ñ, etc.)
@@ -1234,24 +699,40 @@ function normalizeCharacter(profile, equip, stats, media, region, iconUrlsByItem
 
       // Encantamientos: sólo tipo PERMANENT (excluye BONUS_SOCKETS, TEMPORARY, etc.)
       // display_string: "Enchanted: Chant of Burrowing Rapidity" → extraemos el nombre
-      const enchantments = (item.enchantments || [])
-        .filter(e => e.enchantment_slot?.type === 'PERMANENT')
-        .map(e => {
-          // Primero intentamos source_item.name: "Enchant Cloak - Chant of Burrowing Rapidity"
-          // y extraemos lo que va después del primer " - "
-          const sourceName = e.source_item?.name || '';
-          if (sourceName.includes(' - ')) {
-            return sourceName.split(' - ').slice(1).join(' - ').trim();
-          }
-          // Fallback: display_string menos el prefijo "Enchanted: "
-          return (e.display_string || '').replace(/^Enchanted:\s*/i, '').trim();
-        })
-        .filter(e => e.length > 0);
+      const enchantments = [];
+      const enchantmentIds = [];
+      for (const enchant of item.enchantments || []) {
+        if (enchant?.enchantment_slot?.type !== 'PERMANENT') continue;
 
-      // Gemas: sólo sockets que tienen ítem equipado (ignorar sockets vacíos)
-      const gems = (item.sockets || [])
-        .map(s => s.item?.name || '')
-        .filter(g => g.length > 0);
+        const enchantId = enchant?.source_item?.id;
+        if (Number.isInteger(enchantId)) {
+          enchantmentIds.push(enchantId);
+        }
+
+        const sourceName = enchant?.source_item?.name || '';
+        const parsedName = sourceName.includes(' - ')
+          ? sourceName.split(' - ').slice(1).join(' - ').trim()
+          : (enchant?.display_string || '').replace(/^Enchanted:\s*/i, '').trim();
+        if (parsedName.length > 0) {
+          enchantments.push(parsedName);
+        }
+      }
+
+      const sockets = Array.isArray(item.sockets) ? item.sockets : [];
+      const gems = [];
+      const gemIds = [];
+      for (const socket of sockets) {
+        const gemName = socket?.item?.name || '';
+        if (typeof gemName === 'string' && gemName.trim().length > 0) {
+          gems.push(gemName.trim());
+        }
+        const gemId = socket?.item?.id;
+        if (Number.isInteger(gemId)) {
+          gemIds.push(gemId);
+        }
+      }
+      const socketsTotal = sockets.length;
+      const socketsFilled = gemIds.length;
 
       const itemId = item.item?.id ?? null;
 
@@ -1263,7 +744,11 @@ function normalizeCharacter(profile, equip, stats, media, region, iconUrlsByItem
         item_id:      itemId,
         icon_url:     itemId != null ? (iconUrlsByItemId[itemId] ?? null) : null,
         enchantments: enchantments,
+        enchantment_ids: enchantmentIds,
         gems:         gems,
+        gem_ids:      gemIds,
+        sockets_total: socketsTotal,
+        sockets_filled: socketsFilled,
         // Blizzard equipment summary no devuelve bonus_ids directamente
         bonus_ids:    [],
       });
@@ -1449,56 +934,499 @@ function extractItemIconUrl(media) {
   return firstValidAsset?.value ?? null;
 }
 
-// ─── /invalidate ─────────────────────────────────────────────────────────────
+function normalizeSpecToken(value) {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
 
-async function handleInvalidate(request, env) {
-  if (env.INVALIDATE_SECRET) {
-    const provided = request.headers.get('X-Invalidate-Secret');
-    if (provided !== env.INVALIDATE_SECRET) {
-      return json({ error: 'Unauthorized' }, 401);
+function normalizeTextToken(value) {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function normalizeBuildSlot(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+
+  const collapsed = raw
+    .replace(/[\s-]+/g, '_')
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .toLowerCase();
+
+  switch (collapsed) {
+    case 'head':
+    case 'neck':
+    case 'shoulder':
+    case 'back':
+    case 'chest':
+    case 'wrist':
+    case 'hands':
+    case 'waist':
+    case 'legs':
+    case 'feet':
+    case 'main_hand':
+    case 'mainhand':
+    case 'off_hand':
+    case 'offhand':
+    case 'finger_1':
+    case 'finger1':
+    case 'finger_2':
+    case 'finger2':
+    case 'trinket_1':
+    case 'trinket1':
+    case 'trinket_2':
+    case 'trinket2':
+      break;
+    default:
+      return null;
+  }
+
+  switch (collapsed) {
+    case 'main_hand':
+    case 'mainhand':
+      return 'mainHand';
+    case 'off_hand':
+    case 'offhand':
+      return 'offHand';
+    case 'finger_1':
+    case 'finger1':
+      return 'finger1';
+    case 'finger_2':
+    case 'finger2':
+      return 'finger2';
+    case 'trinket_1':
+    case 'trinket1':
+      return 'trinket1';
+    case 'trinket_2':
+    case 'trinket2':
+      return 'trinket2';
+    default:
+      return collapsed;
+  }
+}
+
+function parseBuildSlotsQuery(rawValue) {
+  if (!rawValue) return [];
+
+  let parsed;
+  try {
+    parsed = JSON.parse(rawValue);
+  } catch {
+    return [];
+  }
+
+  if (!Array.isArray(parsed)) return [];
+
+  const normalized = [];
+  for (const entry of parsed) {
+    if (!entry || typeof entry !== 'object') continue;
+    const slot = normalizeBuildSlot(entry.slot);
+    if (!slot) continue;
+
+    const enchantRaw = entry.enchantment;
+    const enchantment = typeof enchantRaw === 'string'
+      ? enchantRaw.trim()
+      : (typeof enchantRaw?.name === 'string' ? enchantRaw.name.trim() : '');
+    const enchantmentId = Number.isInteger(entry.enchantment_id)
+      ? entry.enchantment_id
+      : (Number.isInteger(entry.enchantmentId) ? entry.enchantmentId : null);
+
+    const gemsRaw = Array.isArray(entry.gems) ? entry.gems : [];
+    const gems = gemsRaw
+      .map((gem) => {
+        if (typeof gem === 'string') return gem.trim();
+        if (typeof gem?.name === 'string') return gem.name.trim();
+        return '';
+      })
+      .filter(Boolean);
+
+    const gemIdsRaw = Array.isArray(entry.gem_ids)
+      ? entry.gem_ids
+      : (Array.isArray(entry.gemIds) ? entry.gemIds : []);
+    const gemIds = gemIdsRaw
+      .filter((id) => Number.isInteger(id))
+      .map((id) => Number(id));
+
+    if (enchantmentId == null && !enchantment && gemIds.length === 0 && gems.length === 0) {
+      continue;
+    }
+
+    normalized.push({
+      slot,
+      enchantment_id: enchantmentId,
+      enchantment: enchantment || null,
+      gem_ids: gemIds,
+      gems,
+    });
+  }
+
+  return normalized;
+}
+
+function hasTargetEnchantment(slot) {
+  return Number.isInteger(slot?.enchantment_id) ||
+    normalizeTextToken(slot?.enchantment).length > 0;
+}
+
+function hasTargetGems(slot) {
+  const gemIds = Array.isArray(slot?.gem_ids) ? slot.gem_ids : [];
+  const gems = Array.isArray(slot?.gems) ? slot.gems : [];
+  return gemIds.length > 0 || gems.some((gem) => normalizeTextToken(gem).length > 0);
+}
+
+function toTargetGemList(slot) {
+  const gemIds = Array.isArray(slot?.gem_ids) ? slot.gem_ids : [];
+  const gemNames = Array.isArray(slot?.gems) ? slot.gems : [];
+  const maxLen = Math.max(gemIds.length, gemNames.length);
+  const targets = [];
+
+  for (let i = 0; i < maxLen; i += 1) {
+    const id = Number.isInteger(gemIds[i]) ? gemIds[i] : null;
+    const nameRaw = typeof gemNames[i] === 'string' ? gemNames[i].trim() : '';
+    if (id == null && !nameRaw) continue;
+    targets.push({ id, name: nameRaw || null });
+  }
+
+  return targets;
+}
+
+function getCharacterEnchantIdsForSlot(slotKey, equipBySlot) {
+  const items = getEquipItemsForTargetSlot(slotKey, equipBySlot);
+  if (!Array.isArray(items) || items.length === 0) return [];
+
+  const result = [];
+  for (const item of items) {
+    const ids = Array.isArray(item?.enchantment_ids) ? item.enchantment_ids : [];
+    for (const id of ids) {
+      if (Number.isInteger(id)) result.push(id);
+    }
+  }
+  return result;
+}
+
+function getCharacterGemIdsForSlot(slotKey, equipBySlot) {
+  const items = getEquipItemsForTargetSlot(slotKey, equipBySlot);
+  if (!Array.isArray(items) || items.length === 0) return [];
+
+  const result = [];
+  for (const item of items) {
+    const ids = Array.isArray(item?.gem_ids) ? item.gem_ids : [];
+    for (const id of ids) {
+      if (Number.isInteger(id)) result.push(id);
+    }
+  }
+  return result;
+}
+
+function hasMatchByIdOrName(currentIds, currentNames, targetId, targetName) {
+  if (Number.isInteger(targetId) && currentIds.includes(targetId)) {
+    return true;
+  }
+
+  const normalizedTargetName = normalizeTextToken(targetName);
+  if (!normalizedTargetName) return false;
+  return currentNames.map((name) => normalizeTextToken(name)).includes(normalizedTargetName);
+}
+
+function computeCharacterFacts(equipment = []) {
+  const equippedItemsCount = Array.isArray(equipment) ? equipment.length : 0;
+  let enchantedItemsCount = 0;
+  let socketsTotalCount = 0;
+  let socketsFilledCount = 0;
+
+  for (const item of equipment) {
+    const enchantments = Array.isArray(item?.enchantments) ? item.enchantments : [];
+    if (enchantments.length > 0) {
+      enchantedItemsCount += 1;
+    }
+
+    const socketsTotal = Number.isInteger(item?.sockets_total) ? item.sockets_total : 0;
+    const socketsFilled = Number.isInteger(item?.sockets_filled) ? item.sockets_filled : 0;
+    socketsTotalCount += socketsTotal;
+    socketsFilledCount += Math.min(socketsFilled, socketsTotal);
+  }
+
+  return {
+    equipped_items_count: equippedItemsCount,
+    enchanted_items_count: enchantedItemsCount,
+    sockets_total_count: socketsTotalCount,
+    sockets_filled_count: socketsFilledCount,
+    sockets_empty_count: Math.max(0, socketsTotalCount - socketsFilledCount),
+  };
+}
+
+function computeObjectiveBuildVerification(characterPayload, localBuildSlots = []) {
+  const equipment = Array.isArray(characterPayload?.equipment)
+    ? characterPayload.equipment
+    : [];
+  const equipBySlot = buildEquipmentLookup(equipment);
+  const facts = computeCharacterFacts(equipment);
+
+  const buildTargets = localBuildSlots.filter(
+    (slot) => hasTargetEnchantment(slot) || hasTargetGems(slot),
+  );
+  const hasBuildTarget = buildTargets.length > 0;
+
+  let checksTotal = 0;
+  let checksCompleted = 0;
+  let missingEnchants = 0;
+  let missingGems = 0;
+  let mismatchedEnchants = 0;
+  let mismatchedGems = 0;
+  const actions = [];
+
+  for (const slotTarget of buildTargets) {
+    const slotKey = slotTarget.slot;
+    const currentEnchantments = getCharacterEnchantmentsForSlot(slotKey, equipBySlot);
+    const currentEnchantmentIds = getCharacterEnchantIdsForSlot(slotKey, equipBySlot);
+    const currentGems = getCharacterGemsForSlot(slotKey, equipBySlot);
+    const currentGemIds = getCharacterGemIdsForSlot(slotKey, equipBySlot);
+
+    if (hasTargetEnchantment(slotTarget)) {
+      checksTotal += 1;
+      const targetEnchantName = slotTarget.enchantment || null;
+      const targetEnchantId = Number.isInteger(slotTarget.enchantment_id)
+        ? slotTarget.enchantment_id
+        : null;
+      const enchantMatched = hasMatchByIdOrName(
+        currentEnchantmentIds,
+        currentEnchantments,
+        targetEnchantId,
+        targetEnchantName,
+      );
+      if (enchantMatched) {
+        checksCompleted += 1;
+      } else {
+        const hasCurrent = currentEnchantments.length > 0 || currentEnchantmentIds.length > 0;
+        if (hasCurrent) {
+          mismatchedEnchants += 1;
+        } else {
+          missingEnchants += 1;
+        }
+        const recommendedText = targetEnchantName || (targetEnchantId != null ? `Enchant #${targetEnchantId}` : 'Unknown enchant');
+        actions.push({
+          priority_score: getEnchantPriorityScore(slotKey),
+          slot: slotKey,
+          type: hasCurrent ? 'enchant_mismatch_target' : 'enchant_missing_target',
+          label: `${hasCurrent ? 'Replace with' : 'Apply'} ${recommendedText}`,
+          recommended: recommendedText,
+          expected: recommendedText,
+          expected_id: targetEnchantId,
+          current: currentEnchantments,
+          source: 'build',
+        });
+      }
+    }
+
+    const targetGems = toTargetGemList(slotTarget);
+    for (const targetGem of targetGems) {
+      checksTotal += 1;
+      const gemMatched = hasMatchByIdOrName(
+        currentGemIds,
+        currentGems,
+        targetGem.id,
+        targetGem.name,
+      );
+      if (gemMatched) {
+        checksCompleted += 1;
+        continue;
+      }
+
+      const hasCurrentGem = currentGemIds.length > 0 || currentGems.length > 0;
+      if (hasCurrentGem) {
+        mismatchedGems += 1;
+      } else {
+        missingGems += 1;
+      }
+
+      const recommendedText = targetGem.name || (targetGem.id != null ? `Gem #${targetGem.id}` : 'Unknown gem');
+      actions.push({
+        priority_score: 65,
+        slot: slotKey,
+        type: hasCurrentGem ? 'gem_mismatch_target' : 'gem_missing_target',
+        label: `${hasCurrentGem ? 'Replace with' : 'Socket'} ${recommendedText}`,
+        recommended: recommendedText,
+        expected: recommendedText,
+        expected_id: targetGem.id,
+        current: currentGems,
+        source: 'build',
+      });
     }
   }
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: 'Invalid JSON body' }, 400);
+  const completionPct = checksTotal > 0
+    ? Math.round((checksCompleted / checksTotal) * 100)
+    : 0;
+
+  actions.sort((a, b) => b.priority_score - a.priority_score);
+
+  return {
+    facts,
+    summary: {
+      analysis_mode: 'objective',
+      target_profile: hasBuildTarget ? 'build_target' : 'character_only',
+      checks_total: checksTotal,
+      checks_completed: checksCompleted,
+      completion_pct: completionPct,
+      missing_enchants: missingEnchants,
+      missing_gems: missingGems,
+      mismatched_enchants: mismatchedEnchants,
+      mismatched_gems: mismatchedGems,
+      actions_count: actions.length,
+    },
+    actions,
+  };
+}
+
+function normalizeEquipSlot(slot) {
+  const raw = String(slot || '').toUpperCase().replace(/[\s-]+/g, '_');
+  switch (raw) {
+    case 'HEAD':
+      return 'head';
+    case 'NECK':
+      return 'neck';
+    case 'SHOULDER':
+      return 'shoulder';
+    case 'CLOAK':
+    case 'BACK':
+      return 'back';
+    case 'CHEST':
+      return 'chest';
+    case 'WRIST':
+    case 'BRACER':
+      return 'wrist';
+    case 'HAND':
+    case 'HANDS':
+      return 'hands';
+    case 'WAIST':
+      return 'waist';
+    case 'LEGS':
+      return 'legs';
+    case 'FEET':
+      return 'feet';
+    case 'FINGER':
+    case 'FINGER_1':
+    case 'FINGER_2':
+      return 'finger';
+    case 'MAIN_HAND':
+    case 'MAINHAND':
+      return 'mainHand';
+    case 'OFF_HAND':
+    case 'OFFHAND':
+      return 'offHand';
+    case 'TRINKET':
+    case 'TRINKET_1':
+    case 'TRINKET_2':
+      return 'trinket';
+    default:
+      return null;
+  }
+}
+
+function buildEquipmentLookup(equipment = []) {
+  const bySlot = {};
+
+  if (!Array.isArray(equipment)) {
+    return bySlot;
   }
 
-  const classParam = (body.class || '').toLowerCase().trim();
-  const specParam  = (body.spec  || '').toLowerCase().trim();
-  const patch      = body.patch || env.CURRENT_PATCH || '12.0.1';
-
-  if (!classParam || !specParam) {
-    return json({ error: 'Missing required fields: class, spec' }, 400);
+  for (const item of equipment) {
+    const mappedSlot = normalizeEquipSlot(item?.slot);
+    if (!mappedSlot) continue;
+    if (!bySlot[mappedSlot]) bySlot[mappedSlot] = [];
+    bySlot[mappedSlot].push(item);
   }
 
-  const cacheKey = buildRecsKey(classParam, specParam, patch);
-  await env.RECS_CACHE.delete(cacheKey);
-  return json({ invalidated: cacheKey, ok: true });
+  return bySlot;
+}
+
+function getEquipItemsForTargetSlot(slotKey, equipBySlot) {
+  if (!equipBySlot || typeof equipBySlot !== 'object') return null;
+
+  switch (slotKey) {
+    case 'finger1':
+      return equipBySlot.finger?.[0] ? [equipBySlot.finger[0]] : [];
+    case 'finger2':
+      return equipBySlot.finger?.[1] ? [equipBySlot.finger[1]] : [];
+    case 'trinket1':
+      return equipBySlot.trinket?.[0] ? [equipBySlot.trinket[0]] : [];
+    case 'trinket2':
+      return equipBySlot.trinket?.[1] ? [equipBySlot.trinket[1]] : [];
+    case 'mainHand':
+      return equipBySlot.mainHand?.[0] ? [equipBySlot.mainHand[0]] : [];
+    case 'offHand':
+      return equipBySlot.offHand?.[0] ? [equipBySlot.offHand[0]] : [];
+    default:
+      return equipBySlot[slotKey]?.[0] ? [equipBySlot[slotKey][0]] : [];
+  }
+}
+
+function getEnchantPriorityScore(slotKey) {
+  switch (slotKey) {
+    case 'mainHand':
+      return 95;
+    case 'offHand':
+      return 80;
+    case 'finger1':
+    case 'finger2':
+      return 70;
+    default:
+      return 60;
+  }
+}
+
+function getCharacterEnchantmentsForSlot(slotKey, equipBySlot) {
+  const items = getEquipItemsForTargetSlot(slotKey, equipBySlot);
+  if (!Array.isArray(items) || items.length === 0) return [];
+
+  const result = [];
+  for (const item of items) {
+    const enchantments = Array.isArray(item?.enchantments) ? item.enchantments : [];
+    for (const enchant of enchantments) {
+      if (typeof enchant === 'string' && enchant.trim()) {
+        result.push(enchant.trim());
+      }
+    }
+  }
+
+  return result;
+}
+
+function getCharacterGemsForSlot(slotKey, equipBySlot) {
+  const items = getEquipItemsForTargetSlot(slotKey, equipBySlot);
+  if (!Array.isArray(items) || items.length === 0) return [];
+
+  const result = [];
+  for (const item of items) {
+    const gems = Array.isArray(item?.gems) ? item.gems : [];
+    for (const gem of gems) {
+      if (typeof gem === 'string' && gem.trim()) {
+        result.push(gem.trim());
+      }
+    }
+  }
+
+  return result;
+}
+
+// ─── /invalidate ─────────────────────────────────────────────────────────────
+
+async function handleInvalidate(request, env) {
+  return json({
+    error: 'Deprecated endpoint. Recommendation cache invalidation is no longer supported.',
+  }, 410);
 }
 
 // ─── /specs ───────────────────────────────────────────────────────────────────
 
 async function handleSpecs(url, env) {
-  const patch = url.searchParams.get('patch') || env.CURRENT_PATCH || '12.0.1';
-
-  const results = await Promise.all(
-    SUPPORTED_SPECS.map(async ({ class: cls, spec }) => {
-      const key = buildRecsKey(cls, spec, patch);
-      const cached = await env.RECS_CACHE.get(key, 'json');
-      return {
-        class: cls,
-        spec,
-        cached:       cached !== null,
-        generated_at: cached?.generated_at ?? null,
-        source:       cached?._source      ?? null,
-      };
-    })
-  );
-
-  return json({ patch, specs: results });
+  return json({
+    error: 'Deprecated endpoint. Recommendation catalog has been removed.',
+  }, 410);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1513,10 +1441,6 @@ function getCacheTtlSeconds(env, cacheType) {
   if (!config) return 300;
   if (!config.envKey) return config.fallback;
   return parsePositiveInt(env[config.envKey], config.fallback);
-}
-
-function buildRecsKey(cls, spec, patch) {
-  return `recs:${cls}:${spec.replace(' ', '_')}:${patch}`;
 }
 
 function buildCharacterLegacyKey(region, realmInput, name) {
@@ -1570,9 +1494,12 @@ async function inferResponseSource(response) {
 
   try {
     const payload = await response.clone().json();
-    const source = payload?._source ?? payload?.source ?? null;
+    const rawSource = payload?._source ?? payload?.source ?? null;
+    const source = typeof rawSource === 'string'
+      ? rawSource
+      : (typeof rawSource?.character === 'string' ? rawSource.character : null);
     if (source === 'cache') {
-      return { source, cacheHit: true };
+      return { source: 'cache', cacheHit: true };
     }
     if (source === 'static' || source === 'blizzard') {
       return { source, cacheHit: false };
@@ -1616,3 +1543,5 @@ function logWorkerError({ requestId, endpoint, method, error }) {
     timestamp: new Date().toISOString(),
   }));
 }
+
+

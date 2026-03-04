@@ -1,127 +1,102 @@
-# wow-recommendations — Cloudflare Worker v4
+# wow-recommendations — Cloudflare Worker v5
 
-Sirve recomendaciones de enchants, gemas y consumibles por clase/spec.
-Prioriza static data embebido (actualizable por parche) y usa KV Storage como caché de respaldo (TTL 7 días).
+Worker orientado a datos objetivos de personaje/build usando Blizzard API.
 
 ## Endpoints
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/health` | Estado del Worker |
-| GET | `/recommendations?class=druid&spec=feral` | Obtener recomendaciones |
-| POST | `/invalidate` | Limpiar caché de una spec |
-| GET | `/specs` | Listar specs y estado de caché |
+| Método | Ruta | Estado | Descripción |
+|--------|------|--------|-------------|
+| GET | `/health` | activo | Estado del worker + capacidades |
+| GET | `/character?region=eu&realm=sanguino&name=apastar` | activo | Snapshot de personaje (legacy) |
+| GET | `/v1/character/snapshot?region=eu&realm=sanguino&name=apastar` | activo | Snapshot versionado v1 |
+| GET | `/v2/build/verification?region=eu&realm=sanguino&name=apastar` | activo | Verificación objetiva build vs personaje |
+| GET | `/v1/build/gap-analysis?region=eu&realm=sanguino&name=apastar` | compat | Alias compatible de V2 |
+| GET | `/recommendations` | deprecated | Ya no se sirven recomendaciones estáticas |
+| GET | `/specs` | deprecated | Catálogo de recomendaciones retirado |
+| POST | `/invalidate` | deprecated | Invalidez de recomendaciones retirada |
 
-### GET /recommendations
+## GET /health
 
-| Param | Req | Descripción |
-|-------|-----|-------------|
-| `class` | ✓ | Clase en minúsculas (`druid`, `warrior`...) |
-| `spec` | ✓ | Spec en minúsculas (`feral`, `arms`...) |
-| `patch` | - | Versión (default: `CURRENT_PATCH` en wrangler.toml) |
-| `force` | - | `force=1` para ignorar caché y refrescar |
-
-**Response:**
 ```json
 {
-  "class_name": "druid",
-  "spec_name": "feral",
+  "status": "ok",
   "patch": "12.0.1",
-  "generated_at": "2026-02-20T10:00:00Z",
-  "_source": "static | cache",
-  "enchants": { "back": [{"name": "...", "note": "...", "is_primary": true}], ... },
-  "gems": { "meta": {"name": "...", "note": "..."}, "generic": {...} },
-  "consumables": { "flask": {...}, "food": {...}, "potion": {...}, "weapon": {...} },
-  "stat_priority": ["Agility", "Critical Strike", ...]
+  "service_version": "5.1.0",
+  "capabilities": {
+    "build_verification_v2": true
+  }
 }
 ```
 
-### POST /invalidate
+## GET /v2/build/verification
 
-Requiere header `X-Invalidate-Secret` si `INVALIDATE_SECRET` está configurado.
+Compara el estado real del personaje con el target local (`build_slots`) usando IDs primero y nombre como fallback.
+
+### Query params
+
+| Param | Req | Descripción |
+|-------|-----|-------------|
+| `region` | ✓ | `us`, `eu`, `kr`, `tw` |
+| `realm` | ✓ | Reino del personaje |
+| `name` | ✓ | Nombre del personaje |
+| `build_slots` | - | JSON string con `slot`, `enchantment_id`, `enchantment`, `gem_ids`, `gems` |
+| `force` | - | `force=1` para ignorar caché de personaje |
+
+### Success response
 
 ```json
-{ "class": "druid", "spec": "feral", "patch": "12.0.1" }
+{
+  "version": "v2",
+  "endpoint": "/v2/build/verification",
+  "source": {
+    "character": "cache|blizzard",
+    "policy": "official_only"
+  },
+  "facts": {
+    "equipped_items_count": 16,
+    "enchanted_items_count": 8,
+    "sockets_total_count": 7,
+    "sockets_filled_count": 6,
+    "sockets_empty_count": 1
+  },
+  "summary": {
+    "analysis_mode": "objective",
+    "target_profile": "character_only|build_target",
+    "checks_total": 2,
+    "checks_completed": 1,
+    "completion_pct": 50,
+    "missing_enchants": 0,
+    "missing_gems": 1,
+    "mismatched_enchants": 1,
+    "mismatched_gems": 0,
+    "actions_count": 2
+  },
+  "actions": [
+    {
+      "priority_score": 95,
+      "slot": "mainHand",
+      "type": "enchant_mismatch_target",
+      "label": "Replace with Authority of Fiery Resolve",
+      "recommended": "Authority of Fiery Resolve",
+      "expected": "Authority of Fiery Resolve",
+      "expected_id": 2002,
+      "current": ["Authority of Radiant Power"],
+      "source": "build"
+    }
+  ]
+}
 ```
 
----
+## Compatibilidad V1
 
-## Setup inicial
+`/v1/build/gap-analysis` sigue disponible, pero usa el mismo motor objetivo de V2 para evitar datos estáticos/manuales.
+
+## Setup
 
 ```bash
-# 1. Instalar Wrangler globalmente
 npm install -g wrangler
-
-# 2. Login en tu cuenta Cloudflare
 wrangler login
-
-# 3. Crear KV namespace
 wrangler kv:namespace create "RECS_CACHE"
-# → Copia el id que devuelve y pégalo en wrangler.toml
-
-# 4. Añadir secrets (NUNCA en wrangler.toml) — opcional
-wrangler secret put INVALIDATE_SECRET
-
-# 5. Deploy
+wrangler secret put BLIZZARD_CLIENT_SECRET
 wrangler deploy
-# → Anota la URL: https://wow-recommendations.TU-SUBDOMINIO.workers.dev
-```
-
----
-
-## Conectar la app Flutter
-
-En `lib/features/builds/data/datasources/spec_recommendations_datasource.dart`:
-
-```dart
-static const String _baseUrl =
-    'https://wow-recommendations.TU-SUBDOMINIO.workers.dev';
-```
-
----
-
-## Flujo de resolución
-
-```
-GET /recommendations?class=druid&spec=feral
-        │
-        ▼
-1. ¿Existe en STATIC_DATA?  ──SÍ──▶  Devuelve datos + refresca KV  (_source: static)
-        │NO
-        ▼
-2. ¿Existe en KV cache?     ──SÍ──▶  Devuelve datos               (_source: cache)
-        │NO
-        ▼
-3. 404 — spec no soportada
-```
-
-El static data en `src/index.js` es la fuente de verdad. Para añadir o actualizar specs, edita `STATIC_DATA` y haz `wrangler deploy`.
-
----
-
-## Cuando sale un nuevo parche
-
-1. Actualizar `CURRENT_PATCH` en `wrangler.toml`
-2. Editar `STATIC_DATA` en `src/index.js` con los nuevos datos
-3. `wrangler deploy`
-
-Para invalidar caché manualmente de una spec:
-```bash
-curl -X POST https://wow-recommendations.TU-SUBDOMINIO.workers.dev/invalidate \
-  -H "Content-Type: application/json" \
-  -H "X-Invalidate-Secret: TU_SECRET" \
-  -d '{"class": "druid", "spec": "feral"}'
-```
-
-Para invalidar TODAS las specs a la vez (útil tras un parche grande):
-```bash
-for spec in "druid:feral" "druid:balance" "warrior:arms" "warrior:fury" "paladin:retribution" "mage:fire" "hunter:beast mastery"; do
-  CLASS="${spec%%:*}"
-  SPEC="${spec##*:}"
-  curl -X POST https://wow-recommendations.TU-SUBDOMINIO.workers.dev/invalidate \
-    -H "Content-Type: application/json" \
-    -H "X-Invalidate-Secret: TU_SECRET" \
-    -d "{\"class\": \"$CLASS\", \"spec\": \"$SPEC\"}"
-  echo "Invalidated $CLASS:$SPEC"
-done
 ```

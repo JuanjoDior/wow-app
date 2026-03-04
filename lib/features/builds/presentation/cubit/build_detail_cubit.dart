@@ -3,6 +3,7 @@ import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/builds/domain/repositories/builds_repository.dart';
+import 'package:wow_companion/features/builds/data/datasources/build_gap_analysis_datasource.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/build_detail_state.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
 import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dart';
@@ -11,15 +12,26 @@ import 'package:wow_companion/features/builds/data/datasources/character_media_d
 class BuildDetailCubit extends Cubit<BuildDetailState> {
   final BuildsRepository _repository;
   final CharacterMediaDataSource _mediaDataSource;
+  final BuildGapAnalysisDataSource _gapAnalysisDataSource;
 
-  BuildDetailCubit(this._repository, this._mediaDataSource)
-    : super(const BuildDetailLoading());
+  BuildDetailCubit(
+    this._repository,
+    this._mediaDataSource,
+    this._gapAnalysisDataSource,
+  ) : super(const BuildDetailLoading());
 
   Future<void> loadBuild(String id) async {
     try {
       final builds = await _repository.getBuilds();
       final build = builds.firstWhere((b) => b.id == id);
-      emit(BuildDetailLoaded(build));
+      emit(
+        BuildDetailLoaded(
+          build,
+          isGapAnalysisLoading: _canLoadGapAnalysis(build),
+        ),
+      );
+
+      await _loadGapAnalysisForBuild(build);
 
       // Cargar avatar si falta
       if (build.characterAvatarUrl == null && build.characterRefKey != null) {
@@ -248,11 +260,22 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     await _save(current.copyWith(slots: updatedSlots));
   }
 
+  Future<void> refreshGapAnalysis({bool force = true}) async {
+    final current = _currentBuild;
+    if (current == null) return;
+    await _loadGapAnalysisForBuild(current, force: force);
+  }
+
   // ─── Private helpers ──────────────────────────────────────────────────────
 
   /// Guarda y emite el build actualizado.
   Future<void> _save(Build updated) async {
     await _repository.saveBuild(updated);
+    final current = state;
+    if (current is BuildDetailLoaded) {
+      emit(current.copyWith(build: updated));
+      return;
+    }
     emit(BuildDetailLoaded(updated));
   }
 
@@ -283,5 +306,68 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     final name = parts.sublist(2).join('-');
 
     return _mediaDataSource.getMedia(region: region, realm: realm, name: name);
+  }
+
+  bool _canLoadGapAnalysis(Build build) {
+    return build.characterRefKey != null;
+  }
+
+  Future<void> _loadGapAnalysisForBuild(
+    Build build, {
+    bool force = false,
+  }) async {
+    if (!_canLoadGapAnalysis(build)) {
+      final current = state;
+      if (current is BuildDetailLoaded && current.build.id == build.id) {
+        emit(
+          current.copyWith(clearGapAnalysis: true, isGapAnalysisLoading: false),
+        );
+      }
+      return;
+    }
+
+    final refKey = build.characterRefKey!;
+    final parts = refKey.split('-');
+    if (parts.length < 3) {
+      final current = state;
+      if (current is BuildDetailLoaded && current.build.id == build.id) {
+        emit(
+          current.copyWith(clearGapAnalysis: true, isGapAnalysisLoading: false),
+        );
+      }
+      return;
+    }
+
+    final region = parts[0];
+    final realm = parts[1];
+    final name = parts.sublist(2).join('-');
+
+    final current = state;
+    if (current is BuildDetailLoaded && current.build.id == build.id) {
+      emit(current.copyWith(isGapAnalysisLoading: true));
+    }
+
+    try {
+      final analysis = await _gapAnalysisDataSource.getGapAnalysis(
+        region: region,
+        realm: realm,
+        name: name,
+        className: build.characterClass,
+        specName: build.characterSpec,
+        buildSlots: build.slots,
+        force: force,
+      );
+      final latest = state;
+      if (latest is BuildDetailLoaded && latest.build.id == build.id) {
+        emit(
+          latest.copyWith(gapAnalysis: analysis, isGapAnalysisLoading: false),
+        );
+      }
+    } catch (_) {
+      final latest = state;
+      if (latest is BuildDetailLoaded && latest.build.id == build.id) {
+        emit(latest.copyWith(isGapAnalysisLoading: false));
+      }
+    }
   }
 }

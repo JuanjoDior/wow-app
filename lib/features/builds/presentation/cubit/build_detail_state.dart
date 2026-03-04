@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:wow_companion/features/builds/domain/entities/build_gap_analysis.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
 
 abstract class BuildDetailState extends Equatable {
@@ -13,13 +14,28 @@ class BuildDetailLoading extends BuildDetailState {
 
 class BuildDetailLoaded extends BuildDetailState {
   final Build build;
-  const BuildDetailLoaded(this.build);
+  final BuildGapAnalysis? gapAnalysis;
+  final bool isGapAnalysisLoading;
 
-  BuildDetailLoaded copyWith({Build? build}) =>
-      BuildDetailLoaded(build ?? this.build);
+  const BuildDetailLoaded(
+    this.build, {
+    this.gapAnalysis,
+    this.isGapAnalysisLoading = false,
+  });
+
+  BuildDetailLoaded copyWith({
+    Build? build,
+    BuildGapAnalysis? gapAnalysis,
+    bool? isGapAnalysisLoading,
+    bool clearGapAnalysis = false,
+  }) => BuildDetailLoaded(
+    build ?? this.build,
+    gapAnalysis: clearGapAnalysis ? null : (gapAnalysis ?? this.gapAnalysis),
+    isGapAnalysisLoading: isGapAnalysisLoading ?? this.isGapAnalysisLoading,
+  );
 
   @override
-  List<Object?> get props => [build];
+  List<Object?> get props => [build, gapAnalysis, isGapAnalysisLoading];
 }
 
 class BuildDetailError extends BuildDetailState {

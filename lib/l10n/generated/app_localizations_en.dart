@@ -488,6 +488,48 @@ class SEn extends S {
   String get buildNotFound => 'Build not found';
 
   @override
+  String get buildIntelligenceTitle => 'Build Verification';
+
+  @override
+  String get buildIntelligenceSubtitle =>
+      'Objective comparison of character vs your target build';
+
+  @override
+  String get buildIntelligenceNoData => 'No analysis data available.';
+
+  @override
+  String get buildIntelligenceMissingCharacter =>
+      'Link a character to run analysis.';
+
+  @override
+  String get buildIntelligenceCharacterStatus => 'Verifiable character status';
+
+  @override
+  String get buildIntelligenceNoTargetHint =>
+      'Add enchants and gems to your build to enable target actions.';
+
+  @override
+  String get buildIntelligenceEquippedItems => 'Equipped slots';
+
+  @override
+  String get buildIntelligenceEnchantedItems => 'Items with enchant';
+
+  @override
+  String get buildIntelligenceSockets => 'Sockets with gem';
+
+  @override
+  String get buildIntelligenceCompletion => 'Completion';
+
+  @override
+  String get buildIntelligenceMissingEnchants => 'Missing enchants';
+
+  @override
+  String get buildIntelligenceMissingGems => 'Missing gems';
+
+  @override
+  String get buildIntelligenceTopActions => 'Top actions';
+
+  @override
   String get guideTitle => 'Build Guide';
 
   @override

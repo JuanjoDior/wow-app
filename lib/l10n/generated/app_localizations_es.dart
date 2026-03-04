@@ -490,6 +490,49 @@ class SEs extends S {
   String get buildNotFound => 'Build no encontrada';
 
   @override
+  String get buildIntelligenceTitle => 'Verificación de Build';
+
+  @override
+  String get buildIntelligenceSubtitle =>
+      'Comparación objetiva del personaje vs tu build objetivo';
+
+  @override
+  String get buildIntelligenceNoData => 'No hay datos de análisis disponibles.';
+
+  @override
+  String get buildIntelligenceMissingCharacter =>
+      'Vincula un personaje para ejecutar el análisis.';
+
+  @override
+  String get buildIntelligenceCharacterStatus =>
+      'Estado verificable del personaje';
+
+  @override
+  String get buildIntelligenceNoTargetHint =>
+      'Añade enchants y gemas a tu build para activar acciones de comparación.';
+
+  @override
+  String get buildIntelligenceEquippedItems => 'Slots equipados';
+
+  @override
+  String get buildIntelligenceEnchantedItems => 'Objetos con enchant';
+
+  @override
+  String get buildIntelligenceSockets => 'Sockets con gema';
+
+  @override
+  String get buildIntelligenceCompletion => 'Completado';
+
+  @override
+  String get buildIntelligenceMissingEnchants => 'Enchants faltantes';
+
+  @override
+  String get buildIntelligenceMissingGems => 'Gemas faltantes';
+
+  @override
+  String get buildIntelligenceTopActions => 'Acciones principales';
+
+  @override
   String get guideTitle => 'Guía de Build';
 
   @override

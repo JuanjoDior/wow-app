@@ -29,6 +29,7 @@ import 'package:wow_companion/features/builds/domain/repositories/spells_reposit
 import 'package:wow_companion/features/builds/domain/usecases/search_spells.dart';
 import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dart';
 import 'package:wow_companion/features/builds/data/datasources/character_media_datasource.dart';
+import 'package:wow_companion/features/builds/data/datasources/build_gap_analysis_datasource.dart';
 
 final sl = GetIt.instance;
 
@@ -81,7 +82,7 @@ Future<void> initDependencies() async {
   // ── Builds Feature ────────────────────────────────────────────────────────
   sl.registerLazySingleton<BuildsRepository>(() => BuildsRepositoryImpl());
   sl.registerFactory(() => BuildsCubit(sl()));
-  sl.registerFactory(() => BuildDetailCubit(sl(), sl()));
+  sl.registerFactory(() => BuildDetailCubit(sl(), sl(), sl()));
 
   // ── Spells (Build Guide) ──────────────────────────────────────────────────
   sl.registerLazySingleton<SpellsDataSource>(() => SpellsDataSource(sl()));
@@ -93,5 +94,8 @@ Future<void> initDependencies() async {
   // ── Character Media ───────────────────────────────────────────────────────
   sl.registerLazySingleton<CharacterMediaDataSource>(
     () => CharacterMediaDataSource(sl()),
+  );
+  sl.registerLazySingleton<BuildGapAnalysisDataSource>(
+    () => BuildGapAnalysisDataSource(sl()),
   );
 }

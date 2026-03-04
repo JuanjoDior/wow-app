@@ -97,9 +97,8 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/builds/:id',
       parentNavigatorKey: _rootNavigatorKey,
-      builder: (context, state) => BuildDetailPage(
-        buildId: state.pathParameters['id']!,
-      ),
+      builder: (context, state) =>
+          BuildDetailPage(buildId: state.pathParameters['id']!),
     ),
   ],
 );

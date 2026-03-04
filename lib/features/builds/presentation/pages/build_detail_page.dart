@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
+import 'package:wow_companion/features/builds/domain/entities/build_gap_analysis.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/build_detail_cubit.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/build_detail_state.dart';
 import 'package:wow_companion/features/builds/presentation/widgets/item_search_dialog.dart';
@@ -116,7 +117,11 @@ class _BuildDetailView extends StatelessWidget {
           );
         }
         if (state is BuildDetailLoaded) {
-          return _BuildDetailContent(buildData: state.build);
+          return _BuildDetailContent(
+            buildData: state.build,
+            gapAnalysis: state.gapAnalysis,
+            gapAnalysisLoading: state.isGapAnalysisLoading,
+          );
         }
         return const SizedBox.shrink();
       },
@@ -127,7 +132,14 @@ class _BuildDetailView extends StatelessWidget {
 // ─── Main content ─────────────────────────────────────────────────────────────
 class _BuildDetailContent extends StatefulWidget {
   final Build buildData;
-  const _BuildDetailContent({required this.buildData});
+  final BuildGapAnalysis? gapAnalysis;
+  final bool gapAnalysisLoading;
+
+  const _BuildDetailContent({
+    required this.buildData,
+    required this.gapAnalysis,
+    required this.gapAnalysisLoading,
+  });
 
   @override
   State<_BuildDetailContent> createState() => _BuildDetailContentState();
@@ -174,6 +186,7 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
   @override
   Widget build(BuildContext context) {
     final build = widget.buildData;
+    final hasCharacter = build.characterRefKey != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -201,6 +214,21 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
                 pinned: true,
                 delegate: _ProgressHeaderDelegate(buildData: build),
               ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    isMobile ? 12 : 16,
+                    10,
+                    isMobile ? 12 : 16,
+                    4,
+                  ),
+                  child: _BuildIntelligenceSection(
+                    gapAnalysis: widget.gapAnalysis,
+                    loading: widget.gapAnalysisLoading,
+                    hasCharacter: hasCharacter,
+                  ),
+                ),
+              ),
               // Contenido principal
               if (isMobile)
                 SliverPadding(
@@ -211,7 +239,7 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
                   sliver: _MobileSliverContent(
                     avatarUrl: _avatarUrl,
                     loadingImage: _loadingImage,
-                    hasCharacter: build.characterRefKey != null,
+                    hasCharacter: hasCharacter,
                     showAvatar: build.characterClass == null,
                     guide: build.guide,
                   ),
@@ -224,7 +252,7 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
                       _PaperdollLayout(
                         renderUrl: _renderUrl,
                         loadingImage: _loadingImage,
-                        hasCharacter: build.characterRefKey != null,
+                        hasCharacter: hasCharacter,
                       ),
                       const SizedBox(height: 8),
                       BuildGuideSection(guide: build.guide),
@@ -383,6 +411,280 @@ class _ClassFallback extends StatelessWidget {
     return Container(
       color: WowTheme.surfaceLight,
       child: Icon(Icons.person_outline, color: classColor, size: 32),
+    );
+  }
+}
+
+class _BuildIntelligenceSection extends StatelessWidget {
+  final BuildGapAnalysis? gapAnalysis;
+  final bool loading;
+  final bool hasCharacter;
+
+  const _BuildIntelligenceSection({
+    required this.gapAnalysis,
+    required this.loading,
+    required this.hasCharacter,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = S.of(context)!;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        t.buildIntelligenceTitle,
+                        style: const TextStyle(
+                          color: WowTheme.primaryGold,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        t.buildIntelligenceSubtitle,
+                        style: TextStyle(
+                          color: WowTheme.textSecondary.withValues(alpha: 0.8),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.refresh,
+                    size: 18,
+                    color: WowTheme.textSecondary,
+                  ),
+                  tooltip: t.retry,
+                  onPressed: loading || !hasCharacter
+                      ? null
+                      : () => context
+                            .read<BuildDetailCubit>()
+                            .refreshGapAnalysis(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (!hasCharacter)
+              Text(
+                t.buildIntelligenceMissingCharacter,
+                style: const TextStyle(color: WowTheme.textSecondary),
+              )
+            else if (loading && gapAnalysis == null)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: WowTheme.primaryGold,
+                    strokeWidth: 2,
+                  ),
+                ),
+              )
+            else if (gapAnalysis == null)
+              Text(
+                t.buildIntelligenceNoData,
+                style: const TextStyle(color: WowTheme.textSecondary),
+              )
+            else ...[
+              if ((gapAnalysis!.summary.targetProfile ?? '') ==
+                      'build_target' ||
+                  gapAnalysis!.summary.checksTotal > 0)
+                _BuildIntelligenceSummary(summary: gapAnalysis!.summary)
+              else if (gapAnalysis!.facts != null) ...[
+                Text(
+                  t.buildIntelligenceCharacterStatus,
+                  style: const TextStyle(
+                    color: WowTheme.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                _BuildIntelligenceFacts(facts: gapAnalysis!.facts!),
+                const SizedBox(height: 8),
+                Text(
+                  t.buildIntelligenceNoTargetHint,
+                  style: const TextStyle(
+                    color: WowTheme.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ] else
+                Text(
+                  t.buildIntelligenceNoData,
+                  style: const TextStyle(color: WowTheme.textSecondary),
+                ),
+              const SizedBox(height: 10),
+              if ((gapAnalysis!.summary.targetProfile ?? '') ==
+                      'build_target' ||
+                  gapAnalysis!.summary.checksTotal > 0) ...[
+                Text(
+                  t.buildIntelligenceTopActions,
+                  style: const TextStyle(
+                    color: WowTheme.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                if (gapAnalysis!.actions.isEmpty)
+                  Text(
+                    t.buildIntelligenceNoData,
+                    style: const TextStyle(color: WowTheme.textSecondary),
+                  )
+                else
+                  ...gapAnalysis!.actions
+                      .take(3)
+                      .map(
+                        (action) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            '• [${action.priorityScore}] ${action.label}',
+                            style: const TextStyle(
+                              color: WowTheme.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BuildIntelligenceFacts extends StatelessWidget {
+  final BuildGapFacts facts;
+
+  const _BuildIntelligenceFacts({required this.facts});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = S.of(context)!;
+    final metrics = [
+      (
+        label: t.buildIntelligenceEquippedItems,
+        value: '${facts.equippedItemsCount}',
+      ),
+      (
+        label: t.buildIntelligenceEnchantedItems,
+        value: '${facts.enchantedItemsCount}',
+      ),
+      (
+        label: t.buildIntelligenceSockets,
+        value: '${facts.socketsFilledCount}/${facts.socketsTotalCount}',
+      ),
+    ];
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: metrics
+          .map(
+            (metric) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: WowTheme.surfaceLight,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: WowTheme.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    metric.label,
+                    style: TextStyle(
+                      color: WowTheme.textSecondary.withValues(alpha: 0.85),
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    metric.value,
+                    style: const TextStyle(
+                      color: WowTheme.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _BuildIntelligenceSummary extends StatelessWidget {
+  final BuildGapSummary summary;
+
+  const _BuildIntelligenceSummary({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = S.of(context)!;
+    final metrics = [
+      (
+        label: t.buildIntelligenceCompletion,
+        value: '${summary.completionPct}%',
+      ),
+      (
+        label: t.buildIntelligenceMissingEnchants,
+        value: '${summary.missingEnchants}',
+      ),
+      (label: t.buildIntelligenceMissingGems, value: '${summary.missingGems}'),
+    ];
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: metrics
+          .map(
+            (metric) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: WowTheme.surfaceLight,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: WowTheme.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    metric.label,
+                    style: TextStyle(
+                      color: WowTheme.textSecondary.withValues(alpha: 0.85),
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    metric.value,
+                    style: const TextStyle(
+                      color: WowTheme.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
     );
   }
 }
