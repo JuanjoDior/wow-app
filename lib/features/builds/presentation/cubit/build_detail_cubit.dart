@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:wow_companion/core/config/feature_flags.dart';
 import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
@@ -318,7 +319,7 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
   }
 
   bool _canLoadGapAnalysis(Build build) {
-    return build.characterRefKey != null;
+    return FeatureFlags.buildIntelligence && build.characterRefKey != null;
   }
 
   Future<void> _loadGapAnalysisForBuild(

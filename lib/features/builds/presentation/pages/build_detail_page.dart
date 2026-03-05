@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:wow_companion/core/config/feature_flags.dart';
 import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
@@ -215,21 +216,22 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
                 pinned: true,
                 delegate: _ProgressHeaderDelegate(buildData: build),
               ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    isMobile ? 12 : 16,
-                    10,
-                    isMobile ? 12 : 16,
-                    4,
-                  ),
-                  child: _BuildIntelligenceSection(
-                    gapAnalysis: widget.gapAnalysis,
-                    loading: widget.gapAnalysisLoading,
-                    hasCharacter: hasCharacter,
+              if (FeatureFlags.buildIntelligence)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      isMobile ? 12 : 16,
+                      10,
+                      isMobile ? 12 : 16,
+                      4,
+                    ),
+                    child: _BuildIntelligenceSection(
+                      gapAnalysis: widget.gapAnalysis,
+                      loading: widget.gapAnalysisLoading,
+                      hasCharacter: hasCharacter,
+                    ),
                   ),
                 ),
-              ),
               // Contenido principal
               if (isMobile)
                 SliverPadding(

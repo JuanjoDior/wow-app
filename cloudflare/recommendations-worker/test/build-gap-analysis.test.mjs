@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import worker from '../src/index.js';
 
-function createEnv() {
+function createEnv(overrides = {}) {
   const cache = new Map();
 
   const env = {
@@ -23,12 +23,13 @@ function createEnv() {
         cache.delete(key);
       },
     },
+    ...overrides,
   };
 
   return { env, cache };
 }
 
-test('health exposes v2 capability', async () => {
+test('health exposes capabilities with module feature flags', async () => {
   const { env } = createEnv();
   const req = new Request('https://worker.example/health');
   const res = await worker.fetch(req, env);
@@ -36,8 +37,40 @@ test('health exposes v2 capability', async () => {
 
   assert.equal(res.status, 200);
   assert.equal(body.status, 'ok');
+  assert.equal(body.capabilities?.build_intelligence, true);
+  assert.equal(body.capabilities?.weekly_planner, false);
+  assert.equal(body.capabilities?.economy_assistant, false);
   assert.equal(body.capabilities?.build_verification_v2, true);
   assert.equal(body.capabilities?.catalog_search_v2, true);
+});
+
+test('health honors explicit module feature flags from env', async () => {
+  const { env } = createEnv({
+    FEATURE_BUILD_INTELLIGENCE: 'false',
+    FEATURE_WEEKLY_PLANNER: 'true',
+    FEATURE_ECONOMY_ASSISTANT: 'true',
+  });
+  const req = new Request('https://worker.example/health');
+  const res = await worker.fetch(req, env);
+  const body = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.equal(body.capabilities?.build_intelligence, false);
+  assert.equal(body.capabilities?.weekly_planner, true);
+  assert.equal(body.capabilities?.economy_assistant, true);
+  assert.equal(body.capabilities?.build_verification_v2, false);
+});
+
+test('weekly planner endpoint is disabled by flag by default', async () => {
+  const { env } = createEnv();
+  const req = new Request('https://worker.example/v1/planner/weekly');
+  const res = await worker.fetch(req, env);
+  const body = await res.json();
+
+  assert.equal(res.status, 503);
+  assert.equal(body.version, 'v1');
+  assert.equal(body.endpoint, '/v1/planner/weekly');
+  assert.match(body.error, /weekly_planner/i);
 });
 
 test('v1 build gap-analysis uses objective mode in compatibility alias', async () => {

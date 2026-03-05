@@ -20,6 +20,10 @@ BLIZZARD_TOKEN_CACHE_TTL = "82800"
 BLIZZARD_REALM_CACHE_TTL = "2592000"
 # TTL del caché por icono de item (7 días).
 BLIZZARD_ITEM_ICON_CACHE_TTL = "604800"
+# Feature flags de módulo (F0-04)
+FEATURE_BUILD_INTELLIGENCE = "true"
+FEATURE_WEEKLY_PLANNER = "false"
+FEATURE_ECONOMY_ASSISTANT = "false"
 
 # Secrets — añadir via CLI, NUNCA en este archivo:
 #   wrangler secret put BLIZZARD_CLIENT_SECRET

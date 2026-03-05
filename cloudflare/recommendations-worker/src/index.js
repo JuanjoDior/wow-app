@@ -91,6 +91,7 @@ export default {
     let status = 500;
     let source = null;
     let cacheHit = null;
+    const capabilities = resolveWorkerCapabilities(env);
 
     try {
       if (request.method === 'OPTIONS') {
@@ -101,15 +102,16 @@ export default {
           patch: env.CURRENT_PATCH,
           specs: SUPPORTED_SPECS.length,
           service_version: env.SERVICE_VERSION || 'v5',
-          capabilities: {
-            build_verification_v2: true,
-            catalog_search_v2: true,
-          },
+          capabilities,
         });
       } else if (url.pathname === '/v2/catalog/search' && request.method === 'GET') {
         response = await handleCatalogSearchV2(url, env);
       } else if (url.pathname === '/v2/build/verification' && request.method === 'GET') {
+        if (!capabilities.build_intelligence) {
+          response = featureFlagDisabled('/v2/build/verification', 'build_intelligence', 'v2');
+        } else {
         response = await handleBuildVerificationV2(url, env);
+        }
       } else if (url.pathname === '/recommendations' && request.method === 'GET') {
         response = await handleRecommendations(url, env);
       } else if (url.pathname === '/character' && request.method === 'GET') {
@@ -117,9 +119,17 @@ export default {
       } else if (url.pathname === '/v1/character/snapshot' && request.method === 'GET') {
         response = await handleCharacterSnapshotV1(url, env);
       } else if (url.pathname === '/v1/build/gap-analysis' && request.method === 'GET') {
+        if (!capabilities.build_intelligence) {
+          response = featureFlagDisabled('/v1/build/gap-analysis', 'build_intelligence', 'v1');
+        } else {
         response = await handleBuildGapAnalysisV1(url, env);
+        }
       } else if (url.pathname === '/v1/planner/weekly' && request.method === 'GET') {
-        response = notImplementedV1('/v1/planner/weekly');
+        if (!capabilities.weekly_planner) {
+          response = featureFlagDisabled('/v1/planner/weekly', 'weekly_planner', 'v1');
+        } else {
+          response = notImplementedV1('/v1/planner/weekly');
+        }
       } else if (url.pathname === '/invalidate' && request.method === 'POST') {
         response = await handleInvalidate(request, env);
       } else if (url.pathname === '/specs' && request.method === 'GET') {
@@ -2177,6 +2187,34 @@ async function handleSpecs(url, env) {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function parseFeatureFlag(rawValue, defaultValue = false) {
+  if (rawValue == null) return defaultValue;
+  if (typeof rawValue === 'boolean') return rawValue;
+  const normalized = String(rawValue).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on', 'enabled'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off', 'disabled'].includes(normalized)) return false;
+  return defaultValue;
+}
+
+function resolveWorkerCapabilities(env) {
+  const buildIntelligence = parseFeatureFlag(env.FEATURE_BUILD_INTELLIGENCE, true);
+  return {
+    build_intelligence: buildIntelligence,
+    weekly_planner: parseFeatureFlag(env.FEATURE_WEEKLY_PLANNER, false),
+    economy_assistant: parseFeatureFlag(env.FEATURE_ECONOMY_ASSISTANT, false),
+    build_verification_v2: buildIntelligence,
+    catalog_search_v2: true,
+  };
+}
+
+function featureFlagDisabled(endpoint, featureName, version = 'v1') {
+  return json({
+    version,
+    endpoint,
+    error: `Feature disabled: ${featureName}`,
+  }, 503);
+}
 
 function parsePositiveInt(value, fallback) {
   const parsed = parseInt(String(value ?? ''), 10);

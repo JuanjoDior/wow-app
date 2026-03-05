@@ -24,6 +24,9 @@ Worker orientado a datos objetivos de personaje/build usando Blizzard API.
   "patch": "12.0.1",
   "service_version": "5.1.0",
   "capabilities": {
+    "build_intelligence": true,
+    "weekly_planner": false,
+    "economy_assistant": false,
     "build_verification_v2": true,
     "catalog_search_v2": true
   }
@@ -153,3 +156,9 @@ wrangler kv:namespace create "RECS_CACHE"
 wrangler secret put BLIZZARD_CLIENT_SECRET
 wrangler deploy
 ```
+
+## Feature flags (Worker vars)
+
+- `FEATURE_BUILD_INTELLIGENCE` (default `true`)
+- `FEATURE_WEEKLY_PLANNER` (default `false`)
+- `FEATURE_ECONOMY_ASSISTANT` (default `false`)
