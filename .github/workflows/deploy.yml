@@ -29,7 +29,7 @@ jobs:
         run: flutter gen-l10n
 
       - name: Build Web
-        run: flutter build web --release --base-href "/wow-app/" --dart-define=BUILD_VERIFICATION_V2=true --dart-define=CATALOG_SEARCH_V2=false
+        run: flutter build web --release --base-href "/wow-app/" --dart-define=BUILD_VERIFICATION_V2=true --dart-define=CATALOG_SEARCH_V2=true
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4

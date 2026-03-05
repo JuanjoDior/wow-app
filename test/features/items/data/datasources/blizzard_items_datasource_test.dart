@@ -27,7 +27,7 @@ void main() {
 
   setUp(() {
     apiClient = _MockApiClient();
-    datasource = BlizzardItemsDataSource(apiClient);
+    datasource = BlizzardItemsDataSource(apiClient, catalogV2Enabled: false);
   });
 
   test('searchItems sends locale in query params', () async {
