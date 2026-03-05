@@ -228,6 +228,124 @@ test('catalog search enchant mode returns localized and canonical english names'
   });
 });
 
+test('catalog search uses requested locale from localized name maps', async () => {
+  const { env } = createEnv();
+
+  await withMockedFetch(async (url) => {
+    if (url.hostname === 'oauth.battle.net') {
+      return jsonResponse({ access_token: 'token' });
+    }
+    if (url.pathname === '/data/wow/search/item') {
+      return jsonResponse({
+        results: [
+          itemEntry({
+            id: 3010,
+            name: {
+              it_IT: 'Incanta Arma - Autorita del Potere Radioso',
+              es_ES: 'Encantar arma: autoridad de poder radiante',
+              en_US: 'Enchant Weapon - Authority of Radiant Power',
+            },
+            itemClass: {
+              it_IT: 'Ricetta',
+              es_ES: 'Receta',
+              en_US: 'Recipe',
+            },
+            itemSubclass: {
+              it_IT: 'Incantamento',
+              es_ES: 'Encantamiento',
+              en_US: 'Enchanting',
+            },
+            inventoryType: 'NON_EQUIP',
+            inventoryName: {
+              it_IT: 'Non equipaggiabile',
+              es_ES: 'No equipable',
+              en_US: 'Non-equippable',
+            },
+          }),
+        ],
+      });
+    }
+    if (url.pathname === '/data/wow/search/spell') {
+      return jsonResponse({ results: [] });
+    }
+    return new Response('Not Found', { status: 404 });
+  }, async () => {
+    const req = new Request(
+      'https://worker.example/v2/catalog/search?q=Authority%20of%20Radiant%20Power&mode=enchant&region=eu&locale=es_ES',
+    );
+    const res = await worker.fetch(req, env);
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.ok(body.results.length >= 1);
+    assert.equal(
+      body.results[0].name_localized,
+      'Encantar arma: autoridad de poder radiante',
+    );
+    assert.equal(
+      body.results[0].name_en_us,
+      'Enchant Weapon - Authority of Radiant Power',
+    );
+  });
+});
+
+test('catalog search enchant mode filters weak lexical matches', async () => {
+  const { env } = createEnv();
+
+  await withMockedFetch(async (url) => {
+    if (url.hostname === 'oauth.battle.net') {
+      return jsonResponse({ access_token: 'token' });
+    }
+    if (url.pathname === '/data/wow/search/item') {
+      const locale = url.searchParams.get('locale');
+      const exactName =
+        locale === 'en_US'
+          ? 'Enchant Weapon - Authority of Radiant Power'
+          : 'Encantar arma: autoridad de poder radiante';
+      return jsonResponse({
+        results: [
+          itemEntry({
+            id: 4010,
+            name:
+              locale === 'en_US'
+                ? 'QAEnchant Gloves +26 Attack Power'
+                : 'QAEncantar guantes +26 poder de ataque',
+            itemClass: locale === 'en_US' ? 'Recipe' : 'Receta',
+            itemSubclass: locale === 'en_US' ? 'Enchanting' : 'Encantamiento',
+            inventoryType: 'NON_EQUIP',
+            inventoryName:
+              locale === 'en_US' ? 'Non-equippable' : 'No equipable',
+          }),
+          itemEntry({
+            id: 4011,
+            name: exactName,
+            itemClass: locale === 'en_US' ? 'Recipe' : 'Receta',
+            itemSubclass: locale === 'en_US' ? 'Enchanting' : 'Encantamiento',
+            inventoryType: 'NON_EQUIP',
+            inventoryName:
+              locale === 'en_US' ? 'Non-equippable' : 'No equipable',
+          }),
+        ],
+      });
+    }
+    if (url.pathname === '/data/wow/search/spell') {
+      return jsonResponse({ results: [] });
+    }
+    return new Response('Not Found', { status: 404 });
+  }, async () => {
+    const req = new Request(
+      'https://worker.example/v2/catalog/search?q=Authority%20of%20Radiant%20Power&mode=enchant&region=eu&locale=es_ES',
+    );
+    const res = await worker.fetch(req, env);
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.ok(body.results.length >= 1);
+    assert.equal(body.results[0].id, 4011);
+    assert.ok(!body.results.some((it) => it.id === 4010));
+  });
+});
+
 test('catalog search validates mode', async () => {
   const { env } = createEnv();
   const req = new Request(

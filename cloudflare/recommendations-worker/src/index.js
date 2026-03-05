@@ -57,6 +57,25 @@ const CATALOG_DEFAULT_LOCALE_BY_REGION = {
   tw: 'zh_TW',
 };
 const CATALOG_SEARCH_MODES = new Set(['item', 'enchant', 'gem', 'consumable']);
+const CATALOG_QUERY_STOPWORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'con',
+  'de',
+  'del',
+  'di',
+  'el',
+  'for',
+  'in',
+  'la',
+  'las',
+  'los',
+  'of',
+  'the',
+  'to',
+  'y',
+]);
 
 // ─── Legacy recommendation catalog (disabled in v2 objective mode) ──────────
 export const SUPPORTED_SPECS = [];
@@ -421,7 +440,7 @@ async function fetchBlizzardItemSearch({ token, region, locale, query }) {
     const payload = await response.json();
     const entries = extractCatalogEntries(payload);
     return entries
-      .map((entry) => toItemCatalogCandidate(entry))
+      .map((entry) => toItemCatalogCandidate(entry, locale))
       .filter(Boolean);
   } catch {
     return [];
@@ -449,7 +468,7 @@ async function fetchBlizzardSpellSearch({ token, region, locale, query }) {
     const payload = await response.json();
     const entries = extractCatalogEntries(payload);
     return entries
-      .map((entry) => toSpellCatalogCandidate(entry))
+      .map((entry) => toSpellCatalogCandidate(entry, locale))
       .filter(Boolean);
   } catch {
     return [];
@@ -463,11 +482,11 @@ function extractCatalogEntries(payload) {
     .filter(Boolean);
 }
 
-function toItemCatalogCandidate(entry) {
+function toItemCatalogCandidate(entry, locale) {
   const id = extractEntityId(entry);
   if (!Number.isInteger(id)) return null;
 
-  const name = extractCatalogName(entry?.name);
+  const name = extractCatalogName(entry?.name, locale);
   if (!name) return null;
 
   return {
@@ -476,25 +495,30 @@ function toItemCatalogCandidate(entry) {
     name,
     quality: normalizeQualityToken(entry?.quality?.type || entry?.quality),
     level: extractNumericStatValue(entry?.level),
-    itemClass: extractCatalogName(entry?.item_class?.name || entry?.item_class),
+    itemClass: extractCatalogName(
+      entry?.item_class?.name || entry?.item_class,
+      locale,
+    ),
     itemSubclass: extractCatalogName(
       entry?.item_subclass?.name || entry?.item_subclass,
+      locale,
     ),
     inventoryType: normalizeInventoryTypeToken(
       entry?.inventory_type?.type || entry?.inventory_type,
     ),
     inventoryName: extractCatalogName(
       entry?.inventory_type?.name || entry?.inventory_type_name,
+      locale,
     ),
     iconUrl: extractIconUrlFromSearchEntry(entry),
     source: 'blizzard_item',
   };
 }
 
-function toSpellCatalogCandidate(entry) {
+function toSpellCatalogCandidate(entry, locale) {
   const id = extractEntityId(entry);
   if (!Number.isInteger(id)) return null;
-  const name = extractCatalogName(entry?.name);
+  const name = extractCatalogName(entry?.name, locale);
   if (!name) return null;
 
   return {
@@ -520,11 +544,27 @@ function extractEntityId(entry) {
   return null;
 }
 
-function extractCatalogName(rawName) {
+function extractCatalogName(rawName, preferredLocale) {
   if (typeof rawName === 'string') {
     return rawName.trim();
   }
   if (!rawName || typeof rawName !== 'object') return null;
+
+  const preferred = String(preferredLocale || '').trim();
+  const preferredKey = preferred.replace('-', '_');
+  const localeKeys = [];
+  if (preferred.length > 0) {
+    localeKeys.push(preferred, preferredKey);
+  }
+  localeKeys.push('en_US', 'en-US', 'en_GB', 'en-GB');
+
+  for (const key of localeKeys) {
+    const value = rawName?.[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
   for (const value of Object.values(rawName)) {
     if (typeof value === 'string' && value.trim().length > 0) {
       return value.trim();
@@ -555,24 +595,37 @@ function scoreCatalogCandidate({ candidate, mode, normalizedQuery, inventoryType
   ].filter(Boolean);
   if (names.length === 0) return 0;
 
+  const queryTokens = extractMeaningfulCatalogTokens(normalizedQuery);
   let score = 0;
+  let bestTokenMatches = 0;
   for (const name of names) {
     const value = normalizeCatalogToken(name);
     if (!value) continue;
     if (value === normalizedQuery) {
       score = Math.max(score, 120);
+      bestTokenMatches = Math.max(bestTokenMatches, queryTokens.length);
       continue;
     }
     if (value.startsWith(normalizedQuery)) {
       score = Math.max(score, 90);
+      bestTokenMatches = Math.max(bestTokenMatches, queryTokens.length);
       continue;
     }
     if (value.includes(normalizedQuery)) {
       score = Math.max(score, 70);
+      bestTokenMatches = Math.max(bestTokenMatches, queryTokens.length);
       continue;
     }
-    const overlap = computeTokenOverlapScore(value, normalizedQuery);
-    score = Math.max(score, overlap);
+    const overlap = computeTokenOverlapScore(value, normalizedQuery, queryTokens);
+    score = Math.max(score, overlap.score);
+    bestTokenMatches = Math.max(bestTokenMatches, overlap.matches);
+  }
+
+  if ((mode === 'enchant' || mode === 'gem') && queryTokens.length > 0) {
+    const minMatches = queryTokens.length >= 3 ? 2 : 1;
+    if (bestTokenMatches < minMatches && score < 90) {
+      return 0;
+    }
   }
 
   const recipeLike = isRecipeLike(candidate);
@@ -593,28 +646,56 @@ function scoreCatalogCandidate({ candidate, mode, normalizedQuery, inventoryType
   }
 
   if (mode === 'enchant') {
-    if (isEnchantLike(candidate)) score += 45;
-    if (candidate.kind === 'spell') score += 20;
+    if (isEnchantLike(candidate)) score += 25;
+    if (candidate.kind === 'spell') score += 8;
   }
 
   if (mode === 'consumable') {
     if (candidate.inventoryType === 'NON_EQUIP') score += 20;
   }
 
-  return score;
+  return Math.max(score, 0);
 }
 
-function computeTokenOverlapScore(nameNormalized, queryNormalized) {
-  const queryTokens = queryNormalized.split(' ').filter(Boolean);
+function computeTokenOverlapScore(nameNormalized, queryNormalized, precomputedQueryTokens) {
+  const queryTokens = precomputedQueryTokens?.length
+    ? precomputedQueryTokens
+    : extractMeaningfulCatalogTokens(queryNormalized);
   const nameTokens = new Set(nameNormalized.split(' ').filter(Boolean));
-  if (queryTokens.length === 0) return 0;
+  if (queryTokens.length === 0) {
+    return { score: 0, matches: 0, ratio: 0 };
+  }
   let matches = 0;
   for (const token of queryTokens) {
-    if (nameTokens.has(token)) matches += 1;
+    const matched = [...nameTokens].some(
+      (nameToken) =>
+        nameToken === token ||
+        nameToken.startsWith(token) ||
+        token.startsWith(nameToken),
+    );
+    if (matched) matches += 1;
   }
   const ratio = matches / queryTokens.length;
-  if (ratio <= 0) return 0;
-  return Math.round(40 + ratio * 30);
+  if (ratio <= 0) {
+    return { score: 0, matches, ratio };
+  }
+  return {
+    score: Math.round(35 + ratio * 35),
+    matches,
+    ratio,
+  };
+}
+
+function extractMeaningfulCatalogTokens(queryNormalized) {
+  const rawTokens = String(queryNormalized || '')
+    .split(' ')
+    .map((token) => token.trim())
+    .filter(Boolean);
+  const meaningful = rawTokens.filter(
+    (token) => token.length >= 3 && !CATALOG_QUERY_STOPWORDS.has(token),
+  );
+  if (meaningful.length > 0) return meaningful;
+  return rawTokens.filter((token) => token.length >= 2);
 }
 
 function isRecipeLike(candidate) {
