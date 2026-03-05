@@ -194,7 +194,7 @@
   "buildIntelligenceEnchantedItems": "Objetos con enchant",
   "buildIntelligenceSockets": "Sockets con gema",
   "buildIntelligenceCompletion": "Completado",
-  "buildIntelligenceMissingEnchants": "Enchants faltantes",
+  "buildIntelligenceMissingEnchants": "Encantamientos faltantes",
   "buildIntelligenceMissingGems": "Gemas faltantes",
   "buildIntelligenceTopActions": "Acciones principales",
   "buildIntelligenceActionEnchantMissing": "Aplica {name}",

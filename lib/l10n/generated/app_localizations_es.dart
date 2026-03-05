@@ -530,7 +530,7 @@ class SEs extends S {
   String get buildIntelligenceCompletion => 'Completado';
 
   @override
-  String get buildIntelligenceMissingEnchants => 'Enchants faltantes';
+  String get buildIntelligenceMissingEnchants => 'Encantamientos faltantes';
 
   @override
   String get buildIntelligenceMissingGems => 'Gemas faltantes';

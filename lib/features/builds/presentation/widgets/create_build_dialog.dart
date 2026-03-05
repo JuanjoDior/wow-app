@@ -6,6 +6,7 @@ import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/builds_cubit.dart';
 import 'package:wow_companion/features/favorites/domain/favorites_repository.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
+import 'package:wow_companion/core/l10n/wow_translations.dart';
 
 class CreateBuildDialog extends StatefulWidget {
   const CreateBuildDialog({super.key});
@@ -36,17 +37,17 @@ const _classes = [
 const _specsByClass = <String, List<String>>{
   'Death Knight': ['Blood', 'Frost', 'Unholy'],
   'Demon Hunter': ['Devourer', 'Havoc', 'Vengeance'],
-  'Druid':        ['Balance', 'Feral', 'Guardian', 'Restoration'],
-  'Evoker':       ['Augmentation', 'Devastation', 'Preservation'],
-  'Hunter':       ['Beast Mastery', 'Marksmanship', 'Survival'],
-  'Mage':         ['Arcane', 'Fire', 'Frost'],
-  'Monk':         ['Brewmaster', 'Mistweaver', 'Windwalker'],
-  'Paladin':      ['Holy', 'Protection', 'Retribution'],
-  'Priest':       ['Discipline', 'Holy', 'Shadow'],
-  'Rogue':        ['Assassination', 'Outlaw', 'Subtlety'],
-  'Shaman':       ['Elemental', 'Enhancement', 'Restoration'],
-  'Warlock':      ['Affliction', 'Demonology', 'Destruction'],
-  'Warrior':      ['Arms', 'Fury', 'Protection'],
+  'Druid': ['Balance', 'Feral', 'Guardian', 'Restoration'],
+  'Evoker': ['Augmentation', 'Devastation', 'Preservation'],
+  'Hunter': ['Beast Mastery', 'Marksmanship', 'Survival'],
+  'Mage': ['Arcane', 'Fire', 'Frost'],
+  'Monk': ['Brewmaster', 'Mistweaver', 'Windwalker'],
+  'Paladin': ['Holy', 'Protection', 'Retribution'],
+  'Priest': ['Discipline', 'Holy', 'Shadow'],
+  'Rogue': ['Assassination', 'Outlaw', 'Subtlety'],
+  'Shaman': ['Elemental', 'Enhancement', 'Restoration'],
+  'Warlock': ['Affliction', 'Demonology', 'Destruction'],
+  'Warrior': ['Arms', 'Fury', 'Protection'],
 };
 
 class _CreateBuildDialogState extends State<CreateBuildDialog> {
@@ -119,6 +120,7 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
   @override
   Widget build(BuildContext context) {
     final t = S.of(context)!;
+    final localeCode = Localizations.localeOf(context).languageCode;
     return AlertDialog(
       backgroundColor: WowTheme.surfaceDark,
       title: Text(
@@ -127,96 +129,116 @@ class _CreateBuildDialogState extends State<CreateBuildDialog> {
       ),
       content: SingleChildScrollView(
         child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _nameController,
-            autofocus: true,
-            style: const TextStyle(color: WowTheme.textPrimary),
-            decoration: InputDecoration(
-              hintText: t.buildsBuildName,
-              hintStyle: const TextStyle(color: WowTheme.textSecondary),
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (_loadingFavorites)
-            const CircularProgressIndicator(color: WowTheme.primaryGold)
-          else if (_favorites.isNotEmpty) ...[  
-            DropdownButtonFormField<FavoriteCharacter?>(
-              initialValue: _selectedCharacter,
-              dropdownColor: WowTheme.surfaceDark,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _nameController,
+              autofocus: true,
+              style: const TextStyle(color: WowTheme.textPrimary),
               decoration: InputDecoration(
-                hintText: t.buildsLinkCharacter,
+                hintText: t.buildsBuildName,
                 hintStyle: const TextStyle(color: WowTheme.textSecondary),
               ),
-              style: const TextStyle(color: WowTheme.textPrimary),
-              items: [
-                DropdownMenuItem(
-                  value: null,
-                  child: Text(
-                    t.buildsGenericBuild,
-                    style: const TextStyle(color: WowTheme.textSecondary),
-                  ),
-                ),
-                ..._favorites.map(
-                  (f) => DropdownMenuItem(
-                    value: f,
-                    child: Text(
-                      '${f.name} - ${f.realm}',
-                      style: const TextStyle(color: WowTheme.textPrimary),
-                    ),
-                  ),
-                ),
-              ],
-              onChanged: (value) => setState(() {
-                _selectedCharacter = value;
-                // Reset manual si vinculamos personaje
-                if (value != null) { _manualClass = null; _manualSpec = null; }
-              }),
             ),
-            const SizedBox(height: 8),
-          ],
-
-          // Selector manual (solo si no hay personaje vinculado)
-          if (_selectedCharacter == null) ...[  
-            const Divider(color: WowTheme.textSecondary),
-            const SizedBox(height: 4),
-            Text(
-              t.buildsClassAndSpec,
-              style: const TextStyle(color: WowTheme.textSecondary, fontSize: 12),
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              initialValue: _manualClass,
-              dropdownColor: WowTheme.surfaceDark,
-              decoration: InputDecoration(
-                hintText: t.buildsSelectClass,
-                hintStyle: const TextStyle(color: WowTheme.textSecondary),
-              ),
-              style: const TextStyle(color: WowTheme.textPrimary),
-              items: _classes
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                  .toList(),
-              onChanged: _onClassChanged,
-            ),
-            if (_manualClass != null) ...[  
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: _manualSpec,
+            const SizedBox(height: 16),
+            if (_loadingFavorites)
+              const CircularProgressIndicator(color: WowTheme.primaryGold)
+            else if (_favorites.isNotEmpty) ...[
+              DropdownButtonFormField<FavoriteCharacter?>(
+                initialValue: _selectedCharacter,
                 dropdownColor: WowTheme.surfaceDark,
                 decoration: InputDecoration(
-                  hintText: t.buildsSelectSpec,
+                  hintText: t.buildsLinkCharacter,
                   hintStyle: const TextStyle(color: WowTheme.textSecondary),
                 ),
                 style: const TextStyle(color: WowTheme.textPrimary),
-                items: (_specsByClass[_manualClass] ?? <String>[])
-                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                    .toList(),
-                onChanged: (value) => setState(() => _manualSpec = value),
+                items: [
+                  DropdownMenuItem(
+                    value: null,
+                    child: Text(
+                      t.buildsGenericBuild,
+                      style: const TextStyle(color: WowTheme.textSecondary),
+                    ),
+                  ),
+                  ..._favorites.map(
+                    (f) => DropdownMenuItem(
+                      value: f,
+                      child: Text(
+                        '${f.name} - ${f.realm}',
+                        style: const TextStyle(color: WowTheme.textPrimary),
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: (value) => setState(() {
+                  _selectedCharacter = value;
+                  // Reset manual si vinculamos personaje
+                  if (value != null) {
+                    _manualClass = null;
+                    _manualSpec = null;
+                  }
+                }),
               ),
+              const SizedBox(height: 8),
+            ],
+
+            // Selector manual (solo si no hay personaje vinculado)
+            if (_selectedCharacter == null) ...[
+              const Divider(color: WowTheme.textSecondary),
+              const SizedBox(height: 4),
+              Text(
+                t.buildsClassAndSpec,
+                style: const TextStyle(
+                  color: WowTheme.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: _manualClass,
+                dropdownColor: WowTheme.surfaceDark,
+                decoration: InputDecoration(
+                  hintText: t.buildsSelectClass,
+                  hintStyle: const TextStyle(color: WowTheme.textSecondary),
+                ),
+                style: const TextStyle(color: WowTheme.textPrimary),
+                items: _classes
+                    .map(
+                      (c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(
+                          WowTranslations.translateClass(c, localeCode),
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: _onClassChanged,
+              ),
+              if (_manualClass != null) ...[
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: _manualSpec,
+                  dropdownColor: WowTheme.surfaceDark,
+                  decoration: InputDecoration(
+                    hintText: t.buildsSelectSpec,
+                    hintStyle: const TextStyle(color: WowTheme.textSecondary),
+                  ),
+                  style: const TextStyle(color: WowTheme.textPrimary),
+                  items: (_specsByClass[_manualClass] ?? <String>[])
+                      .map(
+                        (s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(
+                            WowTranslations.translateSpec(s, localeCode),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() => _manualSpec = value),
+                ),
+              ],
             ],
           ],
-        ],
         ),
       ),
       actions: [
