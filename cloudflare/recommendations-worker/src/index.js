@@ -249,6 +249,7 @@ async function handleCatalogSearchV2(url, env) {
       inventoryType: inventoryType || null,
       slot,
       limit,
+      env,
     });
 
     const payload = {
@@ -317,6 +318,7 @@ async function fetchCatalogResults({
   inventoryType,
   slot,
   limit,
+  env,
 }) {
   const locales = [...new Set([locale, 'en_US'])];
   const queryVariants = buildCatalogQueryVariants(mode, query, slot);
@@ -377,8 +379,31 @@ async function fetchCatalogResults({
       return a.id - b.id;
     });
 
+  const selected = ranked.slice(0, limit);
+  const missingIconItemIds = [
+    ...new Set(
+      selected
+        .filter((candidate) => candidate.kind === 'item' && !candidate.iconUrl)
+        .map((candidate) => candidate.id)
+        .filter((itemId) => Number.isInteger(itemId)),
+    ),
+  ];
+  if (missingIconItemIds.length > 0) {
+    const iconUrlsByItemId = await resolveItemIconsByIds(
+      region,
+      missingIconItemIds,
+      token,
+      env,
+    );
+    for (const candidate of selected) {
+      if (candidate.kind !== 'item') continue;
+      if (candidate.iconUrl) continue;
+      candidate.iconUrl = iconUrlsByItemId[candidate.id] ?? null;
+    }
+  }
+
   return {
-    items: ranked.slice(0, limit),
+    items: selected,
     totalCandidates: ranked.length,
   };
 }
@@ -583,7 +608,7 @@ function extractIconUrlFromSearchEntry(entry) {
       typeof asset?.value === 'string' &&
       asset.value.length > 0,
   );
-  if (icon) return icon.value;
+  if (icon) return normalizeMediaUrl(icon.value);
   return null;
 }
 
@@ -1563,10 +1588,9 @@ function extractMediaAssetUrl(asset) {
 }
 
 async function resolveItemIcons(region, equip, token, env) {
-  const iconUrlsByItemId = {};
   const equippedItems = equip?.equipped_items;
   if (!Array.isArray(equippedItems) || equippedItems.length === 0) {
-    return iconUrlsByItemId;
+    return {};
   }
 
   const itemIds = [...new Set(
@@ -1575,9 +1599,12 @@ async function resolveItemIcons(region, equip, token, env) {
       .filter(itemId => Number.isInteger(itemId))
   )];
 
-  if (itemIds.length === 0) {
-    return iconUrlsByItemId;
-  }
+  return resolveItemIconsByIds(region, itemIds, token, env);
+}
+
+async function resolveItemIconsByIds(region, itemIds, token, env) {
+  const iconUrlsByItemId = {};
+  if (!Array.isArray(itemIds) || itemIds.length === 0) return iconUrlsByItemId;
 
   const ttl = getCacheTtlSeconds(env, 'itemIcon');
   const base = BLIZZARD_API_BASE[region];
@@ -1636,13 +1663,22 @@ function extractItemIconUrl(media) {
     asset => asset?.key === 'icon' && typeof asset?.value === 'string' && asset.value.length > 0
   );
   if (iconAsset) {
-    return iconAsset.value;
+    return normalizeMediaUrl(iconAsset.value);
   }
 
   const firstValidAsset = assets.find(
     asset => typeof asset?.value === 'string' && asset.value.length > 0
   );
-  return firstValidAsset?.value ?? null;
+  return normalizeMediaUrl(firstValidAsset?.value ?? null);
+}
+
+function normalizeMediaUrl(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  if (trimmed.startsWith('//')) return `https:${trimmed}`;
+  if (trimmed.startsWith('http://')) return `https://${trimmed.slice(7)}`;
+  return trimmed;
 }
 
 function normalizeSpecToken(value) {

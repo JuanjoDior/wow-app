@@ -359,3 +359,59 @@ test('catalog search validates mode', async () => {
   assert.equal(body.endpoint, '/v2/catalog/search');
   assert.match(body.error, /invalid mode/i);
 });
+
+test('catalog search resolves icon_url from item media when search payload has no media', async () => {
+  const { env } = createEnv();
+
+  await withMockedFetch(async (url) => {
+    if (url.hostname === 'oauth.battle.net') {
+      return jsonResponse({ access_token: 'token' });
+    }
+    if (url.pathname === '/data/wow/search/item') {
+      const locale = url.searchParams.get('locale');
+      return jsonResponse({
+        results: [
+          itemEntry({
+            id: 5001,
+            name:
+              locale === 'en_US'
+                ? 'Enchant Weapon - Authority of Radiant Power'
+                : 'Encantar arma: autoridad de poder radiante',
+            itemClass: locale === 'en_US' ? 'Recipe' : 'Receta',
+            itemSubclass: locale === 'en_US' ? 'Enchanting' : 'Encantamiento',
+            inventoryType: 'NON_EQUIP',
+            inventoryName:
+              locale === 'en_US' ? 'Non-equippable' : 'No equipable',
+          }),
+        ],
+      });
+    }
+    if (url.pathname === '/data/wow/media/item/5001') {
+      return jsonResponse({
+        assets: [
+          {
+            key: 'icon',
+            value: 'http://render.worldofwarcraft.com/eu/icons/56/inv_sword_1h.jpg',
+          },
+        ],
+      });
+    }
+    if (url.pathname === '/data/wow/search/spell') {
+      return jsonResponse({ results: [] });
+    }
+    return new Response('Not Found', { status: 404 });
+  }, async () => {
+    const req = new Request(
+      'https://worker.example/v2/catalog/search?q=Authority%20of%20Radiant%20Power&mode=enchant&region=eu&locale=es_ES',
+    );
+    const res = await worker.fetch(req, env);
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(body.results.length, 1);
+    assert.equal(
+      body.results[0].icon_url,
+      'https://render.worldofwarcraft.com/eu/icons/56/inv_sword_1h.jpg',
+    );
+  });
+});
