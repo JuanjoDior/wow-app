@@ -100,7 +100,7 @@ void main() {
       'checklist': [
         {
           'id': 'mplus_one_run',
-          'label': 'Completa al menos 1 M+',
+          'label': 'Complete at least 1 Mythic+ run',
           'current': 0,
           'target': 1,
           'remaining': 1,
@@ -111,7 +111,7 @@ void main() {
         {
           'priority_score': 80,
           'type': 'mplus_one_run',
-          'label': 'Completa al menos 1 M+ (1 pendiente)',
+          'label': 'Complete at least 1 Mythic+ run (1 remaining)',
           'remaining': 1,
           'source': 'planner',
         },
@@ -142,9 +142,9 @@ void main() {
     expect(find.text('Afijos'), findsOneWidget);
     expect(find.text('Fortified'), findsOneWidget);
     expect(find.text('Bursting'), findsOneWidget);
-    expect(find.text('Checklist'), findsOneWidget);
-    expect(find.textContaining('Completa al menos 1 M+'), findsWidgets);
+    expect(find.text('Lista de tareas'), findsOneWidget);
+    expect(find.textContaining('Completa al menos 1 Mythic+'), findsWidgets);
     expect(find.text('Acciones prioritarias'), findsOneWidget);
-    expect(find.textContaining('[80]'), findsOneWidget);
+    expect(find.textContaining('(1 pendientes)'), findsOneWidget);
   });
 }

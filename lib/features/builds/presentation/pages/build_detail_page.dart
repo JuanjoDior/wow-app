@@ -552,7 +552,7 @@ class _BuildIntelligenceSection extends StatelessWidget {
                         (action) => Padding(
                           padding: const EdgeInsets.only(bottom: 4),
                           child: Text(
-                            '• [${action.priorityScore}] ${action.label}',
+                            '• [${action.priorityScore}] ${_localizeActionLabel(t, action)}',
                             style: const TextStyle(
                               color: WowTheme.textSecondary,
                               fontSize: 13,
@@ -566,6 +566,28 @@ class _BuildIntelligenceSection extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _localizeActionLabel(S t, BuildGapAction action) {
+    final expected = action.expected?.trim();
+    final recommended = action.recommended?.trim();
+    final target = (expected != null && expected.isNotEmpty)
+        ? expected
+        : (recommended != null && recommended.isNotEmpty)
+        ? recommended
+        : action.label;
+
+    return switch (action.type) {
+      'enchant_missing_target' ||
+      'enchant_missing' => t.buildIntelligenceActionEnchantMissing(target),
+      'enchant_mismatch_target' ||
+      'enchant_mismatch' => t.buildIntelligenceActionEnchantMismatch(target),
+      'gem_missing_target' ||
+      'gem_missing' => t.buildIntelligenceActionGemMissing(target),
+      'gem_mismatch_target' ||
+      'gem_mismatch' => t.buildIntelligenceActionGemMismatch(target),
+      _ => action.label,
+    };
   }
 }
 

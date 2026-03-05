@@ -46,10 +46,14 @@ void main() {
     await sl.reset();
   });
 
-  Future<void> pumpPage(WidgetTester tester, String buildId) async {
+  Future<void> pumpPage(
+    WidgetTester tester,
+    String buildId, {
+    Locale locale = const Locale('en'),
+  }) async {
     await tester.pumpWidget(
       MaterialApp(
-        locale: const Locale('en'),
+        locale: locale,
         supportedLocales: S.supportedLocales,
         localizationsDelegates: S.localizationsDelegates,
         theme: WowTheme.darkTheme,
@@ -155,6 +159,70 @@ void main() {
       );
     },
   );
+
+  testWidgets('localiza acciones de verificación en español', (tester) async {
+    final build = buildFixture(
+      id: 'b2es',
+      characterRefKey: 'eu-sanguino-apastar',
+      characterClass: 'Druid',
+      characterSpec: 'Feral',
+    );
+    final analysis = BuildGapAnalysis(
+      summary: const BuildGapSummary(
+        analysisMode: 'objective',
+        targetProfile: 'build_target',
+        checksTotal: 4,
+        checksCompleted: 2,
+        completionPct: 50,
+        missingEnchants: 1,
+        missingGems: 1,
+        actionsCount: 2,
+      ),
+      actions: const [
+        BuildGapAction(
+          priorityScore: 95,
+          slot: 'mainHand',
+          type: 'enchant_missing_target',
+          label: 'Apply Authority of Radiant Power',
+          expected: 'Authority of Radiant Power',
+          source: 'build',
+        ),
+      ],
+    );
+
+    when(() => buildsRepository.getBuilds()).thenAnswer((_) async => [build]);
+    when(
+      () => mediaDataSource.getMedia(
+        region: any(named: 'region'),
+        realm: any(named: 'realm'),
+        name: any(named: 'name'),
+      ),
+    ).thenAnswer((_) async => null);
+    when(
+      () => gapDataSource.getGapAnalysis(
+        region: any(named: 'region'),
+        realm: any(named: 'realm'),
+        name: any(named: 'name'),
+        className: any(named: 'className'),
+        specName: any(named: 'specName'),
+        buildSlots: any(named: 'buildSlots'),
+        force: any(named: 'force'),
+      ),
+    ).thenAnswer((_) async => analysis);
+
+    await pumpPage(tester, build.id, locale: const Locale('es'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Verificación de Build'), findsOneWidget);
+    expect(
+      find.textContaining('Aplica Authority of Radiant Power'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Apply Authority of Radiant Power'),
+      findsNothing,
+    );
+  });
 
   testWidgets(
     'shows objective facts when character has no local target build',

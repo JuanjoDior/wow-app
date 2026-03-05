@@ -539,6 +539,26 @@ class SEs extends S {
   String get buildIntelligenceTopActions => 'Acciones principales';
 
   @override
+  String buildIntelligenceActionEnchantMissing(String name) {
+    return 'Aplica $name';
+  }
+
+  @override
+  String buildIntelligenceActionEnchantMismatch(String name) {
+    return 'Reemplaza enchant por $name';
+  }
+
+  @override
+  String buildIntelligenceActionGemMissing(String name) {
+    return 'Engarza $name';
+  }
+
+  @override
+  String buildIntelligenceActionGemMismatch(String name) {
+    return 'Reemplaza gema por $name';
+  }
+
+  @override
   String get weeklyPlannerTitle => 'Planificador Semanal';
 
   @override
@@ -555,10 +575,10 @@ class SEs extends S {
   String get weeklyPlannerCompletion => 'Completado';
 
   @override
-  String get weeklyPlannerChecks => 'Checks';
+  String get weeklyPlannerChecks => 'Comprobaciones';
 
   @override
-  String get weeklyPlannerRuns => 'Runs semanales';
+  String get weeklyPlannerRuns => 'Mythic+ semanales';
 
   @override
   String get weeklyPlannerRating => 'Puntuación';
@@ -571,13 +591,33 @@ class SEs extends S {
       'Aún no hay datos de afijos disponibles.';
 
   @override
-  String get weeklyPlannerChecklist => 'Checklist';
+  String get weeklyPlannerChecklist => 'Lista de tareas';
 
   @override
   String get weeklyPlannerActions => 'Acciones prioritarias';
 
   @override
   String get weeklyPlannerNoActions => 'No hay acciones pendientes.';
+
+  @override
+  String get weeklyPlannerTaskEnchantsCompleted => 'Aplica enchants faltantes';
+
+  @override
+  String get weeklyPlannerTaskSocketsFilled => 'Rellena sockets vacíos';
+
+  @override
+  String get weeklyPlannerTaskMplusOne => 'Completa al menos 1 Mythic+';
+
+  @override
+  String get weeklyPlannerTaskMplusFour => 'Completa 4 Mythic+';
+
+  @override
+  String get weeklyPlannerTaskMplusEight => 'Completa 8 Mythic+';
+
+  @override
+  String weeklyPlannerActionRemaining(String label, int remaining) {
+    return '$label ($remaining pendientes)';
+  }
 
   @override
   String get guideTitle => 'Guía de Build';

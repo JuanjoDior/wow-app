@@ -197,19 +197,47 @@
   "buildIntelligenceMissingEnchants": "Enchants faltantes",
   "buildIntelligenceMissingGems": "Gemas faltantes",
   "buildIntelligenceTopActions": "Acciones principales",
+  "buildIntelligenceActionEnchantMissing": "Aplica {name}",
+  "@buildIntelligenceActionEnchantMissing": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "buildIntelligenceActionEnchantMismatch": "Reemplaza enchant por {name}",
+  "@buildIntelligenceActionEnchantMismatch": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "buildIntelligenceActionGemMissing": "Engarza {name}",
+  "@buildIntelligenceActionGemMissing": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "buildIntelligenceActionGemMismatch": "Reemplaza gema por {name}",
+  "@buildIntelligenceActionGemMismatch": {
+    "placeholders": { "name": { "type": "String" } }
+  },
   "weeklyPlannerTitle": "Planificador Semanal",
   "weeklyPlannerTooltip": "Abrir Planificador Semanal",
   "weeklyPlannerUnavailable": "El Planificador Semanal está desactivado ahora mismo.",
   "weeklyPlannerSummaryTitle": "Resumen semanal",
   "weeklyPlannerCompletion": "Completado",
-  "weeklyPlannerChecks": "Checks",
-  "weeklyPlannerRuns": "Runs semanales",
+  "weeklyPlannerChecks": "Comprobaciones",
+  "weeklyPlannerRuns": "Mythic+ semanales",
   "weeklyPlannerRating": "Puntuación",
   "weeklyPlannerAffixes": "Afijos",
   "weeklyPlannerNoAffixes": "Aún no hay datos de afijos disponibles.",
-  "weeklyPlannerChecklist": "Checklist",
+  "weeklyPlannerChecklist": "Lista de tareas",
   "weeklyPlannerActions": "Acciones prioritarias",
   "weeklyPlannerNoActions": "No hay acciones pendientes.",
+  "weeklyPlannerTaskEnchantsCompleted": "Aplica enchants faltantes",
+  "weeklyPlannerTaskSocketsFilled": "Rellena sockets vacíos",
+  "weeklyPlannerTaskMplusOne": "Completa al menos 1 Mythic+",
+  "weeklyPlannerTaskMplusFour": "Completa 4 Mythic+",
+  "weeklyPlannerTaskMplusEight": "Completa 8 Mythic+",
+  "weeklyPlannerActionRemaining": "{label} ({remaining} pendientes)",
+  "@weeklyPlannerActionRemaining": {
+    "placeholders": {
+      "label": { "type": "String" },
+      "remaining": { "type": "int" }
+    }
+  },
 
   "guideTitle": "Guía de Build",
   "guideContent": "Contenido",

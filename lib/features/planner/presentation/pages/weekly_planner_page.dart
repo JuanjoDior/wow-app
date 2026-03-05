@@ -302,7 +302,7 @@ class _ChecklistCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '${entry.label} (${entry.current}/${entry.target})',
+                        '${_localizePlannerTaskLabel(t, entry.id, entry.label)} (${entry.current}/${entry.target})',
                         style: const TextStyle(color: WowTheme.textPrimary),
                       ),
                     ),
@@ -349,7 +349,7 @@ class _ActionsCard extends StatelessWidget {
                 (action) => Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Text(
-                    '• [${action.priorityScore}] ${action.label}',
+                    '• [${action.priorityScore}] ${_localizePlannerActionLabel(t, action)}',
                     style: const TextStyle(color: WowTheme.textSecondary),
                   ),
                 ),
@@ -359,6 +359,25 @@ class _ActionsCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _localizePlannerTaskLabel(S t, String id, String fallbackLabel) {
+  return switch (id) {
+    'enchants_completed' => t.weeklyPlannerTaskEnchantsCompleted,
+    'sockets_filled' => t.weeklyPlannerTaskSocketsFilled,
+    'mplus_one_run' => t.weeklyPlannerTaskMplusOne,
+    'mplus_four_runs' => t.weeklyPlannerTaskMplusFour,
+    'mplus_eight_runs' => t.weeklyPlannerTaskMplusEight,
+    _ => fallbackLabel,
+  };
+}
+
+String _localizePlannerActionLabel(S t, WeeklyPlannerAction action) {
+  final base = _localizePlannerTaskLabel(t, action.type, action.label);
+  if (action.remaining > 0) {
+    return t.weeklyPlannerActionRemaining(base, action.remaining);
+  }
+  return base;
 }
 
 class _MetricChip extends StatelessWidget {

@@ -536,6 +536,26 @@ class SEn extends S {
   String get buildIntelligenceTopActions => 'Top actions';
 
   @override
+  String buildIntelligenceActionEnchantMissing(String name) {
+    return 'Apply $name';
+  }
+
+  @override
+  String buildIntelligenceActionEnchantMismatch(String name) {
+    return 'Replace enchant with $name';
+  }
+
+  @override
+  String buildIntelligenceActionGemMissing(String name) {
+    return 'Socket $name';
+  }
+
+  @override
+  String buildIntelligenceActionGemMismatch(String name) {
+    return 'Replace gem with $name';
+  }
+
+  @override
   String get weeklyPlannerTitle => 'Weekly Planner';
 
   @override
@@ -574,6 +594,26 @@ class SEn extends S {
 
   @override
   String get weeklyPlannerNoActions => 'No pending actions.';
+
+  @override
+  String get weeklyPlannerTaskEnchantsCompleted => 'Apply missing enchants';
+
+  @override
+  String get weeklyPlannerTaskSocketsFilled => 'Fill empty sockets';
+
+  @override
+  String get weeklyPlannerTaskMplusOne => 'Complete at least 1 Mythic+ run';
+
+  @override
+  String get weeklyPlannerTaskMplusFour => 'Complete 4 Mythic+ runs';
+
+  @override
+  String get weeklyPlannerTaskMplusEight => 'Complete 8 Mythic+ runs';
+
+  @override
+  String weeklyPlannerActionRemaining(String label, int remaining) {
+    return '$label ($remaining remaining)';
+  }
 
   @override
   String get guideTitle => 'Build Guide';

@@ -1111,6 +1111,30 @@ abstract class S {
   /// **'Top actions'**
   String get buildIntelligenceTopActions;
 
+  /// No description provided for @buildIntelligenceActionEnchantMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply {name}'**
+  String buildIntelligenceActionEnchantMissing(String name);
+
+  /// No description provided for @buildIntelligenceActionEnchantMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace enchant with {name}'**
+  String buildIntelligenceActionEnchantMismatch(String name);
+
+  /// No description provided for @buildIntelligenceActionGemMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Socket {name}'**
+  String buildIntelligenceActionGemMissing(String name);
+
+  /// No description provided for @buildIntelligenceActionGemMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace gem with {name}'**
+  String buildIntelligenceActionGemMismatch(String name);
+
   /// No description provided for @weeklyPlannerTitle.
   ///
   /// In en, this message translates to:
@@ -1188,6 +1212,42 @@ abstract class S {
   /// In en, this message translates to:
   /// **'No pending actions.'**
   String get weeklyPlannerNoActions;
+
+  /// No description provided for @weeklyPlannerTaskEnchantsCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply missing enchants'**
+  String get weeklyPlannerTaskEnchantsCompleted;
+
+  /// No description provided for @weeklyPlannerTaskSocketsFilled.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill empty sockets'**
+  String get weeklyPlannerTaskSocketsFilled;
+
+  /// No description provided for @weeklyPlannerTaskMplusOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete at least 1 Mythic+ run'**
+  String get weeklyPlannerTaskMplusOne;
+
+  /// No description provided for @weeklyPlannerTaskMplusFour.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete 4 Mythic+ runs'**
+  String get weeklyPlannerTaskMplusFour;
+
+  /// No description provided for @weeklyPlannerTaskMplusEight.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete 8 Mythic+ runs'**
+  String get weeklyPlannerTaskMplusEight;
+
+  /// No description provided for @weeklyPlannerActionRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} ({remaining} remaining)'**
+  String weeklyPlannerActionRemaining(String label, int remaining);
 
   /// No description provided for @guideTitle.
   ///

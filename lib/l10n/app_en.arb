@@ -197,6 +197,22 @@
   "buildIntelligenceMissingEnchants": "Missing enchants",
   "buildIntelligenceMissingGems": "Missing gems",
   "buildIntelligenceTopActions": "Top actions",
+  "buildIntelligenceActionEnchantMissing": "Apply {name}",
+  "@buildIntelligenceActionEnchantMissing": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "buildIntelligenceActionEnchantMismatch": "Replace enchant with {name}",
+  "@buildIntelligenceActionEnchantMismatch": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "buildIntelligenceActionGemMissing": "Socket {name}",
+  "@buildIntelligenceActionGemMissing": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "buildIntelligenceActionGemMismatch": "Replace gem with {name}",
+  "@buildIntelligenceActionGemMismatch": {
+    "placeholders": { "name": { "type": "String" } }
+  },
   "weeklyPlannerTitle": "Weekly Planner",
   "weeklyPlannerTooltip": "Open Weekly Planner",
   "weeklyPlannerUnavailable": "Weekly Planner is disabled right now.",
@@ -210,6 +226,18 @@
   "weeklyPlannerChecklist": "Checklist",
   "weeklyPlannerActions": "Priority actions",
   "weeklyPlannerNoActions": "No pending actions.",
+  "weeklyPlannerTaskEnchantsCompleted": "Apply missing enchants",
+  "weeklyPlannerTaskSocketsFilled": "Fill empty sockets",
+  "weeklyPlannerTaskMplusOne": "Complete at least 1 Mythic+ run",
+  "weeklyPlannerTaskMplusFour": "Complete 4 Mythic+ runs",
+  "weeklyPlannerTaskMplusEight": "Complete 8 Mythic+ runs",
+  "weeklyPlannerActionRemaining": "{label} ({remaining} remaining)",
+  "@weeklyPlannerActionRemaining": {
+    "placeholders": {
+      "label": { "type": "String" },
+      "remaining": { "type": "int" }
+    }
+  },
 
   "guideTitle": "Build Guide",
   "guideContent": "Content",
