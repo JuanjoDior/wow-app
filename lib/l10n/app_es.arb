@@ -224,6 +224,8 @@
   "weeklyPlannerAffixes": "Afijos",
   "weeklyPlannerNoAffixes": "Aún no hay datos de afijos disponibles.",
   "weeklyPlannerChecklist": "Lista de tareas",
+  "weeklyPlannerResetLocalProgress": "Restablecer progreso local",
+  "weeklyPlannerObjectiveCompleted": "Completado con datos del personaje",
   "weeklyPlannerActions": "Acciones prioritarias",
   "weeklyPlannerNoActions": "No hay acciones pendientes.",
   "weeklyPlannerTaskEnchantsCompleted": "Aplica encantamientos faltantes",

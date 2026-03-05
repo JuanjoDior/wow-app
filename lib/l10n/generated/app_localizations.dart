@@ -1201,6 +1201,18 @@ abstract class S {
   /// **'Checklist'**
   String get weeklyPlannerChecklist;
 
+  /// No description provided for @weeklyPlannerResetLocalProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset local progress'**
+  String get weeklyPlannerResetLocalProgress;
+
+  /// No description provided for @weeklyPlannerObjectiveCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed from character data'**
+  String get weeklyPlannerObjectiveCompleted;
+
   /// No description provided for @weeklyPlannerActions.
   ///
   /// In en, this message translates to:

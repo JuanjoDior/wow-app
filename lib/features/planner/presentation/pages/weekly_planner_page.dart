@@ -4,7 +4,9 @@ import 'package:wow_companion/core/error/exceptions.dart';
 import 'package:wow_companion/core/l10n/failure_localizer.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/planner/data/datasources/weekly_planner_datasource.dart';
+import 'package:wow_companion/features/planner/data/repositories/weekly_planner_local_progress_repository.dart';
 import 'package:wow_companion/features/planner/domain/entities/weekly_planner.dart';
+import 'package:wow_companion/features/planner/domain/services/weekly_planner_local_progress.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class WeeklyPlannerPage extends StatefulWidget {
@@ -27,6 +29,10 @@ class _WeeklyPlannerPageState extends State<WeeklyPlannerPage> {
   bool _loading = true;
   String? _error;
   WeeklyPlanner? _planner;
+  WeeklyPlanner? _rawPlanner;
+  Set<String> _objectiveDoneTaskIds = <String>{};
+  Set<String> _localDoneTaskIds = <String>{};
+  String? _plannerWeekKey;
 
   @override
   void initState() {
@@ -43,15 +49,42 @@ class _WeeklyPlannerPageState extends State<WeeklyPlannerPage> {
 
     try {
       final dataSource = sl<WeeklyPlannerDataSource>();
+      final progressRepository = sl<WeeklyPlannerLocalProgressRepository>();
       final planner = await dataSource.getWeeklyPlanner(
         region: widget.region,
         realm: widget.realm,
         name: widget.name,
         force: force,
       );
+      final plannerKey = progressRepository.buildPlannerKey(
+        region: widget.region,
+        realm: widget.realm,
+        name: widget.name,
+      );
+      final weekKey = progressRepository.buildWeekKey(
+        planner.generatedAt ?? DateTime.now().toUtc(),
+      );
+      final objectiveDoneTaskIds = planner.checklist
+          .where((entry) => entry.done)
+          .map((entry) => entry.id)
+          .toSet();
+      final localDoneTaskIds =
+          await progressRepository.getCompletedTaskIds(
+              plannerKey: plannerKey,
+              weekKey: weekKey,
+            )
+            ..removeWhere((taskId) => objectiveDoneTaskIds.contains(taskId));
+      final effectivePlanner = applyWeeklyPlannerLocalProgress(
+        planner,
+        localDoneTaskIds,
+      );
       if (!mounted) return;
       setState(() {
-        _planner = planner;
+        _rawPlanner = planner;
+        _planner = effectivePlanner;
+        _objectiveDoneTaskIds = objectiveDoneTaskIds;
+        _localDoneTaskIds = localDoneTaskIds;
+        _plannerWeekKey = weekKey;
         _loading = false;
       });
     } on ServerException catch (e) {
@@ -145,11 +178,75 @@ class _WeeklyPlannerPageState extends State<WeeklyPlannerPage> {
         const SizedBox(height: 12),
         _AffixesCard(affixes: planner.affixes),
         const SizedBox(height: 12),
-        _ChecklistCard(checklist: planner.checklist),
+        _ChecklistCard(
+          checklist: planner.checklist,
+          objectiveDoneTaskIds: _objectiveDoneTaskIds,
+          hasLocalProgress: _localDoneTaskIds.isNotEmpty,
+          onToggleTask: _toggleTask,
+          onResetLocalProgress: _resetLocalProgress,
+        ),
         const SizedBox(height: 12),
         _ActionsCard(planner: planner),
       ],
     );
+  }
+
+  Future<void> _toggleTask(WeeklyPlannerChecklistItem item, bool done) async {
+    if (_objectiveDoneTaskIds.contains(item.id)) return;
+    final rawPlanner = _rawPlanner;
+    final weekKey = _plannerWeekKey;
+    if (rawPlanner == null || weekKey == null) return;
+
+    final progressRepository = sl<WeeklyPlannerLocalProgressRepository>();
+    final plannerKey = progressRepository.buildPlannerKey(
+      region: widget.region,
+      realm: widget.realm,
+      name: widget.name,
+    );
+
+    final updatedLocalDoneTaskIds = {..._localDoneTaskIds};
+    if (done) {
+      updatedLocalDoneTaskIds.add(item.id);
+    } else {
+      updatedLocalDoneTaskIds.remove(item.id);
+    }
+    await progressRepository.setCompletedTaskIds(
+      plannerKey: plannerKey,
+      weekKey: weekKey,
+      taskIds: updatedLocalDoneTaskIds,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _localDoneTaskIds = updatedLocalDoneTaskIds;
+      _planner = applyWeeklyPlannerLocalProgress(
+        rawPlanner,
+        updatedLocalDoneTaskIds,
+      );
+    });
+  }
+
+  Future<void> _resetLocalProgress() async {
+    final rawPlanner = _rawPlanner;
+    final weekKey = _plannerWeekKey;
+    if (rawPlanner == null || weekKey == null) return;
+
+    final progressRepository = sl<WeeklyPlannerLocalProgressRepository>();
+    final plannerKey = progressRepository.buildPlannerKey(
+      region: widget.region,
+      realm: widget.realm,
+      name: widget.name,
+    );
+    await progressRepository.clearCompletedTaskIds(
+      plannerKey: plannerKey,
+      weekKey: weekKey,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _localDoneTaskIds = <String>{};
+      _planner = rawPlanner;
+    });
   }
 }
 
@@ -265,8 +362,19 @@ class _AffixesCard extends StatelessWidget {
 
 class _ChecklistCard extends StatelessWidget {
   final List<WeeklyPlannerChecklistItem> checklist;
+  final Set<String> objectiveDoneTaskIds;
+  final bool hasLocalProgress;
+  final Future<void> Function(WeeklyPlannerChecklistItem item, bool done)
+  onToggleTask;
+  final Future<void> Function() onResetLocalProgress;
 
-  const _ChecklistCard({required this.checklist});
+  const _ChecklistCard({
+    required this.checklist,
+    required this.objectiveDoneTaskIds,
+    required this.hasLocalProgress,
+    required this.onToggleTask,
+    required this.onResetLocalProgress,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -277,36 +385,55 @@ class _ChecklistCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              t.weeklyPlannerChecklist,
-              style: const TextStyle(
-                color: WowTheme.primaryGold,
-                fontWeight: FontWeight.w700,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    t.weeklyPlannerChecklist,
+                    style: const TextStyle(
+                      color: WowTheme.primaryGold,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (hasLocalProgress)
+                  TextButton(
+                    onPressed: onResetLocalProgress,
+                    child: Text(
+                      t.weeklyPlannerResetLocalProgress,
+                      style: const TextStyle(color: WowTheme.primaryGold),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
             ...checklist.map(
               (entry) => Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    Icon(
-                      entry.done
-                          ? Icons.check_circle
-                          : Icons.radio_button_unchecked,
-                      size: 18,
-                      color: entry.done
-                          ? Colors.greenAccent
-                          : WowTheme.textSecondary,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${_localizePlannerTaskLabel(t, entry.id, entry.label)} (${entry.current}/${entry.target})',
-                        style: const TextStyle(color: WowTheme.textPrimary),
-                      ),
-                    ),
-                  ],
+                child: CheckboxListTile(
+                  key: ValueKey('planner-check-${entry.id}'),
+                  value: entry.done,
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  activeColor: Colors.greenAccent,
+                  checkColor: Colors.black,
+                  onChanged: objectiveDoneTaskIds.contains(entry.id)
+                      ? null
+                      : (value) => onToggleTask(entry, value ?? false),
+                  title: Text(
+                    '${_localizePlannerTaskLabel(t, entry.id, entry.label)} (${entry.current}/${entry.target})',
+                    style: const TextStyle(color: WowTheme.textPrimary),
+                  ),
+                  subtitle: objectiveDoneTaskIds.contains(entry.id)
+                      ? Text(
+                          t.weeklyPlannerObjectiveCompleted,
+                          style: const TextStyle(
+                            color: WowTheme.textSecondary,
+                            fontSize: 11,
+                          ),
+                        )
+                      : null,
+                  controlAffinity: ListTileControlAffinity.leading,
                 ),
               ),
             ),

@@ -8,8 +8,10 @@ import 'package:wow_companion/features/builds/presentation/cubit/builds_cubit.da
 import 'package:wow_companion/features/builds/presentation/cubit/builds_state.dart';
 import 'package:wow_companion/features/builds/presentation/pages/builds_list_page.dart';
 import 'package:wow_companion/features/planner/data/datasources/weekly_planner_datasource.dart';
+import 'package:wow_companion/features/planner/data/repositories/weekly_planner_local_progress_repository.dart';
 import 'package:wow_companion/features/planner/domain/entities/weekly_planner.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _MockBuildsCubit extends MockCubit<BuildsState> implements BuildsCubit {}
 
@@ -21,6 +23,7 @@ void main() {
   late _MockWeeklyPlannerDataSource plannerDataSource;
 
   setUp(() async {
+    SharedPreferences.setMockInitialValues({});
     await sl.reset();
     cubit = _MockBuildsCubit();
     plannerDataSource = _MockWeeklyPlannerDataSource();
@@ -29,6 +32,9 @@ void main() {
 
     sl.registerFactory<BuildsCubit>(() => cubit);
     sl.registerLazySingleton<WeeklyPlannerDataSource>(() => plannerDataSource);
+    sl.registerLazySingleton<WeeklyPlannerLocalProgressRepository>(
+      () => WeeklyPlannerLocalProgressRepository(),
+    );
   });
 
   tearDown(() async {

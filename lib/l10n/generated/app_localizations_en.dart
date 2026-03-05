@@ -590,6 +590,12 @@ class SEn extends S {
   String get weeklyPlannerChecklist => 'Checklist';
 
   @override
+  String get weeklyPlannerResetLocalProgress => 'Reset local progress';
+
+  @override
+  String get weeklyPlannerObjectiveCompleted => 'Completed from character data';
+
+  @override
   String get weeklyPlannerActions => 'Priority actions';
 
   @override

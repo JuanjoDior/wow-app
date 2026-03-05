@@ -594,6 +594,13 @@ class SEs extends S {
   String get weeklyPlannerChecklist => 'Lista de tareas';
 
   @override
+  String get weeklyPlannerResetLocalProgress => 'Restablecer progreso local';
+
+  @override
+  String get weeklyPlannerObjectiveCompleted =>
+      'Completado con datos del personaje';
+
+  @override
   String get weeklyPlannerActions => 'Acciones prioritarias';
 
   @override

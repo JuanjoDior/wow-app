@@ -191,6 +191,7 @@ class WeeklyPlannerAction extends Equatable {
 class WeeklyPlanner extends Equatable {
   final String? version;
   final String? endpoint;
+  final DateTime? generatedAt;
   final String region;
   final String realm;
   final String name;
@@ -204,6 +205,7 @@ class WeeklyPlanner extends Equatable {
   const WeeklyPlanner({
     this.version,
     this.endpoint,
+    this.generatedAt,
     required this.region,
     required this.realm,
     required this.name,
@@ -228,6 +230,7 @@ class WeeklyPlanner extends Equatable {
     return WeeklyPlanner(
       version: json['version'] as String?,
       endpoint: json['endpoint'] as String?,
+      generatedAt: DateTime.tryParse(json['generated_at'] as String? ?? ''),
       region: context['region'] as String? ?? '',
       realm: context['realm'] as String? ?? '',
       name: context['name'] as String? ?? '',
@@ -258,6 +261,7 @@ class WeeklyPlanner extends Equatable {
   List<Object?> get props => [
     version,
     endpoint,
+    generatedAt,
     region,
     realm,
     name,

@@ -12,7 +12,9 @@ import 'package:wow_companion/features/builds/presentation/cubit/builds_cubit.da
 import 'package:wow_companion/features/builds/presentation/cubit/builds_state.dart';
 import 'package:wow_companion/features/builds/presentation/widgets/create_build_dialog.dart';
 import 'package:wow_companion/features/planner/data/datasources/weekly_planner_datasource.dart';
+import 'package:wow_companion/features/planner/data/repositories/weekly_planner_local_progress_repository.dart';
 import 'package:wow_companion/features/planner/domain/entities/weekly_planner.dart';
+import 'package:wow_companion/features/planner/domain/services/weekly_planner_local_progress.dart';
 import 'package:wow_companion/core/l10n/wow_translations.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
@@ -177,10 +179,33 @@ class _WeeklyPlannerSummaryCardState extends State<_WeeklyPlannerSummaryCard> {
     if (target == null) return;
 
     try {
-      final planner = await sl<WeeklyPlannerDataSource>().getWeeklyPlanner(
+      final plannerRaw = await sl<WeeklyPlannerDataSource>().getWeeklyPlanner(
         region: target.region,
         realm: target.realm,
         name: target.name,
+      );
+      final progressRepository = sl<WeeklyPlannerLocalProgressRepository>();
+      final plannerKey = progressRepository.buildPlannerKey(
+        region: target.region,
+        realm: target.realm,
+        name: target.name,
+      );
+      final weekKey = progressRepository.buildWeekKey(
+        plannerRaw.generatedAt ?? DateTime.now().toUtc(),
+      );
+      final objectiveDoneTaskIds = plannerRaw.checklist
+          .where((entry) => entry.done)
+          .map((entry) => entry.id)
+          .toSet();
+      final localDoneTaskIds =
+          await progressRepository.getCompletedTaskIds(
+              plannerKey: plannerKey,
+              weekKey: weekKey,
+            )
+            ..removeWhere((taskId) => objectiveDoneTaskIds.contains(taskId));
+      final planner = applyWeeklyPlannerLocalProgress(
+        plannerRaw,
+        localDoneTaskIds,
       );
       if (!mounted) return;
       setState(() {

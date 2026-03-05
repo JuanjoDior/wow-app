@@ -31,6 +31,7 @@ import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dar
 import 'package:wow_companion/features/builds/data/datasources/character_media_datasource.dart';
 import 'package:wow_companion/features/builds/data/datasources/build_gap_analysis_datasource.dart';
 import 'package:wow_companion/features/planner/data/datasources/weekly_planner_datasource.dart';
+import 'package:wow_companion/features/planner/data/repositories/weekly_planner_local_progress_repository.dart';
 
 final sl = GetIt.instance;
 
@@ -103,5 +104,8 @@ Future<void> initDependencies() async {
   // ── Weekly Planner ────────────────────────────────────────────────────────
   sl.registerLazySingleton<WeeklyPlannerDataSource>(
     () => WeeklyPlannerDataSource(sl()),
+  );
+  sl.registerLazySingleton<WeeklyPlannerLocalProgressRepository>(
+    () => WeeklyPlannerLocalProgressRepository(),
   );
 }

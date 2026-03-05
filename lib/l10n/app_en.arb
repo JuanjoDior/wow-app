@@ -224,6 +224,8 @@
   "weeklyPlannerAffixes": "Affixes",
   "weeklyPlannerNoAffixes": "No affix data available yet.",
   "weeklyPlannerChecklist": "Checklist",
+  "weeklyPlannerResetLocalProgress": "Reset local progress",
+  "weeklyPlannerObjectiveCompleted": "Completed from character data",
   "weeklyPlannerActions": "Priority actions",
   "weeklyPlannerNoActions": "No pending actions.",
   "weeklyPlannerTaskEnchantsCompleted": "Apply missing enchants",
