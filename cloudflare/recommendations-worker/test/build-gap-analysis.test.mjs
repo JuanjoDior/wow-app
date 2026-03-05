@@ -73,6 +73,118 @@ test('weekly planner endpoint is disabled by flag by default', async () => {
   assert.match(body.error, /weekly_planner/i);
 });
 
+test('weekly planner returns objective checklist when feature is enabled', async () => {
+  const { env, cache } = createEnv({ FEATURE_WEEKLY_PLANNER: 'true' });
+  cache.set(
+    'char:eu:sanguino:apastar',
+    JSON.stringify({
+      name: 'Apastar',
+      realm: 'Sanguino',
+      region: 'EU',
+      class: 'Druid',
+      spec: 'Feral',
+      equipment: [
+        {
+          slot: 'MAIN_HAND',
+          enchantments: ['Authority of Radiant Power'],
+          enchantment_ids: [1001],
+          gems: [],
+          gem_ids: [],
+          sockets_total: 0,
+          sockets_filled: 0,
+        },
+        {
+          slot: 'FINGER_1',
+          enchantments: [],
+          enchantment_ids: [],
+          gems: ['Radiant Mastery'],
+          gem_ids: [2001],
+          sockets_total: 2,
+          sockets_filled: 1,
+        },
+      ],
+      _source: 'cache',
+    }),
+  );
+
+  const req = new Request(
+    'https://worker.example/v1/planner/weekly?region=eu&realm=sanguino&name=apastar',
+  );
+  const res = await worker.fetch(req, env);
+  const body = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.equal(body.version, 'v1');
+  assert.equal(body.endpoint, '/v1/planner/weekly');
+  assert.equal(body.source?.character, 'cache');
+  assert.equal(body.source?.planner, 'unavailable');
+  assert.equal(body.summary?.analysis_mode, 'objective');
+  assert.equal(body.summary?.checks_total, 5);
+  assert.equal(body.facts?.sockets_empty_count, 1);
+  assert.equal(body.mythic?.weekly_runs_estimated, 0);
+  assert.equal(body.checklist?.length, 5);
+  assert.ok(Array.isArray(body.actions));
+  assert.equal(body._source, 'planner');
+});
+
+test('weekly planner uses cache on subsequent calls', async () => {
+  const { env, cache } = createEnv({ FEATURE_WEEKLY_PLANNER: 'true' });
+  cache.set(
+    'char:eu:sanguino:apastar',
+    JSON.stringify({
+      name: 'Apastar',
+      realm: 'Sanguino',
+      region: 'EU',
+      class: 'Druid',
+      spec: 'Feral',
+      equipment: [],
+      _source: 'cache',
+    }),
+  );
+
+  const baseUrl =
+    'https://worker.example/v1/planner/weekly?region=eu&realm=sanguino&name=apastar';
+
+  const first = await worker.fetch(new Request(baseUrl), env);
+  const firstBody = await first.json();
+  assert.equal(first.status, 200);
+  assert.equal(firstBody._source, 'planner');
+
+  const second = await worker.fetch(new Request(baseUrl), env);
+  const secondBody = await second.json();
+  assert.equal(second.status, 200);
+  assert.equal(secondBody._source, 'cache');
+});
+
+test(
+  'weekly planner with force=1 propagates refresh errors when Blizzard is not configured',
+  async () => {
+    const { env, cache } = createEnv({ FEATURE_WEEKLY_PLANNER: 'true' });
+    cache.set(
+      'char:eu:sanguino:apastar',
+      JSON.stringify({
+        name: 'Apastar',
+        realm: 'Sanguino',
+        region: 'EU',
+        class: 'Druid',
+        spec: 'Feral',
+        equipment: [],
+        _source: 'cache',
+      }),
+    );
+
+    const forced = await worker.fetch(
+      new Request(
+        'https://worker.example/v1/planner/weekly?region=eu&realm=sanguino&name=apastar&force=1',
+      ),
+      env,
+    );
+    const body = await forced.json();
+    assert.equal(forced.status, 503);
+    assert.match(body.error, /Blizzard API not configured/i);
+  },
+);
+
 test('v1 build gap-analysis uses objective mode in compatibility alias', async () => {
   const { env, cache } = createEnv();
   cache.set(

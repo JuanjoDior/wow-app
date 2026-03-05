@@ -8,7 +8,7 @@
  *   GET  /v1/build/gap-analysis      (v1, compatibility alias)
  *   GET  /v2/build/verification      (objective verification)
  *   GET  /v2/catalog/search          (objective catalog search)
- *   GET  /v1/planner/weekly          (reservado)
+ *   GET  /v1/planner/weekly          (planificador semanal objetivo)
  *   GET  /recommendations            (deprecated)
  *   GET  /specs                      (deprecated)
  *   POST /invalidate                 (deprecated)
@@ -34,6 +34,7 @@ const CACHE_TTLS = Object.freeze({
   realmSlug: { envKey: 'BLIZZARD_REALM_CACHE_TTL', fallback: 2592000 },
   itemIcon: { envKey: 'BLIZZARD_ITEM_ICON_CACHE_TTL', fallback: 604800 },
   catalogSearch: { envKey: 'BLIZZARD_CATALOG_SEARCH_CACHE_TTL', fallback: 1800 },
+  weeklyPlanner: { envKey: 'BLIZZARD_WEEKLY_PLANNER_CACHE_TTL', fallback: 300 },
 });
 
 // ─── Blizzard API base URLs ───────────────────────────────────────────────────
@@ -128,7 +129,7 @@ export default {
         if (!capabilities.weekly_planner) {
           response = featureFlagDisabled('/v1/planner/weekly', 'weekly_planner', 'v1');
         } else {
-          response = notImplementedV1('/v1/planner/weekly');
+          response = await handlePlannerWeeklyV1(url, env);
         }
       } else if (url.pathname === '/invalidate' && request.method === 'POST') {
         response = await handleInvalidate(request, env);
@@ -979,6 +980,112 @@ async function handleCharacterSnapshotV1(url, env) {
   });
 }
 
+// ─── /v1/planner/weekly ─────────────────────────────────────────────────────
+//
+// Planificador semanal objetivo:
+// - Basado en datos oficiales Blizzard (personaje + perfil M+ cuando disponible).
+// - Si no hay perfil M+ disponible, el endpoint degrada con datos del personaje
+//   sin romper flujo.
+
+async function handlePlannerWeeklyV1(url, env) {
+  const version = 'v1';
+  const endpoint = '/v1/planner/weekly';
+
+  const region = (url.searchParams.get('region') || '').toLowerCase().trim();
+  const realm = (url.searchParams.get('realm') || '').trim();
+  const name = (url.searchParams.get('name') || '').trim();
+  const force = url.searchParams.get('force') === '1';
+
+  if (!region || !realm || !name) {
+    return json({
+      version,
+      endpoint,
+      error: 'Missing required params: region, realm, name',
+    }, 400);
+  }
+
+  const cacheKey = buildWeeklyPlannerCacheKey(region, realm, name);
+  if (!force) {
+    const cached = await env.RECS_CACHE.get(cacheKey, 'json');
+    if (cached) {
+      return json({ ...cached, _source: 'cache' });
+    }
+  }
+
+  const characterResponse = await handleCharacter(url, env);
+  const contentType = characterResponse.headers.get('Content-Type') || '';
+  if (!contentType.includes('application/json')) return characterResponse;
+
+  let characterPayload;
+  try {
+    characterPayload = await characterResponse.clone().json();
+  } catch {
+    return json({
+      version,
+      endpoint,
+      error: 'Invalid character payload',
+    }, 502);
+  }
+
+  if (!characterResponse.ok) {
+    return json({
+      version,
+      endpoint,
+      error: characterPayload?.error || 'Character lookup failed',
+    }, characterResponse.status);
+  }
+
+  let mythicProfile = null;
+  let plannerSource = 'unavailable';
+  if (env.BLIZZARD_CLIENT_SECRET) {
+    try {
+      const token = await getBlizzardToken(region, env);
+      const realmSlug = await resolveRealmSlug(region, realm, token, env);
+      mythicProfile = await fetchBlizzardMythicKeystoneProfile(
+        region,
+        realmSlug,
+        name,
+        token,
+      );
+      if (mythicProfile) {
+        plannerSource = 'blizzard';
+      }
+    } catch (_) {
+      mythicProfile = null;
+    }
+  }
+
+  const planner = computeWeeklyPlanner(characterPayload, mythicProfile);
+  const payload = {
+    version,
+    endpoint,
+    generated_at: new Date().toISOString(),
+    source: {
+      character: characterPayload?._source ?? null,
+      planner: plannerSource,
+      policy: 'official_only',
+    },
+    context: {
+      region,
+      realm,
+      name: name.toLowerCase(),
+    },
+    facts: planner.facts,
+    mythic: planner.mythic,
+    affixes: planner.affixes,
+    summary: planner.summary,
+    checklist: planner.checklist,
+    actions: planner.actions,
+  };
+
+  const ttl = getCacheTtlSeconds(env, 'weeklyPlanner');
+  await env.RECS_CACHE.put(cacheKey, JSON.stringify(payload), {
+    expirationTtl: ttl,
+  });
+
+  return json({ ...payload, _source: 'planner' });
+}
+
 // ─── /v1/build/gap-analysis (compat) + /v2/build/verification ───────────────
 //
 // Política actual:
@@ -1055,6 +1162,279 @@ async function handleBuildVerificationV2(url, env, compat = null) {
     summary: analysis.summary,
     actions: analysis.actions,
   });
+}
+
+async function fetchBlizzardMythicKeystoneProfile(region, realmSlug, name, token) {
+  const base = BLIZZARD_API_BASE[region];
+  const namespace = `profile-${region}`;
+  const locale = 'en_US';
+  const charName = encodeURIComponent(name.toLowerCase());
+  const headers = { Authorization: `Bearer ${token}` };
+  const url =
+    `${base}/profile/wow/character/${encodeURIComponent(realmSlug)}/${charName}` +
+    `/mythic-keystone-profile?namespace=${namespace}&locale=${locale}`;
+
+  const response = await fetch(url, { headers });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    const err = new Error(
+      `Blizzard mythic profile API error: ${response.status}`,
+    );
+    err.status = 502;
+    throw err;
+  }
+
+  return response.json();
+}
+
+function computeWeeklyPlanner(characterPayload, mythicProfile) {
+  const equipment = Array.isArray(characterPayload?.equipment)
+    ? characterPayload.equipment
+    : [];
+  const facts = computeCharacterFacts(equipment);
+  const mythic = extractMythicWeeklySummary(mythicProfile);
+
+  const checklist = [
+    buildWeeklyChecklistEntry({
+      id: 'enchants_completed',
+      label: 'Apply missing enchants',
+      current: facts.enchanted_items_count,
+      target: facts.equipped_items_count,
+      source: 'character',
+    }),
+    buildWeeklyChecklistEntry({
+      id: 'sockets_filled',
+      label: 'Fill empty sockets',
+      current: facts.sockets_filled_count,
+      target: facts.sockets_total_count,
+      source: 'character',
+    }),
+    buildWeeklyChecklistEntry({
+      id: 'mplus_one_run',
+      label: 'Complete at least 1 Mythic+ run',
+      current: mythic.weeklyRunsEstimated,
+      target: 1,
+      source: 'mythic_profile',
+    }),
+    buildWeeklyChecklistEntry({
+      id: 'mplus_four_runs',
+      label: 'Complete 4 Mythic+ runs',
+      current: mythic.weeklyRunsEstimated,
+      target: 4,
+      source: 'mythic_profile',
+    }),
+    buildWeeklyChecklistEntry({
+      id: 'mplus_eight_runs',
+      label: 'Complete 8 Mythic+ runs',
+      current: mythic.weeklyRunsEstimated,
+      target: 8,
+      source: 'mythic_profile',
+    }),
+  ];
+
+  const checksTotal = checklist.length;
+  const checksCompleted = checklist.filter((entry) => entry.done).length;
+  const completionPct = checksTotal > 0
+    ? Math.round((checksCompleted / checksTotal) * 100)
+    : 0;
+
+  const actions = checklist
+    .filter((entry) => !entry.done)
+    .map((entry) => ({
+      priority_score: getWeeklyChecklistPriority(entry.id),
+      type: entry.id,
+      label: entry.remaining > 0
+        ? `${entry.label} (${entry.remaining} remaining)`
+        : entry.label,
+      remaining: entry.remaining,
+      source: entry.source,
+    }))
+    .sort((a, b) => b.priority_score - a.priority_score);
+
+  return {
+    facts: {
+      equipped_items_count: facts.equipped_items_count,
+      enchanted_items_count: facts.enchanted_items_count,
+      sockets_total_count: facts.sockets_total_count,
+      sockets_filled_count: facts.sockets_filled_count,
+      sockets_empty_count: facts.sockets_empty_count,
+    },
+    mythic: {
+      rating: mythic.rating,
+      weekly_runs_estimated: mythic.weeklyRunsEstimated,
+      weekly_best_level: mythic.weeklyBestLevel,
+      season_best_level: mythic.seasonBestLevel,
+    },
+    affixes: {
+      current: mythic.affixes,
+      source: mythic.affixes.length > 0 ? 'blizzard_profile' : 'unavailable',
+    },
+    summary: {
+      analysis_mode: 'objective',
+      checks_total: checksTotal,
+      checks_completed: checksCompleted,
+      completion_pct: completionPct,
+      missing_enchants: Math.max(
+        0,
+        facts.equipped_items_count - facts.enchanted_items_count,
+      ),
+      missing_gems: facts.sockets_empty_count,
+      weekly_runs_estimated: mythic.weeklyRunsEstimated,
+      actions_count: actions.length,
+    },
+    checklist,
+    actions,
+  };
+}
+
+function buildWeeklyChecklistEntry({
+  id,
+  label,
+  current,
+  target,
+  source,
+}) {
+  const safeCurrent = Number.isFinite(current) ? Number(current) : 0;
+  const safeTarget = Number.isFinite(target) ? Math.max(0, Number(target)) : 0;
+  const done = safeCurrent >= safeTarget;
+  return {
+    id,
+    label,
+    current: safeCurrent,
+    target: safeTarget,
+    remaining: Math.max(0, safeTarget - safeCurrent),
+    done,
+    source,
+  };
+}
+
+function getWeeklyChecklistPriority(checkId) {
+  switch (checkId) {
+    case 'enchants_completed':
+      return 90;
+    case 'sockets_filled':
+      return 85;
+    case 'mplus_one_run':
+      return 80;
+    case 'mplus_four_runs':
+      return 70;
+    case 'mplus_eight_runs':
+      return 60;
+    default:
+      return 50;
+  }
+}
+
+function extractMythicWeeklySummary(profile) {
+  if (!profile || typeof profile !== 'object') {
+    return {
+      rating: null,
+      weeklyRunsEstimated: 0,
+      weeklyBestLevel: null,
+      seasonBestLevel: null,
+      affixes: [],
+    };
+  }
+
+  const weeklyRuns = pickMythicRuns(profile?.current_period?.best_runs);
+  const seasonRuns = pickMythicRuns(
+    profile?.season_best_runs || profile?.best_runs,
+  );
+
+  const weeklyLevels = weeklyRuns
+    .map((run) => extractMythicRunLevel(run))
+    .filter((level) => Number.isInteger(level));
+  const seasonLevels = seasonRuns
+    .map((run) => extractMythicRunLevel(run))
+    .filter((level) => Number.isInteger(level));
+
+  return {
+    rating: extractNumericStatValue(profile?.current_mythic_rating, [
+      'rating',
+      'value',
+    ]),
+    weeklyRunsEstimated: weeklyRuns.length,
+    weeklyBestLevel: weeklyLevels.length > 0 ? Math.max(...weeklyLevels) : null,
+    seasonBestLevel: seasonLevels.length > 0 ? Math.max(...seasonLevels) : null,
+    affixes: extractMythicAffixNames(profile, weeklyRuns),
+  };
+}
+
+function pickMythicRuns(rawRuns) {
+  if (!Array.isArray(rawRuns)) return [];
+  return rawRuns.filter((run) => run && typeof run === 'object');
+}
+
+function extractMythicRunLevel(run) {
+  if (!run || typeof run !== 'object') return null;
+
+  const candidates = [
+    run.keystone_level,
+    run.mythic_level,
+    run.completed_keystone_level,
+    run.level,
+    run?.challenge_mode?.level,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeMythicLevelValue(candidate);
+    if (normalized != null) return normalized;
+  }
+
+  return null;
+}
+
+function normalizeMythicLevelValue(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number.parseInt(value.trim(), 10);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  if (value && typeof value === 'object') {
+    const nested = [
+      value.level,
+      value.value,
+      value.keystone_level,
+      value.completed_keystone_level,
+    ];
+    for (const candidate of nested) {
+      const normalized = normalizeMythicLevelValue(candidate);
+      if (normalized != null) return normalized;
+    }
+  }
+  return null;
+}
+
+function extractMythicAffixNames(profile, weeklyRuns) {
+  const names = [];
+
+  const appendAffixName = (entry) => {
+    const name = extractCatalogName(
+      entry?.name || entry?.keystone_affix?.name || entry?.affix?.name,
+      'en_US',
+    );
+    if (name) names.push(name);
+  };
+
+  const currentPeriodAffixes = Array.isArray(profile?.current_period?.affixes)
+    ? profile.current_period.affixes
+    : [];
+  for (const affix of currentPeriodAffixes) {
+    appendAffixName(affix);
+  }
+
+  for (const run of weeklyRuns) {
+    const runAffixes = Array.isArray(run?.keystone_affixes)
+      ? run.keystone_affixes
+      : (Array.isArray(run?.affixes) ? run.affixes : []);
+    for (const affix of runAffixes) {
+      appendAffixName(affix);
+    }
+  }
+
+  return [...new Set(names)];
 }
 
 // ─── Blizzard: token OAuth2 (client_credentials) ─────────────────────────────
@@ -2246,6 +2626,13 @@ function buildRealmSlugKey(region, normalizedRealm) {
 
 function buildItemIconKey(region, itemId) {
   return `itemicon:${region}:${itemId}`;
+}
+
+function buildWeeklyPlannerCacheKey(region, realm, name) {
+  const normalizedRegion = String(region || '').toLowerCase().trim();
+  const normalizedRealm = normalizeRealmLookupValue(realm).replace(/\s+/g, '-');
+  const normalizedName = String(name || '').toLowerCase().trim();
+  return `planner:v1:${normalizedRegion}:${normalizedRealm}:${normalizedName}`;
 }
 
 function notImplementedV1(endpoint) {

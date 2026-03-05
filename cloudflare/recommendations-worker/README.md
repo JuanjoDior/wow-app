@@ -11,6 +11,7 @@ Worker orientado a datos objetivos de personaje/build usando Blizzard API.
 | GET | `/v1/character/snapshot?region=eu&realm=sanguino&name=apastar` | activo | Snapshot versionado v1 |
 | GET | `/v2/build/verification?region=eu&realm=sanguino&name=apastar` | activo | Verificación objetiva build vs personaje |
 | GET | `/v2/catalog/search?q=blasphemite&mode=gem&locale=es_ES` | activo | Búsqueda objetiva de items/enchants/gemas |
+| GET | `/v1/planner/weekly?region=eu&realm=sanguino&name=apastar` | activo (flag) | Plan semanal objetivo del personaje |
 | GET | `/v1/build/gap-analysis?region=eu&realm=sanguino&name=apastar` | compat | Alias compatible de V2 |
 | GET | `/recommendations` | deprecated | Ya no se sirven recomendaciones estáticas |
 | GET | `/specs` | deprecated | Catálogo de recomendaciones retirado |
@@ -29,6 +30,61 @@ Worker orientado a datos objetivos de personaje/build usando Blizzard API.
     "economy_assistant": false,
     "build_verification_v2": true,
     "catalog_search_v2": true
+  }
+}
+```
+
+## GET /v1/planner/weekly
+
+Planificador semanal objetivo con checklist basado en:
+- Estado real del personaje (`/character`).
+- Perfil Mythic+ oficial Blizzard cuando está disponible.
+
+### Query params
+
+| Param | Req | Descripción |
+|-------|-----|-------------|
+| `region` | ✓ | `us`, `eu`, `kr`, `tw` |
+| `realm` | ✓ | Reino del personaje |
+| `name` | ✓ | Nombre del personaje |
+| `force` | - | `force=1` para saltar caché |
+
+### Notas de comportamiento
+
+- El endpoint está protegido por flag `FEATURE_WEEKLY_PLANNER`.
+- Si el perfil Mythic+ no está disponible, degrada sin error y devuelve checklist con datos de personaje.
+- No usa catálogos estáticos/manuales.
+
+### Success response (resumen)
+
+```json
+{
+  "version": "v1",
+  "endpoint": "/v1/planner/weekly",
+  "source": {
+    "character": "cache|blizzard",
+    "planner": "blizzard|unavailable",
+    "policy": "official_only"
+  },
+  "facts": {
+    "equipped_items_count": 16,
+    "enchanted_items_count": 10,
+    "sockets_total_count": 8,
+    "sockets_filled_count": 6,
+    "sockets_empty_count": 2
+  },
+  "mythic": {
+    "rating": 2500,
+    "weekly_runs_estimated": 3,
+    "weekly_best_level": 12,
+    "season_best_level": 13
+  },
+  "summary": {
+    "analysis_mode": "objective",
+    "checks_total": 5,
+    "checks_completed": 3,
+    "completion_pct": 60,
+    "actions_count": 2
   }
 }
 ```
