@@ -7,6 +7,7 @@
  *   GET  /v1/character/snapshot?region=eu&realm=sanguino&name=apastar[&force=1]
  *   GET  /v1/build/gap-analysis      (v1, compatibility alias)
  *   GET  /v2/build/verification      (objective verification)
+ *   GET  /v2/catalog/search          (objective catalog search)
  *   GET  /v1/planner/weekly          (reservado)
  *   GET  /recommendations            (deprecated)
  *   GET  /specs                      (deprecated)
@@ -32,6 +33,7 @@ const CACHE_TTLS = Object.freeze({
   oauthToken: { envKey: 'BLIZZARD_TOKEN_CACHE_TTL', fallback: 23 * 60 * 60 },
   realmSlug: { envKey: 'BLIZZARD_REALM_CACHE_TTL', fallback: 2592000 },
   itemIcon: { envKey: 'BLIZZARD_ITEM_ICON_CACHE_TTL', fallback: 604800 },
+  catalogSearch: { envKey: 'BLIZZARD_CATALOG_SEARCH_CACHE_TTL', fallback: 1800 },
 });
 
 // ─── Blizzard API base URLs ───────────────────────────────────────────────────
@@ -48,6 +50,13 @@ const REALM_SEARCH_LOCALES = {
   kr: ['ko_KR', 'en_US'],
   tw: ['zh_TW', 'en_US'],
 };
+const CATALOG_DEFAULT_LOCALE_BY_REGION = {
+  us: 'en_US',
+  eu: 'en_GB',
+  kr: 'ko_KR',
+  tw: 'zh_TW',
+};
+const CATALOG_SEARCH_MODES = new Set(['item', 'enchant', 'gem', 'consumable']);
 
 // ─── Legacy recommendation catalog (disabled in v2 objective mode) ──────────
 export const SUPPORTED_SPECS = [];
@@ -75,8 +84,11 @@ export default {
           service_version: env.SERVICE_VERSION || 'v5',
           capabilities: {
             build_verification_v2: true,
+            catalog_search_v2: true,
           },
         });
+      } else if (url.pathname === '/v2/catalog/search' && request.method === 'GET') {
+        response = await handleCatalogSearchV2(url, env);
       } else if (url.pathname === '/v2/build/verification' && request.method === 'GET') {
         response = await handleBuildVerificationV2(url, env);
       } else if (url.pathname === '/recommendations' && request.method === 'GET') {
@@ -127,6 +139,624 @@ async function handleRecommendations(url, env) {
   return json({
     error: 'Deprecated endpoint. Use /v2/build/verification for objective analysis.',
   }, 410);
+}
+
+// ─── /v2/catalog/search ──────────────────────────────────────────────────────
+
+async function handleCatalogSearchV2(url, env) {
+  const queryRaw = (url.searchParams.get('q') || '').trim();
+  const modeRaw = (url.searchParams.get('mode') || 'item').trim().toLowerCase();
+  const region = (url.searchParams.get('region') || 'eu').trim().toLowerCase();
+  const locale = resolveCatalogLocale(region, url.searchParams.get('locale'));
+  const inventoryType = (url.searchParams.get('inventory_type') || '').trim().toUpperCase();
+  const slotRaw = (url.searchParams.get('slot') || '').trim();
+  const slot = slotRaw ? normalizeBuildSlot(slotRaw) : null;
+  const force = url.searchParams.get('force') === '1';
+  const requestedLimit = Number.parseInt(url.searchParams.get('limit') || '30', 10);
+  const limit = Number.isInteger(requestedLimit)
+    ? Math.max(1, Math.min(requestedLimit, 60))
+    : 30;
+
+  if (!queryRaw || queryRaw.length < 2) {
+    return json(
+      {
+        version: 'v2',
+        endpoint: '/v2/catalog/search',
+        error: 'Missing required param: q (min length 2).',
+      },
+      400,
+    );
+  }
+
+  if (!BLIZZARD_API_BASE[region]) {
+    return json(
+      {
+        version: 'v2',
+        endpoint: '/v2/catalog/search',
+        error: `Unknown region: ${region}. Use: us, eu, kr, tw`,
+      },
+      400,
+    );
+  }
+
+  if (!CATALOG_SEARCH_MODES.has(modeRaw)) {
+    return json(
+      {
+        version: 'v2',
+        endpoint: '/v2/catalog/search',
+        error: `Invalid mode: ${modeRaw}. Use: item, enchant, gem, consumable`,
+      },
+      400,
+    );
+  }
+
+  const normalizedQuery = normalizeCatalogToken(queryRaw);
+  const cacheKey = buildCatalogSearchKey({
+    region,
+    locale,
+    mode: modeRaw,
+    query: normalizedQuery,
+    inventoryType,
+    slot,
+    limit,
+  });
+  if (!force) {
+    const cached = await env.RECS_CACHE.get(cacheKey, 'json');
+    if (cached) {
+      return json({ ...cached, _source: 'cache' });
+    }
+  }
+
+  if (!env.BLIZZARD_CLIENT_SECRET) {
+    return json(
+      {
+        version: 'v2',
+        endpoint: '/v2/catalog/search',
+        error:
+          'Blizzard API not configured (missing BLIZZARD_CLIENT_SECRET secret)',
+      },
+      503,
+    );
+  }
+
+  try {
+    const token = await getBlizzardToken(region, env);
+    const results = await fetchCatalogResults({
+      token,
+      region,
+      locale,
+      mode: modeRaw,
+      query: queryRaw,
+      inventoryType: inventoryType || null,
+      slot,
+      limit,
+    });
+
+    const payload = {
+      version: 'v2',
+      endpoint: '/v2/catalog/search',
+      generated_at: new Date().toISOString(),
+      source: { policy: 'official_only' },
+      query: {
+        q: queryRaw,
+        q_normalized: normalizedQuery,
+        mode: modeRaw,
+        region,
+        locale,
+        inventory_type: inventoryType || null,
+        slot,
+        limit,
+      },
+      results: results.items.map((item) => ({
+        id: item.id,
+        kind: item.kind,
+        name_localized: item.nameLocalized || item.displayName || item.nameEnUs,
+        name_en_us: item.nameEnUs || item.displayName || item.nameLocalized,
+        display_name: item.displayName,
+        quality: item.quality,
+        level: item.level,
+        item_class: item.itemClass,
+        item_subclass: item.itemSubclass,
+        inventory_type: item.inventoryType,
+        inventory_name: item.inventoryName,
+        icon_url: item.iconUrl,
+        score: item.score,
+        source: item.source,
+      })),
+      meta: {
+        results_count: results.items.length,
+        total_candidates: results.totalCandidates,
+        mode_applied: modeRaw,
+      },
+      _source: 'blizzard',
+    };
+
+    const ttl = getCacheTtlSeconds(env, 'catalogSearch');
+    await env.RECS_CACHE.put(cacheKey, JSON.stringify(payload), {
+      expirationTtl: ttl,
+    });
+    return json(payload);
+  } catch (err) {
+    const status = err?.status || 502;
+    return json(
+      {
+        version: 'v2',
+        endpoint: '/v2/catalog/search',
+        error: err?.message || 'Catalog search failed',
+      },
+      status,
+    );
+  }
+}
+
+async function fetchCatalogResults({
+  token,
+  region,
+  locale,
+  mode,
+  query,
+  inventoryType,
+  slot,
+  limit,
+}) {
+  const locales = [...new Set([locale, 'en_US'])];
+  const queryVariants = buildCatalogQueryVariants(mode, query, slot);
+  const merged = new Map();
+
+  for (const currentLocale of locales) {
+    for (const queryVariant of queryVariants) {
+      const itemCandidates = await fetchBlizzardItemSearch({
+        token,
+        region,
+        locale: currentLocale,
+        query: queryVariant,
+      });
+      for (const candidate of itemCandidates) {
+        upsertCatalogCandidate(
+          merged,
+          candidate,
+          currentLocale,
+          mode,
+          inventoryType,
+        );
+      }
+    }
+
+    if (mode === 'enchant') {
+      const spellCandidates = await fetchBlizzardSpellSearch({
+        token,
+        region,
+        locale: currentLocale,
+        query,
+      });
+      for (const candidate of spellCandidates) {
+        upsertCatalogCandidate(
+          merged,
+          candidate,
+          currentLocale,
+          mode,
+          inventoryType,
+        );
+      }
+    }
+  }
+
+  const normalizedQuery = normalizeCatalogToken(query);
+  const ranked = [...merged.values()]
+    .map((candidate) => ({
+      ...candidate,
+      score: scoreCatalogCandidate({
+        candidate,
+        mode,
+        normalizedQuery,
+        inventoryType,
+      }),
+    }))
+    .filter((candidate) => candidate.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.id - b.id;
+    });
+
+  return {
+    items: ranked.slice(0, limit),
+    totalCandidates: ranked.length,
+  };
+}
+
+function upsertCatalogCandidate(map, candidate, localeQueried, mode, inventoryType) {
+  const key = `${candidate.kind}:${candidate.id}`;
+  const existing = map.get(key);
+  const normalizedLocale = String(localeQueried || '').trim();
+  const item = existing ?? {
+    ...candidate,
+    nameLocalized: null,
+    nameEnUs: null,
+    displayName: null,
+    score: 0,
+  };
+
+  if (normalizedLocale === 'en_US') {
+    item.nameEnUs = candidate.name || item.nameEnUs;
+  } else {
+    item.nameLocalized = candidate.name || item.nameLocalized;
+  }
+
+  item.displayName =
+    item.nameLocalized || item.nameEnUs || candidate.name || item.displayName;
+  item.quality = candidate.quality ?? item.quality;
+  item.level = candidate.level ?? item.level;
+  item.itemClass = candidate.itemClass ?? item.itemClass;
+  item.itemSubclass = candidate.itemSubclass ?? item.itemSubclass;
+  item.inventoryType = candidate.inventoryType ?? item.inventoryType;
+  item.inventoryName = candidate.inventoryName ?? item.inventoryName;
+  item.iconUrl = candidate.iconUrl ?? item.iconUrl;
+  item.source = candidate.source ?? item.source;
+
+  if (mode === 'item' && inventoryType && item.inventoryType && item.inventoryType !== inventoryType) {
+    return;
+  }
+
+  map.set(key, item);
+}
+
+async function fetchBlizzardItemSearch({ token, region, locale, query }) {
+  const base = BLIZZARD_API_BASE[region];
+  const namespace = `static-${region}`;
+  const params = new URLSearchParams({
+    namespace,
+    locale,
+    _pageSize: '60',
+  });
+  params.set(`name.${locale}`, query);
+  const url = `${base}/data/wow/search/item?${params.toString()}`;
+  const headers = { Authorization: `Bearer ${token}` };
+
+  try {
+    const response = await fetch(url, { headers });
+    if (!response.ok) {
+      if (response.status === 404) return [];
+      throw new Error(`Blizzard item search error: ${response.status}`);
+    }
+    const payload = await response.json();
+    const entries = extractCatalogEntries(payload);
+    return entries
+      .map((entry) => toItemCatalogCandidate(entry))
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+async function fetchBlizzardSpellSearch({ token, region, locale, query }) {
+  const base = BLIZZARD_API_BASE[region];
+  const namespace = `static-${region}`;
+  const params = new URLSearchParams({
+    namespace,
+    locale,
+    _pageSize: '60',
+  });
+  params.set(`name.${locale}`, query);
+  const url = `${base}/data/wow/search/spell?${params.toString()}`;
+  const headers = { Authorization: `Bearer ${token}` };
+
+  try {
+    const response = await fetch(url, { headers });
+    if (!response.ok) {
+      if (response.status === 404) return [];
+      throw new Error(`Blizzard spell search error: ${response.status}`);
+    }
+    const payload = await response.json();
+    const entries = extractCatalogEntries(payload);
+    return entries
+      .map((entry) => toSpellCatalogCandidate(entry))
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function extractCatalogEntries(payload) {
+  const results = Array.isArray(payload?.results) ? payload.results : [];
+  return results
+    .map((entry) => entry?.data || entry)
+    .filter(Boolean);
+}
+
+function toItemCatalogCandidate(entry) {
+  const id = extractEntityId(entry);
+  if (!Number.isInteger(id)) return null;
+
+  const name = extractCatalogName(entry?.name);
+  if (!name) return null;
+
+  return {
+    id,
+    kind: 'item',
+    name,
+    quality: normalizeQualityToken(entry?.quality?.type || entry?.quality),
+    level: extractNumericStatValue(entry?.level),
+    itemClass: extractCatalogName(entry?.item_class?.name || entry?.item_class),
+    itemSubclass: extractCatalogName(
+      entry?.item_subclass?.name || entry?.item_subclass,
+    ),
+    inventoryType: normalizeInventoryTypeToken(
+      entry?.inventory_type?.type || entry?.inventory_type,
+    ),
+    inventoryName: extractCatalogName(
+      entry?.inventory_type?.name || entry?.inventory_type_name,
+    ),
+    iconUrl: extractIconUrlFromSearchEntry(entry),
+    source: 'blizzard_item',
+  };
+}
+
+function toSpellCatalogCandidate(entry) {
+  const id = extractEntityId(entry);
+  if (!Number.isInteger(id)) return null;
+  const name = extractCatalogName(entry?.name);
+  if (!name) return null;
+
+  return {
+    id,
+    kind: 'spell',
+    name,
+    quality: null,
+    level: null,
+    itemClass: null,
+    itemSubclass: null,
+    inventoryType: null,
+    inventoryName: null,
+    iconUrl: extractIconUrlFromSearchEntry(entry),
+    source: 'blizzard_spell',
+  };
+}
+
+function extractEntityId(entry) {
+  const direct = entry?.id;
+  if (Number.isInteger(direct)) return direct;
+  const nested = entry?.item?.id;
+  if (Number.isInteger(nested)) return nested;
+  return null;
+}
+
+function extractCatalogName(rawName) {
+  if (typeof rawName === 'string') {
+    return rawName.trim();
+  }
+  if (!rawName || typeof rawName !== 'object') return null;
+  for (const value of Object.values(rawName)) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+function extractIconUrlFromSearchEntry(entry) {
+  const media = entry?.media;
+  if (!media || typeof media !== 'object') return null;
+  const assets = Array.isArray(media?.assets) ? media.assets : [];
+  const icon = assets.find(
+    (asset) =>
+      asset?.key === 'icon' &&
+      typeof asset?.value === 'string' &&
+      asset.value.length > 0,
+  );
+  if (icon) return icon.value;
+  return null;
+}
+
+function scoreCatalogCandidate({ candidate, mode, normalizedQuery, inventoryType }) {
+  const names = [
+    candidate.nameLocalized,
+    candidate.nameEnUs,
+    candidate.displayName,
+  ].filter(Boolean);
+  if (names.length === 0) return 0;
+
+  let score = 0;
+  for (const name of names) {
+    const value = normalizeCatalogToken(name);
+    if (!value) continue;
+    if (value === normalizedQuery) {
+      score = Math.max(score, 120);
+      continue;
+    }
+    if (value.startsWith(normalizedQuery)) {
+      score = Math.max(score, 90);
+      continue;
+    }
+    if (value.includes(normalizedQuery)) {
+      score = Math.max(score, 70);
+      continue;
+    }
+    const overlap = computeTokenOverlapScore(value, normalizedQuery);
+    score = Math.max(score, overlap);
+  }
+
+  const recipeLike = isRecipeLike(candidate);
+  if (recipeLike) score -= 45;
+
+  if (mode === 'item') {
+    if (inventoryType && candidate.inventoryType === inventoryType) {
+      score += 25;
+    }
+    if (inventoryType && candidate.inventoryType && candidate.inventoryType !== inventoryType) {
+      score -= 35;
+    }
+  }
+
+  if (mode === 'gem') {
+    if (isGemLike(candidate)) score += 55;
+    if (!isGemLike(candidate)) score -= 20;
+  }
+
+  if (mode === 'enchant') {
+    if (isEnchantLike(candidate)) score += 45;
+    if (candidate.kind === 'spell') score += 20;
+  }
+
+  if (mode === 'consumable') {
+    if (candidate.inventoryType === 'NON_EQUIP') score += 20;
+  }
+
+  return score;
+}
+
+function computeTokenOverlapScore(nameNormalized, queryNormalized) {
+  const queryTokens = queryNormalized.split(' ').filter(Boolean);
+  const nameTokens = new Set(nameNormalized.split(' ').filter(Boolean));
+  if (queryTokens.length === 0) return 0;
+  let matches = 0;
+  for (const token of queryTokens) {
+    if (nameTokens.has(token)) matches += 1;
+  }
+  const ratio = matches / queryTokens.length;
+  if (ratio <= 0) return 0;
+  return Math.round(40 + ratio * 30);
+}
+
+function isRecipeLike(candidate) {
+  const samples = [
+    candidate?.nameLocalized,
+    candidate?.nameEnUs,
+    candidate?.displayName,
+  ]
+    .map((value) => normalizeCatalogToken(value))
+    .filter(Boolean);
+
+  if (samples.length === 0) return false;
+  return samples.some((value) =>
+    value.startsWith('recipe ') ||
+    value.startsWith('design ') ||
+    value.startsWith('pattern ') ||
+    value.startsWith('formula ') ||
+    value.startsWith('boceto ') ||
+    value.startsWith('receta ') ||
+    value.startsWith('patron '),
+  );
+}
+
+function isGemLike(candidate) {
+  const itemClass = normalizeCatalogToken(candidate?.itemClass);
+  const itemSubclass = normalizeCatalogToken(candidate?.itemSubclass);
+  return (
+    itemClass.includes('gem') ||
+    itemClass.includes('gema') ||
+    itemSubclass.includes('gem') ||
+    itemSubclass.includes('gema')
+  );
+}
+
+function isEnchantLike(candidate) {
+  const names = [
+    candidate?.nameLocalized,
+    candidate?.nameEnUs,
+    candidate?.displayName,
+    candidate?.itemSubclass,
+  ]
+    .map((value) => normalizeCatalogToken(value))
+    .filter(Boolean);
+  if (names.length === 0) return false;
+  return names.some(
+    (value) =>
+      value.includes('enchant') ||
+      value.includes('encant') ||
+      value.includes('enchanter'),
+  );
+}
+
+function normalizeCatalogToken(value) {
+  return stripDiacritics(String(value || '').toLowerCase())
+    .replace(/[’']/g, '')
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeQualityToken(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toUpperCase();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeInventoryTypeToken(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toUpperCase();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function resolveCatalogLocale(region, localeRaw) {
+  const requested = String(localeRaw || '').trim();
+  if (/^[a-z]{2}_[A-Z]{2}$/.test(requested)) return requested;
+  return CATALOG_DEFAULT_LOCALE_BY_REGION[region] || 'en_GB';
+}
+
+function buildCatalogSearchKey({
+  region,
+  locale,
+  mode,
+  query,
+  inventoryType,
+  slot,
+  limit,
+}) {
+  return [
+    'catalog',
+    'v2',
+    region,
+    locale,
+    mode,
+    query,
+    inventoryType || '_',
+    slot || '_',
+    String(limit),
+  ].join(':');
+}
+
+function buildCatalogQueryVariants(mode, query, slot) {
+  const raw = String(query || '').trim();
+  if (!raw) return [];
+
+  const variants = new Set([raw]);
+  const stripped = raw
+    .replace(/^(enchant(ment)?|enchants?|encantamiento|encantar)\s+/i, '')
+    .trim();
+
+  if (stripped && stripped !== raw) {
+    variants.add(stripped);
+  }
+
+  if (mode === 'enchant' && stripped) {
+    variants.add(`Enchant ${stripped}`);
+    const prefixes = getEnchantPrefixesForSlot(slot);
+    for (const prefix of prefixes) {
+      variants.add(`${prefix}${stripped}`);
+    }
+  }
+
+  return [...variants];
+}
+
+function getEnchantPrefixesForSlot(slot) {
+  switch (slot) {
+    case 'mainHand':
+    case 'offHand':
+      return ['Enchant Weapon - '];
+    case 'back':
+      return ['Enchant Cloak - '];
+    case 'chest':
+      return ['Enchant Chest - '];
+    case 'wrist':
+      return ['Enchant Bracers - '];
+    case 'finger1':
+    case 'finger2':
+      return ['Enchant Ring - '];
+    default:
+      return ['Enchant Weapon - ', 'Enchant Ring - ', 'Enchant Cloak - '];
+  }
 }
 
 // ─── /character ───────────────────────────────────────────────────────────────

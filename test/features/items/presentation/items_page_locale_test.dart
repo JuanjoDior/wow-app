@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/l10n/locale_notifier.dart';
+import 'package:wow_companion/features/items/domain/entities/item_search_mode.dart';
 import 'package:wow_companion/features/items/presentation/cubit/items_cubit.dart';
 import 'package:wow_companion/features/items/presentation/cubit/items_state.dart';
 import 'package:wow_companion/features/items/presentation/items_page.dart';
@@ -45,6 +46,10 @@ void main() {
   late _MockItemsCubit cubit;
   late _TestLocaleNotifier localeNotifier;
 
+  setUpAll(() {
+    registerFallbackValue(ItemSearchMode.item);
+  });
+
   setUp(() async {
     await sl.reset();
     cubit = _MockItemsCubit();
@@ -59,7 +64,7 @@ void main() {
     when(
       () => cubit.search(
         any(),
-        inventoryType: any(named: 'inventoryType'),
+        mode: any(named: 'mode'),
         locale: any(named: 'locale'),
       ),
     ).thenAnswer((_) async {});
@@ -87,7 +92,9 @@ void main() {
     await tester.enterText(find.byType(TextField), 'moneda');
     await tester.pump(const Duration(milliseconds: 600));
 
-    verify(() => cubit.search('moneda', locale: 'es_ES')).called(1);
+    verify(
+      () => cubit.search('moneda', mode: ItemSearchMode.item, locale: 'es_ES'),
+    ).called(1);
   });
 
   testWidgets('changing locale re-runs active query with new locale', (
@@ -97,12 +104,16 @@ void main() {
 
     await tester.enterText(find.byType(TextField), 'moneda');
     await tester.pump(const Duration(milliseconds: 600));
-    verify(() => cubit.search('moneda', locale: 'es_ES')).called(1);
+    verify(
+      () => cubit.search('moneda', mode: ItemSearchMode.item, locale: 'es_ES'),
+    ).called(1);
     clearInteractions(cubit);
 
     await localeNotifier.setLocale(const Locale('en'));
     await tester.pump();
 
-    verify(() => cubit.search('moneda', locale: 'en_GB')).called(1);
+    verify(
+      () => cubit.search('moneda', mode: ItemSearchMode.item, locale: 'en_GB'),
+    ).called(1);
   });
 }

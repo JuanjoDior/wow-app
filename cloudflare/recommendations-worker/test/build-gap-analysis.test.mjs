@@ -37,6 +37,7 @@ test('health exposes v2 capability', async () => {
   assert.equal(res.status, 200);
   assert.equal(body.status, 'ok');
   assert.equal(body.capabilities?.build_verification_v2, true);
+  assert.equal(body.capabilities?.catalog_search_v2, true);
 });
 
 test('v1 build gap-analysis uses objective mode in compatibility alias', async () => {

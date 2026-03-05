@@ -11,6 +11,8 @@ class Item extends Equatable {
   final String? inventoryType;
   final String? inventoryName;
   final String? iconUrl;
+  final String? localizedName;
+  final String? canonicalNameEn;
 
   const Item({
     required this.id,
@@ -23,6 +25,8 @@ class Item extends Equatable {
     this.inventoryType,
     this.inventoryName,
     this.iconUrl,
+    this.localizedName,
+    this.canonicalNameEn,
   });
 
   /// Serialización reducida para persistencia en builds (solo campos necesarios).
@@ -34,6 +38,8 @@ class Item extends Equatable {
     'iconUrl': iconUrl,
     'inventoryType': inventoryType,
     'inventoryName': inventoryName,
+    'localizedName': localizedName,
+    'canonicalNameEn': canonicalNameEn,
   };
 
   factory Item.fromJson(Map<String, dynamic> json) => Item(
@@ -44,8 +50,18 @@ class Item extends Equatable {
     iconUrl: json['iconUrl'] as String?,
     inventoryType: json['inventoryType'] as String?,
     inventoryName: json['inventoryName'] as String?,
+    localizedName: json['localizedName'] as String?,
+    canonicalNameEn: json['canonicalNameEn'] as String?,
   );
 
   @override
-  List<Object?> get props => [id, name, quality, level, inventoryType];
+  List<Object?> get props => [
+    id,
+    name,
+    quality,
+    level,
+    inventoryType,
+    localizedName,
+    canonicalNameEn,
+  ];
 }

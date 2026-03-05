@@ -284,6 +284,15 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     return s is BuildDetailLoaded ? s.build : null;
   }
 
+  String get searchRegion {
+    final current = _currentBuild;
+    final refKey = current?.characterRefKey;
+    if (refKey == null) return 'eu';
+    final parts = refKey.split('-');
+    if (parts.isEmpty) return 'eu';
+    return parts.first.toLowerCase();
+  }
+
   Future<String?> fetchCharacterRenderUrl() async {
     final media = await _fetchMedia();
     return media?.renderUrl ?? media?.avatarUrl;

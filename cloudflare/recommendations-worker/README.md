@@ -10,6 +10,7 @@ Worker orientado a datos objetivos de personaje/build usando Blizzard API.
 | GET | `/character?region=eu&realm=sanguino&name=apastar` | activo | Snapshot de personaje (legacy) |
 | GET | `/v1/character/snapshot?region=eu&realm=sanguino&name=apastar` | activo | Snapshot versionado v1 |
 | GET | `/v2/build/verification?region=eu&realm=sanguino&name=apastar` | activo | Verificación objetiva build vs personaje |
+| GET | `/v2/catalog/search?q=blasphemite&mode=gem&locale=es_ES` | activo | Búsqueda objetiva de items/enchants/gemas |
 | GET | `/v1/build/gap-analysis?region=eu&realm=sanguino&name=apastar` | compat | Alias compatible de V2 |
 | GET | `/recommendations` | deprecated | Ya no se sirven recomendaciones estáticas |
 | GET | `/specs` | deprecated | Catálogo de recomendaciones retirado |
@@ -23,7 +24,59 @@ Worker orientado a datos objetivos de personaje/build usando Blizzard API.
   "patch": "12.0.1",
   "service_version": "5.1.0",
   "capabilities": {
-    "build_verification_v2": true
+    "build_verification_v2": true,
+    "catalog_search_v2": true
+  }
+}
+```
+
+## GET /v2/catalog/search
+
+Búsqueda de catálogo con datos oficiales Blizzard, fusión dual-locale (`locale` + `en_US`) y ranking determinista por relevancia.
+
+### Query params
+
+| Param | Req | Descripción |
+|-------|-----|-------------|
+| `q` | ✓ | Texto de búsqueda (mínimo 2 chars) |
+| `mode` | - | `item`, `enchant`, `gem`, `consumable` (default `item`) |
+| `region` | - | `us`, `eu`, `kr`, `tw` (default `eu`) |
+| `locale` | - | locale Blizzard (default por región) |
+| `inventory_type` | - | filtro de slot Blizzard (`HEAD`, `CHEST`, etc.) |
+| `slot` | - | slot lógico (`mainHand`, `finger1`, etc.) para heurísticas de enchant |
+| `limit` | - | límite de resultados (1..60, default 30) |
+| `force` | - | `force=1` para saltar caché |
+
+### Success response (resumen)
+
+```json
+{
+  "version": "v2",
+  "endpoint": "/v2/catalog/search",
+  "source": { "policy": "official_only" },
+  "query": {
+    "q": "Culminating Blasphemite",
+    "mode": "gem",
+    "region": "eu",
+    "locale": "es_ES"
+  },
+  "results": [
+    {
+      "id": 213743,
+      "kind": "item",
+      "name_localized": "Blasfemita culminante",
+      "name_en_us": "Culminating Blasphemite",
+      "display_name": "Blasfemita culminante",
+      "quality": "EPIC",
+      "item_class": "Gema",
+      "inventory_type": "NON_EQUIP",
+      "score": 160,
+      "source": "blizzard_item"
+    }
+  ],
+  "meta": {
+    "results_count": 1,
+    "total_candidates": 12
   }
 }
 ```

@@ -8,6 +8,7 @@ import 'package:wow_companion/features/builds/presentation/cubit/build_detail_cu
 import 'package:wow_companion/features/builds/presentation/cubit/build_detail_state.dart';
 import 'package:wow_companion/features/builds/presentation/widgets/item_search_dialog.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
+import 'package:wow_companion/features/items/domain/entities/item_search_mode.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
 import 'package:wow_companion/shared/widgets/item_tooltip_trigger.dart';
 import 'package:wow_companion/features/builds/presentation/widgets/build_guide_section.dart';
@@ -1625,7 +1626,7 @@ class _SlotSheetContent extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      slot.enchantment!.name,
+                      _formatItemName(context, slot.enchantment!),
                       style: const TextStyle(
                         color: WowTheme.accentBlue,
                         fontSize: 13,
@@ -1662,7 +1663,7 @@ class _SlotSheetContent extends StatelessWidget {
                   (e) => Chip(
                     backgroundColor: WowTheme.border,
                     label: Text(
-                      e.value.name,
+                      _formatItemName(context, e.value),
                       style: const TextStyle(
                         color: WowTheme.textPrimary,
                         fontSize: 11,
@@ -1732,6 +1733,8 @@ class _SlotSheetContent extends StatelessWidget {
       builder: (_) => ItemSearchDialog(
         slot: slot.slot,
         title: t.slotSearchItem(slot.slot.localizedName(t)),
+        mode: ItemSearchMode.item,
+        region: cubit.searchRegion,
       ),
     );
     if (item != null) cubit.assignItem(slot.slot, item);
@@ -1744,8 +1747,12 @@ class _SlotSheetContent extends StatelessWidget {
   ) async {
     final item = await showDialog<Item>(
       context: context,
-      builder: (_) =>
-          ItemSearchDialog(slot: null, title: t.slotSearchEnchantment),
+      builder: (_) => ItemSearchDialog(
+        slot: slot.slot,
+        title: t.slotSearchEnchantment,
+        mode: ItemSearchMode.enchant,
+        region: cubit.searchRegion,
+      ),
     );
     if (item != null) cubit.assignEnchantment(slot.slot, item);
   }
@@ -1757,9 +1764,27 @@ class _SlotSheetContent extends StatelessWidget {
   ) async {
     final item = await showDialog<Item>(
       context: context,
-      builder: (_) => ItemSearchDialog(slot: null, title: t.slotSearchGem),
+      builder: (_) => ItemSearchDialog(
+        slot: slot.slot,
+        title: t.slotSearchGem,
+        mode: ItemSearchMode.gem,
+        region: cubit.searchRegion,
+      ),
     );
     if (item != null) cubit.addGem(slot.slot, item);
+  }
+
+  String _formatItemName(BuildContext context, Item item) {
+    final localeCode = Localizations.localeOf(context).languageCode;
+    final localized = item.localizedName?.trim();
+    final canonical = item.canonicalNameEn?.trim() ?? item.name;
+    if (localeCode == 'es' &&
+        localized != null &&
+        localized.isNotEmpty &&
+        localized.toLowerCase() != canonical.toLowerCase()) {
+      return '$localized · $canonical';
+    }
+    return canonical;
   }
 }
 

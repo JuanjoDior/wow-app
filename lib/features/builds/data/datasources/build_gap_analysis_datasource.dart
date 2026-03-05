@@ -205,10 +205,19 @@ class BuildGapAnalysisDataSource {
 
     final payload = <Map<String, dynamic>>[];
     for (final slot in buildSlots) {
-      final enchantName = slot.enchantment?.name.trim();
+      final enchantCanonicalName =
+          slot.enchantment?.canonicalNameEn?.trim() ?? '';
+      final enchantFallbackName = slot.enchantment?.name.trim() ?? '';
+      final enchantName = enchantCanonicalName.isNotEmpty
+          ? enchantCanonicalName
+          : (enchantFallbackName.isNotEmpty ? enchantFallbackName : null);
       final enchantId = slot.enchantment?.id;
       final gemNames = slot.gems
-          .map((gem) => gem.name.trim())
+          .map((gem) {
+            final canonical = gem.canonicalNameEn?.trim() ?? '';
+            if (canonical.isNotEmpty) return canonical;
+            return gem.name.trim();
+          })
           .where((name) => name.isNotEmpty)
           .toList();
       final gemIds = slot.gems.map((gem) => gem.id).toList();

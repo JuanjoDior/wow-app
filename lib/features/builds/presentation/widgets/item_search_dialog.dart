@@ -5,6 +5,7 @@ import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
+import 'package:wow_companion/features/items/domain/entities/item_search_mode.dart';
 import 'package:wow_companion/features/items/domain/usecases/search_items.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
 import 'dart:async';
@@ -13,8 +14,16 @@ import 'package:wow_companion/shared/widgets/item_tooltip_trigger.dart';
 class ItemSearchDialog extends StatefulWidget {
   final WowSlot? slot;
   final String title;
+  final ItemSearchMode mode;
+  final String region;
 
-  const ItemSearchDialog({super.key, this.slot, required this.title});
+  const ItemSearchDialog({
+    super.key,
+    this.slot,
+    required this.title,
+    this.mode = ItemSearchMode.item,
+    this.region = 'eu',
+  });
 
   @override
   State<ItemSearchDialog> createState() => _ItemSearchDialogState();
@@ -27,6 +36,7 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
   bool _loading = false;
   bool _hasSearched = false; // ← nueva línea
   String? _error;
+  int _requestId = 0;
 
   @override
   void dispose() {
@@ -42,12 +52,13 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
         _results = [];
         _loading = false;
         _hasSearched = false;
+        _error = null;
       });
       return;
     }
     setState(() => _loading = true);
     _debounce = Timer(const Duration(milliseconds: 400), () {
-      _hasSearched = true; // ← nueva línea
+      _hasSearched = true;
       _doSearch(query);
     });
   }
@@ -62,33 +73,51 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
       _loading = true;
       _error = null;
     });
+    final requestId = ++_requestId;
 
     try {
       final searchItems = sl<SearchItems>();
+      final effectiveInventoryType = _effectiveInventoryType();
       final result = await searchItems(
         query.trim(),
-        inventoryType: widget.slot?.inventoryType,
+        mode: widget.mode,
+        inventoryType: effectiveInventoryType,
+        slot: widget.slot?.name,
+        region: widget.region,
         locale: sl<LocaleNotifier>().blizzardLocale,
       );
+      if (!mounted || requestId != _requestId) return;
 
       result.fold(
         (failure) {
-          if (mounted) {
-            final t = S.of(context)!;
-            setState(() => _error = localizeFailureMessage(t, failure.message));
-          }
+          final t = S.of(context)!;
+          setState(() => _error = localizeFailureMessage(t, failure.message));
         },
         (items) {
-          if (mounted) setState(() => _results = items);
+          setState(() => _results = items);
         },
       );
     } catch (e) {
-      if (mounted) {
-        final t = S.of(context)!;
-        setState(() => _error = t.unexpectedError('$e'));
-      }
+      if (!mounted || requestId != _requestId) return;
+      final t = S.of(context)!;
+      setState(() => _error = t.unexpectedError('$e'));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && requestId == _requestId) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  String? _effectiveInventoryType() {
+    switch (widget.mode) {
+      case ItemSearchMode.item:
+        final type = widget.slot?.inventoryType;
+        if (type == null || type.isEmpty) return null;
+        return type;
+      case ItemSearchMode.enchant:
+      case ItemSearchMode.gem:
+      case ItemSearchMode.consumable:
+        return 'NON_EQUIP';
     }
   }
 
@@ -181,11 +210,14 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
       itemBuilder: (_, i) {
         final item = _results[i];
         final color = WowTheme.getQualityColor(item.quality);
+        final localeCode = Localizations.localeOf(context).languageCode;
+        final primaryName = _primaryName(item, localeCode);
+        final secondaryName = _secondaryName(item, localeCode);
         return ItemTooltipTrigger.forItemId(
           itemId: item.id,
           mode: ItemTooltipInteractionMode.actionFirstMode,
           enableWebOfficialTooltip: false,
-          onPrimaryTap: () => Navigator.of(context).pop(item),
+          onPrimaryTap: () => Navigator.of(context).pop(_persistableItem(item)),
           child: ListTile(
             leading: ClipRRect(
               borderRadius: BorderRadius.circular(4),
@@ -199,9 +231,22 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
                     )
                   : _fallbackIcon(color),
             ),
-            title: Text(
-              item.name,
-              style: TextStyle(color: color, fontWeight: FontWeight.w500),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  primaryName,
+                  style: TextStyle(color: color, fontWeight: FontWeight.w500),
+                ),
+                if (secondaryName != null)
+                  Text(
+                    secondaryName,
+                    style: const TextStyle(
+                      color: WowTheme.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+              ],
             ),
             subtitle: Text(
               [
@@ -216,6 +261,53 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
           ),
         );
       },
+    );
+  }
+
+  String _primaryName(Item item, String localeCode) {
+    if (localeCode == 'es') {
+      return item.localizedName?.trim().isNotEmpty == true
+          ? item.localizedName!
+          : item.name;
+    }
+    return item.canonicalNameEn?.trim().isNotEmpty == true
+        ? item.canonicalNameEn!
+        : item.name;
+  }
+
+  String? _secondaryName(Item item, String localeCode) {
+    final localized = item.localizedName?.trim();
+    final canonical = item.canonicalNameEn?.trim();
+    if (localized == null || localized.isEmpty) return null;
+    if (canonical == null || canonical.isEmpty) return null;
+    if (_normalizeName(localized) == _normalizeName(canonical)) return null;
+    return localeCode == 'es' ? canonical : localized;
+  }
+
+  String _normalizeName(String value) {
+    return value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  Item _persistableItem(Item item) {
+    final canonical = item.canonicalNameEn?.trim();
+    final nameForStorage = canonical != null && canonical.isNotEmpty
+        ? canonical
+        : item.name;
+    return Item(
+      id: item.id,
+      name: nameForStorage,
+      quality: item.quality,
+      level: item.level,
+      requiredLevel: item.requiredLevel,
+      itemClass: item.itemClass,
+      itemSubclass: item.itemSubclass,
+      inventoryType: item.inventoryType,
+      inventoryName: item.inventoryName,
+      iconUrl: item.iconUrl,
+      localizedName: item.localizedName,
+      canonicalNameEn: canonical != null && canonical.isNotEmpty
+          ? canonical
+          : nameForStorage,
     );
   }
 

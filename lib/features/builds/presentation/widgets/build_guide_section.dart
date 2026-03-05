@@ -6,6 +6,7 @@ import 'package:wow_companion/features/builds/presentation/cubit/build_detail_cu
 import 'package:wow_companion/features/builds/presentation/widgets/item_search_dialog.dart';
 import 'package:wow_companion/features/builds/presentation/widgets/spell_search_dialog.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
+import 'package:wow_companion/features/items/domain/entities/item_search_mode.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class BuildGuideSection extends StatefulWidget {
@@ -570,7 +571,12 @@ class _ConsumablesSection extends StatelessWidget {
   }) async {
     final item = await showDialog<Item>(
       context: context,
-      builder: (_) => ItemSearchDialog(slot: null, title: title),
+      builder: (_) => ItemSearchDialog(
+        slot: null,
+        title: title,
+        mode: ItemSearchMode.consumable,
+        region: cubit.searchRegion,
+      ),
     );
     if (item != null) onPicked(item);
   }

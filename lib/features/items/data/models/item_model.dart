@@ -12,6 +12,8 @@ class ItemModel extends Item {
     super.inventoryType,
     super.inventoryName,
     super.iconUrl,
+    super.localizedName,
+    super.canonicalNameEn,
   });
 
   factory ItemModel.fromJson(Map<String, dynamic> json) {
@@ -26,6 +28,8 @@ class ItemModel extends Item {
       inventoryType: json['inventoryType'] as String?,
       inventoryName: json['inventoryName'] as String?,
       iconUrl: json['iconUrl'] as String?,
+      localizedName: json['localizedName'] as String?,
+      canonicalNameEn: json['canonicalNameEn'] as String?,
     );
   }
 }
