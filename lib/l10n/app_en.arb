@@ -61,6 +61,8 @@
   "checkRealmAndName": "Check the region, realm, and character name.",
   "enterRealmAndName": "Please enter both realm and character name",
   "retry": "Retry",
+  "switchToEnglish": "English",
+  "switchToSpanish": "Spanish",
   "equipmentComparison": "Equipment Comparison",
   "char1": "Char 1",
   "char2": "Char 2",

@@ -47,8 +47,8 @@ class ShellLayout extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 32),
                 child: IconButton(
                   tooltip: sl<LocaleNotifier>().locale.languageCode == 'es'
-                      ? 'English'
-                      : 'Español',
+                      ? t.switchToEnglish
+                      : t.switchToSpanish,
                   icon: Text(
                     sl<LocaleNotifier>().locale.languageCode == 'es'
                         ? 'EN'

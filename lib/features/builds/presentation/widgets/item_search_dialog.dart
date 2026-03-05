@@ -250,7 +250,7 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
             ),
             subtitle: Text(
               [
-                if (item.level != null) 'iLvl ${item.level}',
+                if (item.level != null) '${t.ilvl} ${item.level}',
                 if (item.inventoryName != null) item.inventoryName!,
               ].join(' · '),
               style: const TextStyle(

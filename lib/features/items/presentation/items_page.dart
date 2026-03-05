@@ -218,6 +218,7 @@ class _ItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = S.of(context)!;
     final qualityColor = WowTheme.getQualityColor(item.quality);
     return Card(
       color: WowTheme.surfaceDark,
@@ -297,7 +298,7 @@ class _ItemCard extends StatelessWidget {
               ),
               if (item.level != null)
                 Text(
-                  'iLvl ${item.level}',
+                  '${t.ilvl} ${item.level}',
                   style: const TextStyle(
                     color: WowTheme.primaryGold,
                     fontWeight: FontWeight.bold,

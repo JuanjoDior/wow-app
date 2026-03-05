@@ -173,6 +173,12 @@ class SEn extends S {
   String get retry => 'Retry';
 
   @override
+  String get switchToEnglish => 'English';
+
+  @override
+  String get switchToSpanish => 'Spanish';
+
+  @override
   String get equipmentComparison => 'Equipment Comparison';
 
   @override

@@ -175,6 +175,12 @@ class SEs extends S {
   String get retry => 'Reintentar';
 
   @override
+  String get switchToEnglish => 'English';
+
+  @override
+  String get switchToSpanish => 'Español';
+
+  @override
   String get equipmentComparison => 'Comparación de Equipo';
 
   @override

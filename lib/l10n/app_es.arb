@@ -61,6 +61,8 @@
   "checkRealmAndName": "Revisa la región, el reino y el nombre del personaje.",
   "enterRealmAndName": "Introduce reino y nombre del personaje",
   "retry": "Reintentar",
+  "switchToEnglish": "English",
+  "switchToSpanish": "Español",
   "equipmentComparison": "Comparación de Equipo",
   "char1": "Personaje 1",
   "char2": "Personaje 2",

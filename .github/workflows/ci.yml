@@ -23,6 +23,9 @@ jobs:
       - name: Generate l10n
         run: flutter gen-l10n
 
+      - name: Run i18n guards
+        run: flutter test test/core/l10n/arb_glossary_guard_test.dart test/core/l10n/hardcoded_ui_strings_guard_test.dart
+
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 

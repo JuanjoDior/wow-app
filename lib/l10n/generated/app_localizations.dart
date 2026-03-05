@@ -409,6 +409,18 @@ abstract class S {
   /// **'Retry'**
   String get retry;
 
+  /// No description provided for @switchToEnglish.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get switchToEnglish;
+
+  /// No description provided for @switchToSpanish.
+  ///
+  /// In en, this message translates to:
+  /// **'Spanish'**
+  String get switchToSpanish;
+
   /// No description provided for @equipmentComparison.
   ///
   /// In en, this message translates to:

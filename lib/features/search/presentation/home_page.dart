@@ -161,8 +161,8 @@ class _HomePageState extends State<HomePage> {
                 ),
                 label: Text(
                   sl<LocaleNotifier>().locale.languageCode == 'es'
-                      ? 'English'
-                      : 'Español',
+                      ? t.switchToEnglish
+                      : t.switchToSpanish,
                   style: const TextStyle(
                     color: WowTheme.textSecondary,
                     fontSize: 13,

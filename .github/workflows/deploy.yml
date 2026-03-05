@@ -28,6 +28,9 @@ jobs:
       - name: Generate l10n
         run: flutter gen-l10n
 
+      - name: Run i18n guards
+        run: flutter test test/core/l10n/arb_glossary_guard_test.dart test/core/l10n/hardcoded_ui_strings_guard_test.dart
+
       - name: Build Web
         run: flutter build web --release --base-href "/wow-app/" --dart-define=BUILD_VERIFICATION_V2=true --dart-define=CATALOG_SEARCH_V2=true --dart-define=FEATURE_BUILD_INTELLIGENCE=true --dart-define=FEATURE_WEEKLY_PLANNER=false --dart-define=FEATURE_ECONOMY_ASSISTANT=false
 
