@@ -536,6 +536,46 @@ class SEn extends S {
   String get buildIntelligenceTopActions => 'Top actions';
 
   @override
+  String get weeklyPlannerTitle => 'Weekly Planner';
+
+  @override
+  String get weeklyPlannerTooltip => 'Open Weekly Planner';
+
+  @override
+  String get weeklyPlannerUnavailable =>
+      'Weekly Planner is disabled right now.';
+
+  @override
+  String get weeklyPlannerSummaryTitle => 'Weekly summary';
+
+  @override
+  String get weeklyPlannerCompletion => 'Completion';
+
+  @override
+  String get weeklyPlannerChecks => 'Checks';
+
+  @override
+  String get weeklyPlannerRuns => 'Weekly runs';
+
+  @override
+  String get weeklyPlannerRating => 'Rating';
+
+  @override
+  String get weeklyPlannerAffixes => 'Affixes';
+
+  @override
+  String get weeklyPlannerNoAffixes => 'No affix data available yet.';
+
+  @override
+  String get weeklyPlannerChecklist => 'Checklist';
+
+  @override
+  String get weeklyPlannerActions => 'Priority actions';
+
+  @override
+  String get weeklyPlannerNoActions => 'No pending actions.';
+
+  @override
   String get guideTitle => 'Build Guide';
 
   @override

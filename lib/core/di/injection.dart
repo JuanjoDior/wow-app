@@ -30,6 +30,7 @@ import 'package:wow_companion/features/builds/domain/usecases/search_spells.dart
 import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dart';
 import 'package:wow_companion/features/builds/data/datasources/character_media_datasource.dart';
 import 'package:wow_companion/features/builds/data/datasources/build_gap_analysis_datasource.dart';
+import 'package:wow_companion/features/planner/data/datasources/weekly_planner_datasource.dart';
 
 final sl = GetIt.instance;
 
@@ -97,5 +98,10 @@ Future<void> initDependencies() async {
   );
   sl.registerLazySingleton<BuildGapAnalysisDataSource>(
     () => BuildGapAnalysisDataSource(sl()),
+  );
+
+  // ── Weekly Planner ────────────────────────────────────────────────────────
+  sl.registerLazySingleton<WeeklyPlannerDataSource>(
+    () => WeeklyPlannerDataSource(sl()),
   );
 }

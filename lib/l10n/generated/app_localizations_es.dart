@@ -539,6 +539,47 @@ class SEs extends S {
   String get buildIntelligenceTopActions => 'Acciones principales';
 
   @override
+  String get weeklyPlannerTitle => 'Planificador Semanal';
+
+  @override
+  String get weeklyPlannerTooltip => 'Abrir Planificador Semanal';
+
+  @override
+  String get weeklyPlannerUnavailable =>
+      'El Planificador Semanal está desactivado ahora mismo.';
+
+  @override
+  String get weeklyPlannerSummaryTitle => 'Resumen semanal';
+
+  @override
+  String get weeklyPlannerCompletion => 'Completado';
+
+  @override
+  String get weeklyPlannerChecks => 'Checks';
+
+  @override
+  String get weeklyPlannerRuns => 'Runs semanales';
+
+  @override
+  String get weeklyPlannerRating => 'Puntuación';
+
+  @override
+  String get weeklyPlannerAffixes => 'Afijos';
+
+  @override
+  String get weeklyPlannerNoAffixes =>
+      'Aún no hay datos de afijos disponibles.';
+
+  @override
+  String get weeklyPlannerChecklist => 'Checklist';
+
+  @override
+  String get weeklyPlannerActions => 'Acciones prioritarias';
+
+  @override
+  String get weeklyPlannerNoActions => 'No hay acciones pendientes.';
+
+  @override
   String get guideTitle => 'Guía de Build';
 
   @override

@@ -34,5 +34,14 @@ void main() {
 
       expect(route, "/compare/eu/burning-legion/alpha/vs/tw/cho'gall/beta");
     });
+
+    test('buildWeeklyPlannerRoute normalizes route safely', () {
+      final route = buildWeeklyPlannerRoute(
+        region: 'EU',
+        realm: "Burning Legion",
+        name: 'Apästar',
+      );
+      expect(route, '/planner/eu/burning-legion/ap%C3%A4star');
+    });
   });
 }

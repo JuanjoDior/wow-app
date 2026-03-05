@@ -1111,6 +1111,84 @@ abstract class S {
   /// **'Top actions'**
   String get buildIntelligenceTopActions;
 
+  /// No description provided for @weeklyPlannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly Planner'**
+  String get weeklyPlannerTitle;
+
+  /// No description provided for @weeklyPlannerTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Weekly Planner'**
+  String get weeklyPlannerTooltip;
+
+  /// No description provided for @weeklyPlannerUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly Planner is disabled right now.'**
+  String get weeklyPlannerUnavailable;
+
+  /// No description provided for @weeklyPlannerSummaryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly summary'**
+  String get weeklyPlannerSummaryTitle;
+
+  /// No description provided for @weeklyPlannerCompletion.
+  ///
+  /// In en, this message translates to:
+  /// **'Completion'**
+  String get weeklyPlannerCompletion;
+
+  /// No description provided for @weeklyPlannerChecks.
+  ///
+  /// In en, this message translates to:
+  /// **'Checks'**
+  String get weeklyPlannerChecks;
+
+  /// No description provided for @weeklyPlannerRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly runs'**
+  String get weeklyPlannerRuns;
+
+  /// No description provided for @weeklyPlannerRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating'**
+  String get weeklyPlannerRating;
+
+  /// No description provided for @weeklyPlannerAffixes.
+  ///
+  /// In en, this message translates to:
+  /// **'Affixes'**
+  String get weeklyPlannerAffixes;
+
+  /// No description provided for @weeklyPlannerNoAffixes.
+  ///
+  /// In en, this message translates to:
+  /// **'No affix data available yet.'**
+  String get weeklyPlannerNoAffixes;
+
+  /// No description provided for @weeklyPlannerChecklist.
+  ///
+  /// In en, this message translates to:
+  /// **'Checklist'**
+  String get weeklyPlannerChecklist;
+
+  /// No description provided for @weeklyPlannerActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority actions'**
+  String get weeklyPlannerActions;
+
+  /// No description provided for @weeklyPlannerNoActions.
+  ///
+  /// In en, this message translates to:
+  /// **'No pending actions.'**
+  String get weeklyPlannerNoActions;
+
   /// No description provided for @guideTitle.
   ///
   /// In en, this message translates to:
