@@ -115,7 +115,7 @@
   "comingSoon": "Próximamente",
   "character1": "Personaje 1",
   "character2": "Personaje 2",
-  "slot": "Slot",
+  "slot": "Ranura",
   "builds": "Builds",
   "vs": "VS",
 
@@ -137,7 +137,7 @@
     "placeholders": { "name": { "type": "String" } }
   },
   "buildsDelete": "Eliminar",
-  "buildsSlots": "{obtained}/{total} slots",
+  "buildsSlots": "{obtained}/{total} ranuras",
   "@buildsSlots": {
     "placeholders": {
       "obtained": { "type": "int" },
@@ -146,7 +146,7 @@
   },
 
   "slotAssignItem": "Asignar objeto",
-  "slotClearSlot": "Limpiar slot",
+  "slotClearSlot": "Limpiar ranura",
   "slotEnchantmentLabel": "Encantamiento",
   "slotGemsLabel": "Gemas",
   "slotAddEnchantment": "Añadir encantamiento",
@@ -190,7 +190,7 @@
   "buildIntelligenceMissingCharacter": "Vincula un personaje para ejecutar el análisis.",
   "buildIntelligenceCharacterStatus": "Estado verificable del personaje",
   "buildIntelligenceNoTargetHint": "Añade enchants y gemas a tu build para activar acciones de comparación.",
-  "buildIntelligenceEquippedItems": "Slots equipados",
+  "buildIntelligenceEquippedItems": "Ranuras equipadas",
   "buildIntelligenceEnchantedItems": "Objetos con enchant",
   "buildIntelligenceSockets": "Sockets con gema",
   "buildIntelligenceCompletion": "Completado",
@@ -226,7 +226,7 @@
   "weeklyPlannerChecklist": "Lista de tareas",
   "weeklyPlannerActions": "Acciones prioritarias",
   "weeklyPlannerNoActions": "No hay acciones pendientes.",
-  "weeklyPlannerTaskEnchantsCompleted": "Aplica enchants faltantes",
+  "weeklyPlannerTaskEnchantsCompleted": "Aplica encantamientos faltantes",
   "weeklyPlannerTaskSocketsFilled": "Rellena sockets vacíos",
   "weeklyPlannerTaskMplusOne": "Completa al menos 1 Mythic+",
   "weeklyPlannerTaskMplusFour": "Completa 4 Mythic+",

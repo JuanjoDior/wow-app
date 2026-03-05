@@ -331,7 +331,7 @@ class SEs extends S {
   String get character2 => 'Personaje 2';
 
   @override
-  String get slot => 'Slot';
+  String get slot => 'Ranura';
 
   @override
   String get builds => 'Builds';
@@ -388,14 +388,14 @@ class SEs extends S {
 
   @override
   String buildsSlots(int obtained, int total) {
-    return '$obtained/$total slots';
+    return '$obtained/$total ranuras';
   }
 
   @override
   String get slotAssignItem => 'Asignar objeto';
 
   @override
-  String get slotClearSlot => 'Limpiar slot';
+  String get slotClearSlot => 'Limpiar ranura';
 
   @override
   String get slotEnchantmentLabel => 'Encantamiento';
@@ -518,7 +518,7 @@ class SEs extends S {
       'Añade enchants y gemas a tu build para activar acciones de comparación.';
 
   @override
-  String get buildIntelligenceEquippedItems => 'Slots equipados';
+  String get buildIntelligenceEquippedItems => 'Ranuras equipadas';
 
   @override
   String get buildIntelligenceEnchantedItems => 'Objetos con enchant';
@@ -600,7 +600,8 @@ class SEs extends S {
   String get weeklyPlannerNoActions => 'No hay acciones pendientes.';
 
   @override
-  String get weeklyPlannerTaskEnchantsCompleted => 'Aplica enchants faltantes';
+  String get weeklyPlannerTaskEnchantsCompleted =>
+      'Aplica encantamientos faltantes';
 
   @override
   String get weeklyPlannerTaskSocketsFilled => 'Rellena sockets vacíos';

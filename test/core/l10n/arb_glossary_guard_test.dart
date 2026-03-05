@@ -99,5 +99,54 @@ void main() {
         }
       }
     });
+
+    test('critical ES labels are not left in English', () {
+      const mustBeLocalized = <String>[
+        'slot',
+        'slotClearSlot',
+        'buildsSlots',
+        'buildIntelligenceTitle',
+        'buildIntelligenceTopActions',
+        'buildIntelligenceEquippedItems',
+        'buildIntelligenceActionEnchantMissing',
+        'weeklyPlannerTitle',
+        'weeklyPlannerChecklist',
+        'weeklyPlannerActions',
+        'weeklyPlannerTaskEnchantsCompleted',
+        'weeklyPlannerActionRemaining',
+      ];
+
+      for (final key in mustBeLocalized) {
+        expect(
+          esMessages[key],
+          isNot(enMessages[key]),
+          reason: 'Expected key "$key" to be localized in ES',
+        );
+      }
+
+      const forbiddenFragments = <String>[
+        'weekly',
+        'planner',
+        'checklist',
+        'top actions',
+        'apply',
+        'complete',
+        'remaining',
+        'slot',
+      ];
+
+      for (final key in mustBeLocalized) {
+        final raw = (esMessages[key] ?? '').toLowerCase();
+        final sanitized = raw.replaceAll(RegExp(r'\{[^}]+\}'), '');
+        for (final fragment in forbiddenFragments) {
+          expect(
+            sanitized,
+            isNot(contains(fragment)),
+            reason:
+                'Found English fragment "$fragment" in localized key "$key"',
+          );
+        }
+      }
+    });
   });
 }
