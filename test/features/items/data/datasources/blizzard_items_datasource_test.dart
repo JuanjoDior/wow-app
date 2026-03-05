@@ -236,4 +236,72 @@ void main() {
       ),
     ).called(1);
   });
+
+  test('reranks enchant results in legacy search by exact relevance', () async {
+    when(
+      () =>
+          apiClient.get(any(), queryParameters: any(named: 'queryParameters')),
+    ).thenAnswer(
+      (_) async => <String, dynamic>{
+        'results': [
+          {
+            'id': 11,
+            'name': 'QAEnchant Gloves +26 Attack Power',
+            'quality': 'COMMON',
+          },
+          {
+            'id': 12,
+            'name': 'Enchant Weapon - Authority of Radiant Power',
+            'quality': 'EPIC',
+          },
+        ],
+      },
+    );
+
+    final items = await datasource.searchItems(
+      'Authority of Radiant Power',
+      mode: ItemSearchMode.enchant,
+      locale: 'en_US',
+    );
+
+    expect(items, hasLength(2));
+    expect(items.first.id, 12);
+  });
+
+  test('reranks gem over recipe in legacy search', () async {
+    when(
+      () =>
+          apiClient.get(any(), queryParameters: any(named: 'queryParameters')),
+    ).thenAnswer(
+      (_) async => <String, dynamic>{
+        'results': [
+          {
+            'id': 21,
+            'name': 'Design: Culminating Blasphemite',
+            'quality': 'COMMON',
+            'itemClass': 'Recipe',
+            'itemSubclass': 'Jewelcrafting',
+            'inventoryType': 'NON_EQUIP',
+          },
+          {
+            'id': 22,
+            'name': 'Culminating Blasphemite',
+            'quality': 'EPIC',
+            'itemClass': 'Gem',
+            'itemSubclass': 'Other',
+            'inventoryType': 'NON_EQUIP',
+          },
+        ],
+      },
+    );
+
+    final items = await datasource.searchItems(
+      'Culminating Blasphemite',
+      mode: ItemSearchMode.gem,
+      locale: 'en_US',
+    );
+
+    expect(items, hasLength(2));
+    expect(items.first.id, 22);
+  });
 }

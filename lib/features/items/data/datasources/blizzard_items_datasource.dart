@@ -75,6 +75,12 @@ class BlizzardItemsDataSource {
         );
       }
 
+      items = _rerankItems(
+        items,
+        query: name,
+        mode: mode,
+        inventoryType: inventoryType,
+      );
       _searchCache.set(key, items);
       return items;
     } on DioException catch (e) {
@@ -263,4 +269,268 @@ class BlizzardItemsDataSource {
       );
     }
   }
+
+  List<ItemModel> _rerankItems(
+    List<ItemModel> input, {
+    required String query,
+    required ItemSearchMode mode,
+    String? inventoryType,
+  }) {
+    final normalizedQuery = _normalizeSearchText(query);
+    if (normalizedQuery.length < 2 || input.length < 2) return input;
+
+    final scored = <_ScoredItemModel>[];
+    for (var i = 0; i < input.length; i++) {
+      final item = input[i];
+      final score = _scoreItemForQuery(
+        item,
+        normalizedQuery: normalizedQuery,
+        mode: mode,
+        inventoryType: inventoryType,
+      );
+      scored.add(_ScoredItemModel(item: item, score: score, originalIndex: i));
+    }
+
+    scored.sort((a, b) {
+      if (b.score != a.score) return b.score - a.score;
+      return a.originalIndex - b.originalIndex;
+    });
+
+    return scored.map((entry) => entry.item).toList(growable: false);
+  }
+
+  int _scoreItemForQuery(
+    ItemModel item, {
+    required String normalizedQuery,
+    required ItemSearchMode mode,
+    String? inventoryType,
+  }) {
+    final names = [
+      item.localizedName,
+      item.canonicalNameEn,
+      item.name,
+    ].whereType<String>().map(_normalizeSearchText).where((v) => v.isNotEmpty);
+    if (names.isEmpty) return 0;
+
+    final queryTokens = _meaningfulTokens(normalizedQuery);
+    var bestScore = 0;
+    var bestTokenMatches = 0;
+    for (final name in names) {
+      if (name == normalizedQuery) {
+        bestScore = bestScore < 140 ? 140 : bestScore;
+        bestTokenMatches = queryTokens.length;
+        continue;
+      }
+      if (name.startsWith(normalizedQuery)) {
+        bestScore = bestScore < 110 ? 110 : bestScore;
+        bestTokenMatches = bestTokenMatches < queryTokens.length
+            ? queryTokens.length
+            : bestTokenMatches;
+        continue;
+      }
+      if (name.contains(normalizedQuery)) {
+        bestScore = bestScore < 90 ? 90 : bestScore;
+        bestTokenMatches = bestTokenMatches < queryTokens.length
+            ? queryTokens.length
+            : bestTokenMatches;
+        continue;
+      }
+
+      final overlap = _tokenOverlap(name, queryTokens);
+      if (overlap.matches > bestTokenMatches) {
+        bestTokenMatches = overlap.matches;
+      }
+      if (overlap.score > bestScore) {
+        bestScore = overlap.score;
+      }
+    }
+
+    if ((mode == ItemSearchMode.enchant || mode == ItemSearchMode.gem) &&
+        queryTokens.isNotEmpty) {
+      final minMatches = queryTokens.length >= 3 ? 2 : 1;
+      if (bestTokenMatches < minMatches && bestScore < 110) {
+        bestScore -= 60;
+      }
+    }
+
+    if (_isRecipeLike(item)) bestScore -= 20;
+
+    if (mode == ItemSearchMode.item && inventoryType != null) {
+      if (item.inventoryType == inventoryType) {
+        bestScore += 25;
+      } else if ((item.inventoryType ?? '').isNotEmpty) {
+        bestScore -= 20;
+      }
+    }
+
+    if (mode == ItemSearchMode.gem) {
+      if (_isGemLike(item)) {
+        bestScore += 35;
+      } else {
+        bestScore -= 10;
+      }
+    }
+
+    if (mode == ItemSearchMode.enchant) {
+      if (_isEnchantLike(item)) {
+        bestScore += 20;
+      }
+    }
+
+    if (mode == ItemSearchMode.consumable &&
+        (item.inventoryType ?? '').toUpperCase() == 'NON_EQUIP') {
+      bestScore += 10;
+    }
+
+    return bestScore;
+  }
+
+  _SearchTokenOverlap _tokenOverlap(
+    String normalizedName,
+    List<String> queryTokens,
+  ) {
+    if (queryTokens.isEmpty) {
+      return const _SearchTokenOverlap(matches: 0, score: 0);
+    }
+    final tokens = normalizedName
+        .split(' ')
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toSet();
+    var matches = 0;
+    for (final token in queryTokens) {
+      final matched = tokens.any(
+        (candidate) =>
+            candidate == token ||
+            candidate.startsWith(token) ||
+            token.startsWith(candidate),
+      );
+      if (matched) matches += 1;
+    }
+    if (matches == 0) {
+      return const _SearchTokenOverlap(matches: 0, score: 0);
+    }
+    final ratio = matches / queryTokens.length;
+    final score = (55 + ratio * 30).round();
+    return _SearchTokenOverlap(matches: matches, score: score);
+  }
+
+  List<String> _meaningfulTokens(String normalizedQuery) {
+    final tokens = normalizedQuery
+        .split(' ')
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toList(growable: false);
+    if (tokens.isEmpty) return const [];
+
+    const stopwords = {
+      'a',
+      'an',
+      'and',
+      'con',
+      'de',
+      'del',
+      'el',
+      'for',
+      'la',
+      'las',
+      'los',
+      'of',
+      'the',
+      'to',
+      'y',
+    };
+    final meaningful = tokens
+        .where((token) => token.length >= 3 && !stopwords.contains(token))
+        .toList(growable: false);
+    if (meaningful.isNotEmpty) return meaningful;
+    return tokens.where((token) => token.length >= 2).toList(growable: false);
+  }
+
+  String _normalizeSearchText(String value) {
+    return _stripDiacritics(value.toLowerCase())
+        .replaceAll(RegExp(r"[’']"), '')
+        .replaceAll(RegExp(r'[^a-z0-9\s-]'), ' ')
+        .replaceAll(RegExp(r'[-_]+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  String _stripDiacritics(String value) {
+    return value
+        .replaceAll(RegExp(r'[àáâãäå]'), 'a')
+        .replaceAll(RegExp(r'[èéêë]'), 'e')
+        .replaceAll(RegExp(r'[ìíîï]'), 'i')
+        .replaceAll(RegExp(r'[òóôõö]'), 'o')
+        .replaceAll(RegExp(r'[ùúûü]'), 'u')
+        .replaceAll(RegExp(r'[ñ]'), 'n')
+        .replaceAll(RegExp(r'[ç]'), 'c');
+  }
+
+  bool _isRecipeLike(ItemModel item) {
+    final samples = [
+      item.localizedName,
+      item.canonicalNameEn,
+      item.name,
+      item.itemClass,
+      item.itemSubclass,
+    ].whereType<String>().map(_normalizeSearchText);
+    for (final sample in samples) {
+      if (sample.startsWith('recipe ') ||
+          sample.startsWith('design ') ||
+          sample.startsWith('pattern ') ||
+          sample.startsWith('formula ') ||
+          sample.startsWith('receta ') ||
+          sample.startsWith('boceto ') ||
+          sample.startsWith('patron ')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _isGemLike(ItemModel item) {
+    final classToken = _normalizeSearchText(item.itemClass ?? '');
+    final subclassToken = _normalizeSearchText(item.itemSubclass ?? '');
+    return classToken.contains('gem') ||
+        classToken.contains('gema') ||
+        subclassToken.contains('gem') ||
+        subclassToken.contains('gema');
+  }
+
+  bool _isEnchantLike(ItemModel item) {
+    final samples = [
+      item.localizedName,
+      item.canonicalNameEn,
+      item.name,
+      item.itemSubclass,
+    ].whereType<String>().map(_normalizeSearchText);
+    for (final sample in samples) {
+      if (sample.contains('enchant') ||
+          sample.contains('encant') ||
+          sample.contains('enchanter')) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
+class _ScoredItemModel {
+  final ItemModel item;
+  final int score;
+  final int originalIndex;
+
+  const _ScoredItemModel({
+    required this.item,
+    required this.score,
+    required this.originalIndex,
+  });
+}
+
+class _SearchTokenOverlap {
+  final int matches;
+  final int score;
+
+  const _SearchTokenOverlap({required this.matches, required this.score});
 }
