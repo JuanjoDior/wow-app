@@ -269,6 +269,7 @@ void main() {
             region: any(named: 'region'),
             realm: any(named: 'realm'),
             name: any(named: 'name'),
+            locale: any(named: 'locale'),
           ),
         ).thenAnswer((_) async => blizzard);
 
@@ -434,6 +435,7 @@ void _stubSources({
       region: any(named: 'region'),
       realm: any(named: 'realm'),
       name: any(named: 'name'),
+      locale: any(named: 'locale'),
     ),
   ).thenAnswer((_) async => blizzard);
 

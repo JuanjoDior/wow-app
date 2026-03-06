@@ -54,6 +54,7 @@ class CharacterCubit extends Cubit<CharacterState> {
     required String region,
     required String realm,
     required String name,
+    String locale = 'en_GB',
   }) async {
     emit(const CharacterLoading());
 
@@ -61,6 +62,7 @@ class CharacterCubit extends Cubit<CharacterState> {
       region: region,
       realm: realm,
       name: name,
+      locale: locale,
     );
 
     result.fold(

@@ -8,5 +8,6 @@ abstract class CharacterRepository {
     required String region,
     required String realm,
     required String name,
+    String locale = 'en_GB',
   });
 }

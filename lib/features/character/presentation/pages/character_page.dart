@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:wow_companion/core/config/feature_flags.dart';
 import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/l10n/failure_localizer.dart';
+import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/core/l10n/wow_translations.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/core/wow/character_search_input.dart';
@@ -37,6 +38,8 @@ class CharacterPage extends StatefulWidget {
 class _CharacterPageState extends State<CharacterPage> {
   late final CharacterCubit _cubit;
   late final FavoritesCubit _favCubit;
+  late final LocaleNotifier _localeNotifier;
+  String? _lastBlizzardLocale;
   bool _isFavorite = false;
 
   @override
@@ -44,12 +47,27 @@ class _CharacterPageState extends State<CharacterPage> {
     super.initState();
     _cubit = sl<CharacterCubit>();
     _favCubit = sl<FavoritesCubit>();
+    _localeNotifier = sl<LocaleNotifier>();
+    _localeNotifier.addListener(_onLocaleChanged);
+    _fetchCharacterForLocale();
+    _checkFavorite();
+  }
+
+  void _fetchCharacterForLocale() {
+    final locale = _localeNotifier.blizzardLocale;
+    _lastBlizzardLocale = locale;
     _cubit.fetchCharacter(
       region: widget.region,
       realm: widget.realm,
       name: widget.name,
+      locale: locale,
     );
-    _checkFavorite();
+  }
+
+  void _onLocaleChanged() {
+    final nextLocale = _localeNotifier.blizzardLocale;
+    if (nextLocale == _lastBlizzardLocale) return;
+    _fetchCharacterForLocale();
   }
 
   Future<void> _checkFavorite() async {
@@ -62,6 +80,7 @@ class _CharacterPageState extends State<CharacterPage> {
 
   @override
   void dispose() {
+    _localeNotifier.removeListener(_onLocaleChanged);
     _cubit.close();
     super.dispose();
   }
@@ -146,11 +165,7 @@ class _CharacterPageState extends State<CharacterPage> {
       return WowErrorWidget(
         message: localizeFailureMessage(t, state.message),
         suggestion: localizeFailureSuggestion(t, state.suggestion),
-        onRetry: () => _cubit.fetchCharacter(
-          region: widget.region,
-          realm: widget.realm,
-          name: widget.name,
-        ),
+        onRetry: _fetchCharacterForLocale,
       );
     }
     if (state is CharacterLoaded) {

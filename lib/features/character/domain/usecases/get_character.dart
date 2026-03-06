@@ -12,8 +12,13 @@ class GetCharacter {
     required String region,
     required String realm,
     required String name,
+    String locale = 'en_GB',
   }) {
-    return repository.getCharacter(region: region, realm: realm, name: name);
+    return repository.getCharacter(
+      region: region,
+      realm: realm,
+      name: name,
+      locale: locale,
+    );
   }
 }
-

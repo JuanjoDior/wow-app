@@ -34,6 +34,8 @@ class _StaticResponseAdapter implements HttpClientAdapter {
 class _RouteAwareAdapter implements HttpClientAdapter {
   final Future<ResponseBody> Function(RequestOptions options) responder;
   final List<String> requestedPaths = <String>[];
+  final List<Map<String, dynamic>> requestedQueryParameters =
+      <Map<String, dynamic>>[];
 
   _RouteAwareAdapter({required this.responder});
 
@@ -47,6 +49,9 @@ class _RouteAwareAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     requestedPaths.add(options.path);
+    requestedQueryParameters.add(
+      Map<String, dynamic>.from(options.queryParameters),
+    );
     return responder(options);
   }
 }
@@ -171,6 +176,41 @@ void main() {
       expect(result.realm, 'Sanguino');
       expect(result.region, 'EU');
       expect(result.characterClass, 'Druid');
+    });
+
+    test('passes locale parameter to worker', () async {
+      final adapter = _RouteAwareAdapter(
+        responder: (options) async => ResponseBody.fromString(
+          jsonEncode({
+            'version': 'v1',
+            'snapshot': {
+              'name': 'Apastar',
+              'realm': 'Sanguino',
+              'region': 'eu',
+              'class': 'Druid',
+              'race': 'Night Elf',
+              'level': 80,
+              'equipment': const [],
+            },
+          }),
+          200,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        ),
+      );
+      final dio = Dio()..httpClientAdapter = adapter;
+      final datasource = BlizzardCharacterDatasource(dio: dio);
+
+      await datasource.getCharacter(
+        region: 'eu',
+        realm: 'sanguino',
+        name: 'apastar',
+        locale: 'es_ES',
+      );
+
+      expect(adapter.requestedQueryParameters, isNotEmpty);
+      expect(adapter.requestedQueryParameters.first['locale'], 'es_ES');
     });
 
     test(

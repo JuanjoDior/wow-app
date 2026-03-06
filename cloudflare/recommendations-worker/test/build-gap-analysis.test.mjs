@@ -61,6 +61,54 @@ test('health honors explicit module feature flags from env', async () => {
   assert.equal(body.capabilities?.build_verification_v2, false);
 });
 
+test('character cache is isolated by locale', async () => {
+  const { env, cache } = createEnv();
+  cache.set(
+    'char:eu:sanguino:apastar:es_es',
+    JSON.stringify({
+      name: 'Apastar',
+      realm: 'Sanguino',
+      region: 'EU',
+      class: 'Druid',
+      spec: 'Feral',
+      equipment: [{ slot: 'HEAD', name: 'Escalpelo Vicioso' }],
+      _source: 'cache',
+    }),
+  );
+  cache.set(
+    'char:eu:sanguino:apastar:en_gb',
+    JSON.stringify({
+      name: 'Apastar',
+      realm: 'Sanguino',
+      region: 'EU',
+      class: 'Druid',
+      spec: 'Feral',
+      equipment: [{ slot: 'HEAD', name: "Charhound's Vicious Scalp" }],
+      _source: 'cache',
+    }),
+  );
+
+  const esRes = await worker.fetch(
+    new Request(
+      'https://worker.example/character?region=eu&realm=sanguino&name=apastar&locale=es_ES',
+    ),
+    env,
+  );
+  const enRes = await worker.fetch(
+    new Request(
+      'https://worker.example/character?region=eu&realm=sanguino&name=apastar&locale=en_GB',
+    ),
+    env,
+  );
+  const esBody = await esRes.json();
+  const enBody = await enRes.json();
+
+  assert.equal(esRes.status, 200);
+  assert.equal(enRes.status, 200);
+  assert.equal(esBody.equipment?.[0]?.name, 'Escalpelo Vicioso');
+  assert.equal(enBody.equipment?.[0]?.name, "Charhound's Vicious Scalp");
+});
+
 test('weekly planner endpoint is disabled by flag by default', async () => {
   const { env } = createEnv();
   const req = new Request('https://worker.example/v1/planner/weekly');
@@ -76,7 +124,7 @@ test('weekly planner endpoint is disabled by flag by default', async () => {
 test('weekly planner returns objective checklist when feature is enabled', async () => {
   const { env, cache } = createEnv({ FEATURE_WEEKLY_PLANNER: 'true' });
   cache.set(
-    'char:eu:sanguino:apastar',
+    'char:eu:sanguino:apastar:en_us',
     JSON.stringify({
       name: 'Apastar',
       realm: 'Sanguino',
@@ -130,7 +178,7 @@ test('weekly planner returns objective checklist when feature is enabled', async
 test('weekly planner uses cache on subsequent calls', async () => {
   const { env, cache } = createEnv({ FEATURE_WEEKLY_PLANNER: 'true' });
   cache.set(
-    'char:eu:sanguino:apastar',
+    'char:eu:sanguino:apastar:en_us',
     JSON.stringify({
       name: 'Apastar',
       realm: 'Sanguino',
@@ -161,7 +209,7 @@ test(
   async () => {
     const { env, cache } = createEnv({ FEATURE_WEEKLY_PLANNER: 'true' });
     cache.set(
-      'char:eu:sanguino:apastar',
+      'char:eu:sanguino:apastar:en_us',
       JSON.stringify({
         name: 'Apastar',
         realm: 'Sanguino',
@@ -188,7 +236,7 @@ test(
 test('v1 build gap-analysis uses objective mode in compatibility alias', async () => {
   const { env, cache } = createEnv();
   cache.set(
-    'char:eu:sanguino:apastar',
+    'char:eu:sanguino:apastar:en_us',
     JSON.stringify({
       name: 'Apastar',
       realm: 'Sanguino',
@@ -245,7 +293,7 @@ test('v1 build gap-analysis validates required params', async () => {
 test('v2 build verification matches by IDs even with different localized names', async () => {
   const { env, cache } = createEnv();
   cache.set(
-    'char:eu:sanguino:apastar',
+    'char:eu:sanguino:apastar:en_us',
     JSON.stringify({
       name: 'Apastar',
       realm: 'Sanguino',
@@ -294,7 +342,7 @@ test('v2 build verification matches by IDs even with different localized names',
 test('v2 build verification falls back to name matching when IDs are absent', async () => {
   const { env, cache } = createEnv();
   cache.set(
-    'char:eu:sanguino:apastar',
+    'char:eu:sanguino:apastar:en_us',
     JSON.stringify({
       name: 'Apastar',
       realm: 'Sanguino',
@@ -340,7 +388,7 @@ test('v2 build verification falls back to name matching when IDs are absent', as
 test('v2 build verification classifies mismatch vs missing actions', async () => {
   const { env, cache } = createEnv();
   cache.set(
-    'char:eu:sanguino:apastar',
+    'char:eu:sanguino:apastar:en_us',
     JSON.stringify({
       name: 'Apastar',
       realm: 'Sanguino',

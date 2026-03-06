@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wow_companion/core/di/injection.dart';
+import 'package:wow_companion/core/l10n/wow_translations.dart';
 import 'package:wow_companion/core/wow/character_search_input.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/favorites/presentation/favorites_cubit.dart';
@@ -76,6 +77,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   Widget _buildFavoritesList(FavoritesLoaded state) {
+    final localeCode = Localizations.localeOf(context).languageCode;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 600),
@@ -84,6 +86,10 @@ class _FavoritesPageState extends State<FavoritesPage> {
           itemCount: state.favorites.length,
           itemBuilder: (context, index) {
             final fav = state.favorites[index];
+            final detailRaw = fav.specialization ?? fav.characterClass;
+            final detailTranslated = fav.specialization != null
+                ? WowTranslations.translateSpec(detailRaw, localeCode)
+                : WowTranslations.translateClass(detailRaw, localeCode);
             return Dismissible(
               key: ValueKey(fav.key),
               direction: DismissDirection.endToStart,
@@ -109,7 +115,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                     ),
                   ),
                   subtitle: Text(
-                    '${fav.realm} · ${fav.specialization ?? fav.characterClass}',
+                    '${fav.realm} · $detailTranslated',
                     style: const TextStyle(color: WowTheme.textSecondary),
                   ),
                   trailing: fav.itemLevel != null

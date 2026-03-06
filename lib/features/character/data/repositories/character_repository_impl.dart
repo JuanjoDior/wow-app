@@ -31,24 +31,30 @@ class CharacterRepositoryImpl implements CharacterRepository {
     required this.cache,
   });
 
-  String _cacheKey(String region, String realm, String name) =>
-      '${region.toLowerCase()}-${realm.toLowerCase()}-${name.toLowerCase()}';
+  String _cacheKey(String region, String realm, String name, String locale) =>
+      '${region.toLowerCase()}-${realm.toLowerCase()}-${name.toLowerCase()}:${locale.toLowerCase()}';
 
   @override
   Future<Either<Failure, Character>> getCharacter({
     required String region,
     required String realm,
     required String name,
+    String locale = 'en_GB',
   }) async {
     // 1. Caché en memoria (5 min TTL gestionado por MemoryCache)
-    final key = _cacheKey(region, realm, name);
+    final key = _cacheKey(region, realm, name, locale);
     final cached = cache.get(key);
     if (cached != null) return Right(cached);
 
     // 2. Lanzar ambas fuentes en paralelo
     final futures = await Future.wait([
       blizzardDataSource
-          .getCharacter(region: region, realm: realm, name: name)
+          .getCharacter(
+            region: region,
+            realm: realm,
+            name: name,
+            locale: locale,
+          )
           .then<Object?>((v) => v)
           .catchError((e) => e), // captura excepción como valor
       raiderIoDataSource

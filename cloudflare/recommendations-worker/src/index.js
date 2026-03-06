@@ -882,14 +882,20 @@ function getEnchantPrefixesForSlot(slot) {
 // Datos devueltos: perfil, equipo (con enchants+gemas exactos), estadísticas,
 // y URL de render del personaje.
 //
-// Nota sobre locale: se usa en_US para normalizar nombres e IDs de enchants/gemas
-// y permitir comparación estable entre respuestas Blizzard y build local.
+// Nota sobre locale:
+// - Por defecto se usa en_US para mantener compatibilidad y comparación estable.
+// - Si el cliente envía ?locale=..., se devuelve payload localizado para UI.
+// - La caché se segmenta por locale para no mezclar ES/EN.
 
 async function handleCharacter(url, env) {
   const region = (url.searchParams.get('region') || 'eu').toLowerCase().trim();
   const realmInput = (url.searchParams.get('realm') || '').trim();
   const realmLegacyKeyPart = realmInput.toLowerCase();
   const name   = (url.searchParams.get('name')   || '').toLowerCase().trim();
+  const localeParam = url.searchParams.get('locale');
+  const locale = localeParam
+    ? resolveCatalogLocale(region, localeParam)
+    : 'en_US';
   const force  = url.searchParams.get('force') === '1';
 
   if (!realmInput || !name) {
@@ -900,7 +906,12 @@ async function handleCharacter(url, env) {
     return json({ error: `Unknown region: ${region}. Use: us, eu, kr, tw` }, 400);
   }
 
-  const legacyCacheKey = buildCharacterLegacyKey(region, realmLegacyKeyPart, name);
+  const legacyCacheKey = buildCharacterLegacyKey(
+    region,
+    realmLegacyKeyPart,
+    name,
+    locale,
+  );
   const cacheTtl = getCacheTtlSeconds(env, 'character');
 
   // 1. Legacy cache alias (pre-realm-canonicalization).
@@ -919,7 +930,12 @@ async function handleCharacter(url, env) {
   try {
     const token = await getBlizzardToken(region, env);
     const realmSlug = await resolveRealmSlug(region, realmInput, token, env);
-    const canonicalCacheKey = buildCharacterCanonicalKey(region, realmSlug, name);
+    const canonicalCacheKey = buildCharacterCanonicalKey(
+      region,
+      realmSlug,
+      name,
+      locale,
+    );
 
     if (!force) {
       const cachedCanonical = await env.RECS_CACHE.get(canonicalCacheKey, 'json');
@@ -928,7 +944,14 @@ async function handleCharacter(url, env) {
       }
     }
 
-    const data = await fetchBlizzardCharacter(region, realmSlug, name, token, env);
+    const data = await fetchBlizzardCharacter(
+      region,
+      realmSlug,
+      name,
+      token,
+      env,
+      locale,
+    );
     const result = { ...data, _source: 'blizzard' };
     const hasMedia = Boolean(result.avatar_url || result.thumbnail_url);
     const effectiveCacheTtl = hasMedia
@@ -1746,17 +1769,23 @@ function extractPowerTypeValue(source) {
 
 // ─── Blizzard: fetch character data en paralelo ───────────────────────────────
 
-async function fetchBlizzardCharacter(region, realmSlug, name, token, env) {
+async function fetchBlizzardCharacter(
+  region,
+  realmSlug,
+  name,
+  token,
+  env,
+  locale = 'en_US',
+) {
   const base      = BLIZZARD_API_BASE[region];
   const namespace = `profile-${region}`;
-  // en_US para tener nomenclatura estable en el payload normalizado
-  const locale    = 'en_US';
+  const normalizedLocale = String(locale || 'en_US').trim() || 'en_US';
 
   // Character name: lowercase + URL-encode (maneja caracteres especiales: Ä, ñ, etc.)
   const charName   = encodeURIComponent(name.toLowerCase());
 
   const charPath = `/profile/wow/character/${encodeURIComponent(realmSlug)}/${charName}`;
-  const qs       = `namespace=${namespace}&locale=${locale}`;
+  const qs       = `namespace=${namespace}&locale=${normalizedLocale}`;
   const headers  = { 'Authorization': `Bearer ${token}` };
 
   // 4 llamadas en paralelo → minimiza latencia
@@ -2608,12 +2637,24 @@ function getCacheTtlSeconds(env, cacheType) {
   return parsePositiveInt(env[config.envKey], config.fallback);
 }
 
-function buildCharacterLegacyKey(region, realmInput, name) {
-  return `char:${region}:${realmInput}:${name}`;
+function normalizeCharacterLocaleToken(locale) {
+  return String(locale || 'en_US')
+    .trim()
+    .toLowerCase()
+    .replace('-', '_');
 }
 
-function buildCharacterCanonicalKey(region, realmSlug, name) {
-  return `char:${region}:${realmSlug}:${name}`;
+function buildCharacterLegacyKey(region, realmInput, name, locale = 'en_US') {
+  return `char:${region}:${realmInput}:${name}:${normalizeCharacterLocaleToken(locale)}`;
+}
+
+function buildCharacterCanonicalKey(
+  region,
+  realmSlug,
+  name,
+  locale = 'en_US',
+) {
+  return `char:${region}:${realmSlug}:${name}:${normalizeCharacterLocaleToken(locale)}`;
 }
 
 function buildTokenKey(region) {

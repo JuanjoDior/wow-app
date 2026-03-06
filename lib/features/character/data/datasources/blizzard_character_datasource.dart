@@ -30,12 +30,14 @@ class BlizzardCharacterDatasource {
     required String region,
     required String realm,
     required String name,
+    String locale = 'en_GB',
     bool force = false,
   }) async {
     final params = <String, String>{
       'region': region.toLowerCase(),
       'realm': realm.toLowerCase(),
       'name': name.toLowerCase(),
+      'locale': locale,
       if (force) 'force': '1',
     };
 

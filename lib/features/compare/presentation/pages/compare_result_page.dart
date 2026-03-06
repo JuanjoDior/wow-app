@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/l10n/failure_localizer.dart';
+import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/character/domain/entities/character.dart';
 import 'package:wow_companion/features/character/domain/repositories/character_repository.dart';
@@ -47,16 +48,19 @@ class _CompareResultPageState extends State<CompareResultPage> {
 
     try {
       final repo = sl<CharacterRepository>();
+      final locale = sl<LocaleNotifier>().blizzardLocale;
       final results = await Future.wait([
         repo.getCharacter(
           region: widget.region1,
           realm: widget.realm1,
           name: widget.name1,
+          locale: locale,
         ),
         repo.getCharacter(
           region: widget.region2,
           realm: widget.realm2,
           name: widget.name2,
+          locale: locale,
         ),
       ]);
 
@@ -65,14 +69,8 @@ class _CompareResultPageState extends State<CompareResultPage> {
       String? err1;
       String? err2;
 
-      results[0].fold(
-        (f) => err1 = f.message,
-        (c) => c1 = c,
-      );
-      results[1].fold(
-        (f) => err2 = f.message,
-        (c) => c2 = c,
-      );
+      results[0].fold((f) => err1 = f.message, (c) => c1 = c);
+      results[1].fold((f) => err2 = f.message, (c) => c2 = c);
 
       if (mounted) {
         final t = S.of(context)!;
