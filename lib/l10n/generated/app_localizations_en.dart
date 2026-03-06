@@ -556,6 +556,18 @@ class SEn extends S {
   }
 
   @override
+  String get buildIntelligenceEstimatedCostShort => 'Cost';
+
+  @override
+  String get buildIntelligenceRoiShort => 'ROI';
+
+  @override
+  String get buildIntelligenceSummaryEstimatedCost => 'Estimated cost';
+
+  @override
+  String get buildIntelligenceSummaryPricedActions => 'Priced actions';
+
+  @override
   String get economyAssistantTitle => 'Economy Assistant';
 
   @override

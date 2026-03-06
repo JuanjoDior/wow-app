@@ -29,6 +29,28 @@ function createEnv(overrides = {}) {
   return { env, cache };
 }
 
+function jsonResponse(payload, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function withMockedFetch(mock, fn) {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const requestUrl = typeof input === 'string' ? input : input.url;
+    const url = new URL(requestUrl);
+    return mock(url, init);
+  };
+
+  return Promise.resolve()
+    .then(fn)
+    .finally(() => {
+      globalThis.fetch = originalFetch;
+    });
+}
+
 test('health exposes capabilities with module feature flags', async () => {
   const { env } = createEnv();
   const req = new Request('https://worker.example/health');
@@ -451,4 +473,75 @@ test('v2 build verification classifies mismatch vs missing actions', async () =>
   const gemAction = body.actions.find((action) => action.type === 'gem_missing_target');
   assert.ok(enchantAction);
   assert.ok(gemAction);
+});
+
+test('v2 build verification enriches actions with economy cost and ROI when enabled', async () => {
+  const { env, cache } = createEnv({
+    FEATURE_ECONOMY_ASSISTANT: 'true',
+    BLIZZARD_CLIENT_ID: 'test-client',
+    BLIZZARD_CLIENT_SECRET: 'test-secret',
+  });
+  cache.set(
+    'char:eu:sanguino:apastar:en_us',
+    JSON.stringify({
+      name: 'Apastar',
+      realm: 'Sanguino',
+      region: 'EU',
+      class: 'Druid',
+      spec: 'Feral',
+      equipment: [
+        {
+          slot: 'MAIN_HAND',
+          enchantments: [],
+          enchantment_ids: [],
+          gems: [],
+          gem_ids: [],
+          sockets_total: 0,
+          sockets_filled: 0,
+        },
+      ],
+      _source: 'cache',
+    }),
+  );
+
+  await withMockedFetch(async (url) => {
+    if (url.hostname === 'oauth.battle.net') {
+      return jsonResponse({ access_token: 'token' });
+    }
+    if (url.pathname === '/data/wow/auctions/commodities') {
+      return jsonResponse({
+        auctions: [
+          { item: { id: 2002 }, unit_price: 1750000, quantity: 6 },
+        ],
+      });
+    }
+    return new Response('Not Found', { status: 404 });
+  }, async () => {
+    const buildSlots = encodeURIComponent(
+      JSON.stringify([
+        {
+          slot: 'mainHand',
+          enchantment_id: 2002,
+          enchantment: 'Authority of Fiery Resolve',
+        },
+      ]),
+    );
+    const req = new Request(
+      `https://worker.example/v2/build/verification?region=eu&realm=sanguino&name=apastar&build_slots=${buildSlots}`,
+    );
+    const res = await worker.fetch(req, env);
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(body.summary?.actions_count, 1);
+    assert.equal(body.summary?.priced_actions_count, 1);
+    assert.equal(body.summary?.estimated_total_cost_copper, 1750000);
+
+    const action = body.actions?.[0];
+    assert.equal(action?.type, 'enchant_missing_target');
+    assert.equal(action?.expected_id, 2002);
+    assert.equal(action?.estimated_cost_copper, 1750000);
+    assert.equal(action?.price_market, 'commodities');
+    assert.ok(action?.roi_score > 0);
+  });
 });

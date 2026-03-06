@@ -559,6 +559,18 @@ class SEs extends S {
   }
 
   @override
+  String get buildIntelligenceEstimatedCostShort => 'Coste';
+
+  @override
+  String get buildIntelligenceRoiShort => 'ROI';
+
+  @override
+  String get buildIntelligenceSummaryEstimatedCost => 'Coste estimado';
+
+  @override
+  String get buildIntelligenceSummaryPricedActions => 'Acciones con precio';
+
+  @override
   String get economyAssistantTitle => 'Asistente de Economía';
 
   @override

@@ -181,6 +181,72 @@ void main() {
     },
   );
 
+  testWidgets('muestra coste y ROI cuando la verificación incluye economía', (
+    tester,
+  ) async {
+    final build = buildFixture(
+      id: 'b2roi',
+      characterRefKey: 'eu-sanguino-apastar',
+      characterClass: 'Druid',
+      characterSpec: 'Feral',
+    );
+    final analysis = BuildGapAnalysis(
+      summary: const BuildGapSummary(
+        analysisMode: 'objective',
+        targetProfile: 'build_target',
+        checksTotal: 2,
+        checksCompleted: 1,
+        completionPct: 50,
+        missingEnchants: 1,
+        missingGems: 0,
+        actionsCount: 1,
+        pricedActionsCount: 1,
+        actionsWithoutPriceCount: 0,
+        estimatedTotalCostCopper: 1750000,
+      ),
+      actions: const [
+        BuildGapAction(
+          priorityScore: 95,
+          slot: 'mainHand',
+          type: 'enchant_missing_target',
+          label: 'Apply Authority of Fiery Resolve',
+          expected: 'Authority of Fiery Resolve',
+          expectedId: 2002,
+          estimatedCostCopper: 1750000,
+          roiScore: 100,
+          priceMarket: 'commodities',
+        ),
+      ],
+    );
+
+    when(() => buildsRepository.getBuilds()).thenAnswer((_) async => [build]);
+    when(
+      () => mediaDataSource.getMedia(
+        region: any(named: 'region'),
+        realm: any(named: 'realm'),
+        name: any(named: 'name'),
+      ),
+    ).thenAnswer((_) async => null);
+    when(
+      () => gapDataSource.getGapAnalysis(
+        region: any(named: 'region'),
+        realm: any(named: 'realm'),
+        name: any(named: 'name'),
+        className: any(named: 'className'),
+        specName: any(named: 'specName'),
+        buildSlots: any(named: 'buildSlots'),
+        force: any(named: 'force'),
+      ),
+    ).thenAnswer((_) async => analysis);
+
+    await pumpPage(tester, build.id, locale: const Locale('es'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Coste estimado'), findsOneWidget);
+    expect(find.text('175g 0s 0c'), findsWidgets);
+    expect(find.textContaining('ROI: 100'), findsOneWidget);
+  });
+
   testWidgets('localiza acciones de verificación en español', (tester) async {
     final build = buildFixture(
       id: 'b2es',

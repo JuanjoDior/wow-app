@@ -296,4 +296,74 @@ void main() {
       ),
     );
   });
+
+  test('parses optional economy enrichment fields from v2 payload', () async {
+    final datasource = BuildGapAnalysisDataSource(apiClient, v2Enabled: true);
+
+    when(
+      () => apiClient.get(
+        healthEndpoint,
+        queryParameters: any(named: 'queryParameters'),
+        expectedErrorStatusCodes: any(named: 'expectedErrorStatusCodes'),
+      ),
+    ).thenAnswer(
+      (_) async => <String, dynamic>{
+        'status': 'ok',
+        'capabilities': {'build_verification_v2': true},
+      },
+    );
+
+    when(
+      () => apiClient.get(
+        v2Endpoint,
+        queryParameters: any(named: 'queryParameters'),
+        expectedErrorStatusCodes: any(named: 'expectedErrorStatusCodes'),
+      ),
+    ).thenAnswer(
+      (_) async => <String, dynamic>{
+        'version': 'v2',
+        'endpoint': '/v2/build/verification',
+        'summary': {
+          'analysis_mode': 'objective',
+          'target_profile': 'build_target',
+          'checks_total': 2,
+          'checks_completed': 1,
+          'completion_pct': 50,
+          'missing_enchants': 1,
+          'missing_gems': 0,
+          'actions_count': 1,
+          'priced_actions_count': 1,
+          'actions_without_price_count': 0,
+          'estimated_total_cost_copper': 1750000,
+        },
+        'actions': [
+          {
+            'priority_score': 95,
+            'slot': 'mainHand',
+            'type': 'enchant_missing_target',
+            'label': 'Apply Authority of Fiery Resolve',
+            'expected': 'Authority of Fiery Resolve',
+            'expected_id': 2002,
+            'estimated_cost_copper': 1750000,
+            'roi_score': 100,
+            'price_market': 'commodities',
+          },
+        ],
+      },
+    );
+
+    final result = await datasource.getGapAnalysis(
+      region: 'eu',
+      realm: 'sanguino',
+      name: 'apastar',
+    );
+
+    expect(result.summary.pricedActionsCount, 1);
+    expect(result.summary.actionsWithoutPriceCount, 0);
+    expect(result.summary.estimatedTotalCostCopper, 1750000);
+    expect(result.actions, hasLength(1));
+    expect(result.actions.first.estimatedCostCopper, 1750000);
+    expect(result.actions.first.roiScore, 100);
+    expect(result.actions.first.priceMarket, 'commodities');
+  });
 }

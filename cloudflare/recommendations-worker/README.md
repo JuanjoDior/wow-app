@@ -194,6 +194,7 @@ Búsqueda de catálogo con datos oficiales Blizzard, fusión dual-locale (`local
 ## GET /v2/build/verification
 
 Compara el estado real del personaje con el target local (`build_slots`) usando IDs primero y nombre como fallback.
+Si `FEATURE_ECONOMY_ASSISTANT=true`, el endpoint enriquece acciones con coste estimado y ROI usando mercado oficial Blizzard.
 
 ### Query params
 
@@ -232,7 +233,10 @@ Compara el estado real del personaje con el target local (`build_slots`) usando 
     "missing_gems": 1,
     "mismatched_enchants": 1,
     "mismatched_gems": 0,
-    "actions_count": 2
+    "actions_count": 2,
+    "priced_actions_count": 1,
+    "actions_without_price_count": 1,
+    "estimated_total_cost_copper": 1750000
   },
   "actions": [
     {
@@ -244,7 +248,10 @@ Compara el estado real del personaje con el target local (`build_slots`) usando 
       "expected": "Authority of Fiery Resolve",
       "expected_id": 2002,
       "current": ["Authority of Radiant Power"],
-      "source": "build"
+      "source": "build",
+      "estimated_cost_copper": 1750000,
+      "roi_score": 100,
+      "price_market": "commodities"
     }
   ]
 }

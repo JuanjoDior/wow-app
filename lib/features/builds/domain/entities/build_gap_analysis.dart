@@ -47,6 +47,9 @@ class BuildGapSummary extends Equatable {
   final int mismatchedEnchants;
   final int mismatchedGems;
   final int actionsCount;
+  final int? pricedActionsCount;
+  final int? actionsWithoutPriceCount;
+  final int? estimatedTotalCostCopper;
 
   const BuildGapSummary({
     this.analysisMode,
@@ -59,6 +62,9 @@ class BuildGapSummary extends Equatable {
     this.mismatchedEnchants = 0,
     this.mismatchedGems = 0,
     required this.actionsCount,
+    this.pricedActionsCount,
+    this.actionsWithoutPriceCount,
+    this.estimatedTotalCostCopper,
   });
 
   factory BuildGapSummary.fromJson(Map<String, dynamic> json) {
@@ -73,6 +79,11 @@ class BuildGapSummary extends Equatable {
       mismatchedEnchants: (json['mismatched_enchants'] as num?)?.toInt() ?? 0,
       mismatchedGems: (json['mismatched_gems'] as num?)?.toInt() ?? 0,
       actionsCount: (json['actions_count'] as num?)?.toInt() ?? 0,
+      pricedActionsCount: (json['priced_actions_count'] as num?)?.toInt(),
+      actionsWithoutPriceCount: (json['actions_without_price_count'] as num?)
+          ?.toInt(),
+      estimatedTotalCostCopper: (json['estimated_total_cost_copper'] as num?)
+          ?.toInt(),
     );
   }
 
@@ -88,6 +99,9 @@ class BuildGapSummary extends Equatable {
     mismatchedEnchants,
     mismatchedGems,
     actionsCount,
+    pricedActionsCount,
+    actionsWithoutPriceCount,
+    estimatedTotalCostCopper,
   ];
 }
 
@@ -102,6 +116,9 @@ class BuildGapAction extends Equatable {
   final List<String> current;
   final String? estimatedImpact;
   final String? source;
+  final int? estimatedCostCopper;
+  final int? roiScore;
+  final String? priceMarket;
 
   const BuildGapAction({
     required this.priorityScore,
@@ -114,6 +131,9 @@ class BuildGapAction extends Equatable {
     this.current = const [],
     this.estimatedImpact,
     this.source,
+    this.estimatedCostCopper,
+    this.roiScore,
+    this.priceMarket,
   });
 
   factory BuildGapAction.fromJson(Map<String, dynamic> json) {
@@ -130,6 +150,9 @@ class BuildGapAction extends Equatable {
           .toList(),
       estimatedImpact: json['estimated_impact'] as String?,
       source: json['source'] as String?,
+      estimatedCostCopper: (json['estimated_cost_copper'] as num?)?.toInt(),
+      roiScore: (json['roi_score'] as num?)?.toInt(),
+      priceMarket: json['price_market'] as String?,
     );
   }
 
@@ -145,6 +168,9 @@ class BuildGapAction extends Equatable {
     current,
     estimatedImpact,
     source,
+    estimatedCostCopper,
+    roiScore,
+    priceMarket,
   ];
 }
 

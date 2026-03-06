@@ -213,6 +213,10 @@
   "@buildIntelligenceActionGemMismatch": {
     "placeholders": { "name": { "type": "String" } }
   },
+  "buildIntelligenceEstimatedCostShort": "Cost",
+  "buildIntelligenceRoiShort": "ROI",
+  "buildIntelligenceSummaryEstimatedCost": "Estimated cost",
+  "buildIntelligenceSummaryPricedActions": "Priced actions",
   "economyAssistantTitle": "Economy Assistant",
   "economyAssistantSubtitle": "Objective price snapshot for enchants, gems and consumables",
   "economyAssistantNoData": "No market data available.",

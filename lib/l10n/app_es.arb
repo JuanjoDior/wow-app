@@ -213,6 +213,10 @@
   "@buildIntelligenceActionGemMismatch": {
     "placeholders": { "name": { "type": "String" } }
   },
+  "buildIntelligenceEstimatedCostShort": "Coste",
+  "buildIntelligenceRoiShort": "ROI",
+  "buildIntelligenceSummaryEstimatedCost": "Coste estimado",
+  "buildIntelligenceSummaryPricedActions": "Acciones con precio",
   "economyAssistantTitle": "Asistente de Economía",
   "economyAssistantSubtitle": "Instantánea objetiva de precios para encantamientos, gemas y consumibles",
   "economyAssistantNoData": "No hay datos de mercado disponibles.",

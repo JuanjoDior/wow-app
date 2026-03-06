@@ -1456,7 +1456,14 @@ async function handleBuildVerificationV2(url, env, compat = null) {
   }
 
   const localBuildSlots = parseBuildSlotsQuery(url.searchParams.get('build_slots'));
-  const analysis = computeObjectiveBuildVerification(characterPayload, localBuildSlots);
+  const baseAnalysis = computeObjectiveBuildVerification(characterPayload, localBuildSlots);
+  const capabilities = resolveWorkerCapabilities(env);
+  const analysis = await enrichBuildVerificationWithEconomy({
+    analysis: baseAnalysis,
+    env,
+    region,
+    enabled: capabilities.economy_assistant,
+  });
 
   return json({
     version,
@@ -1478,6 +1485,108 @@ async function handleBuildVerificationV2(url, env, compat = null) {
     summary: analysis.summary,
     actions: analysis.actions,
   });
+}
+
+async function enrichBuildVerificationWithEconomy({
+  analysis,
+  env,
+  region,
+  enabled,
+}) {
+  if (!enabled || !analysis || !Array.isArray(analysis.actions) || analysis.actions.length === 0) {
+    return analysis;
+  }
+
+  const actionItemIds = [
+    ...new Set(
+      analysis.actions
+        .map((action) => (Number.isInteger(action?.expected_id) ? action.expected_id : null))
+        .filter((itemId) => Number.isInteger(itemId)),
+    ),
+  ];
+  if (actionItemIds.length === 0) return analysis;
+
+  let economyPayload = null;
+  try {
+    const economyUrl = new URL('https://worker.local/v1/economy/price-summary');
+    economyUrl.searchParams.set('region', region);
+    economyUrl.searchParams.set('item_ids', actionItemIds.join(','));
+
+    const economyResponse = await handleEconomyPriceSummaryV1(economyUrl, env);
+    const contentType = economyResponse.headers.get('Content-Type') || '';
+    if (!contentType.includes('application/json') || !economyResponse.ok) {
+      return analysis;
+    }
+    economyPayload = await economyResponse.clone().json();
+  } catch {
+    return analysis;
+  }
+
+  const economyResults = Array.isArray(economyPayload?.results)
+    ? economyPayload.results
+    : [];
+  const economyByItemId = new Map(
+    economyResults
+      .map((row) => {
+        const itemId = Number.isInteger(row?.item_id) ? row.item_id : null;
+        if (itemId == null) return null;
+        return [itemId, row];
+      })
+      .filter(Boolean),
+  );
+
+  let pricedActionsCount = 0;
+  let estimatedTotalCostCopper = 0;
+  const enrichedActions = analysis.actions.map((action) => {
+    const expectedId = Number.isInteger(action?.expected_id)
+      ? action.expected_id
+      : null;
+    if (expectedId == null) return action;
+
+    const economy = economyByItemId.get(expectedId);
+    const estimatedCostCopper = Number.isInteger(economy?.median_price)
+      ? economy.median_price
+      : null;
+    if (estimatedCostCopper == null || estimatedCostCopper <= 0) {
+      return action;
+    }
+
+    pricedActionsCount += 1;
+    estimatedTotalCostCopper += estimatedCostCopper;
+
+    return {
+      ...action,
+      estimated_cost_copper: estimatedCostCopper,
+      roi_score: computeActionRoiScore(action.priority_score, estimatedCostCopper),
+      price_market: typeof economy?.market === 'string' ? economy.market : null,
+    };
+  });
+
+  const nextSummary = {
+    ...analysis.summary,
+    priced_actions_count: pricedActionsCount,
+    actions_without_price_count: Math.max(0, analysis.actions.length - pricedActionsCount),
+  };
+  if (pricedActionsCount > 0) {
+    nextSummary.estimated_total_cost_copper = estimatedTotalCostCopper;
+  }
+
+  return {
+    ...analysis,
+    summary: nextSummary,
+    actions: enrichedActions,
+  };
+}
+
+function computeActionRoiScore(priorityScore, estimatedCostCopper) {
+  const safePriority = Number.isFinite(priorityScore) ? Number(priorityScore) : 0;
+  const safeCost = Number.isInteger(estimatedCostCopper) ? estimatedCostCopper : 0;
+  if (safePriority <= 0 || safeCost <= 0) return null;
+
+  const costGold = safeCost / 10000;
+  const denominator = Math.log10(costGold + 10);
+  const raw = (safePriority * 18) / denominator;
+  return Math.max(1, Math.min(100, Math.round(raw)));
 }
 
 async function fetchBlizzardMythicKeystoneProfile(region, realmSlug, name, token) {

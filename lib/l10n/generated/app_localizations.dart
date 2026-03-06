@@ -1135,6 +1135,30 @@ abstract class S {
   /// **'Replace gem with {name}'**
   String buildIntelligenceActionGemMismatch(String name);
 
+  /// No description provided for @buildIntelligenceEstimatedCostShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost'**
+  String get buildIntelligenceEstimatedCostShort;
+
+  /// No description provided for @buildIntelligenceRoiShort.
+  ///
+  /// In en, this message translates to:
+  /// **'ROI'**
+  String get buildIntelligenceRoiShort;
+
+  /// No description provided for @buildIntelligenceSummaryEstimatedCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated cost'**
+  String get buildIntelligenceSummaryEstimatedCost;
+
+  /// No description provided for @buildIntelligenceSummaryPricedActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Priced actions'**
+  String get buildIntelligenceSummaryPricedActions;
+
   /// No description provided for @economyAssistantTitle.
   ///
   /// In en, this message translates to:

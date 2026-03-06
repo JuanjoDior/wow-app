@@ -592,20 +592,32 @@ class _BuildIntelligenceSection extends StatelessWidget {
                     style: const TextStyle(color: WowTheme.textSecondary),
                   )
                 else
-                  ...gapAnalysis!.actions
-                      .take(3)
-                      .map(
-                        (action) => Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Text(
+                  ...gapAnalysis!.actions.take(3).map((action) {
+                    final meta = _buildActionMeta(t, action);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
                             '• [${action.priorityScore}] ${_localizeActionLabel(t, action)}',
                             style: const TextStyle(
                               color: WowTheme.textSecondary,
                               fontSize: 13,
                             ),
                           ),
-                        ),
+                          if (meta != null)
+                            Text(
+                              meta,
+                              style: const TextStyle(
+                                color: WowTheme.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
                       ),
+                    );
+                  }),
               ],
             ],
           ],
@@ -634,6 +646,22 @@ class _BuildIntelligenceSection extends StatelessWidget {
       'gem_mismatch' => t.buildIntelligenceActionGemMismatch(target),
       _ => action.label,
     };
+  }
+
+  String? _buildActionMeta(S t, BuildGapAction action) {
+    final parts = <String>[];
+
+    if ((action.estimatedCostCopper ?? 0) > 0) {
+      parts.add(
+        '${t.buildIntelligenceEstimatedCostShort}: ${_formatCopperValue(action.estimatedCostCopper)}',
+      );
+    }
+    if ((action.roiScore ?? 0) > 0) {
+      parts.add('${t.buildIntelligenceRoiShort}: ${action.roiScore}');
+    }
+
+    if (parts.isEmpty) return null;
+    return parts.join('  ·  ');
   }
 }
 
@@ -708,7 +736,7 @@ class _BuildIntelligenceSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = S.of(context)!;
-    final metrics = [
+    final metrics = <({String label, String value})>[
       (
         label: t.buildIntelligenceCompletion,
         value: '${summary.completionPct}%',
@@ -719,6 +747,18 @@ class _BuildIntelligenceSummary extends StatelessWidget {
       ),
       (label: t.buildIntelligenceMissingGems, value: '${summary.missingGems}'),
     ];
+    if ((summary.estimatedTotalCostCopper ?? 0) > 0) {
+      metrics.add((
+        label: t.buildIntelligenceSummaryEstimatedCost,
+        value: _formatCopperValue(summary.estimatedTotalCostCopper),
+      ));
+    }
+    if (summary.pricedActionsCount != null) {
+      metrics.add((
+        label: t.buildIntelligenceSummaryPricedActions,
+        value: '${summary.pricedActionsCount}/${summary.actionsCount}',
+      ));
+    }
 
     return Wrap(
       spacing: 8,
@@ -908,7 +948,7 @@ class _BuildEconomySection extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          '${t.economyAssistantMedianPrice}: ${_formatCopper(entry.medianPrice)}',
+                          '${t.economyAssistantMedianPrice}: ${_formatCopperValue(entry.medianPrice)}',
                           style: const TextStyle(
                             color: WowTheme.textPrimary,
                             fontSize: 12,
@@ -935,14 +975,6 @@ class _BuildEconomySection extends StatelessWidget {
       default:
         return t.economyAssistantMarketUnknown;
     }
-  }
-
-  String _formatCopper(int? value) {
-    if (value == null || value <= 0) return '-';
-    final gold = value ~/ 10000;
-    final silver = (value % 10000) ~/ 100;
-    final copper = value % 100;
-    return '${gold}g ${silver}s ${copper}c';
   }
 
   Map<int, Item> _collectEconomyItems(Build build) {
@@ -972,6 +1004,14 @@ class _BuildEconomySection extends StatelessWidget {
 
     return items;
   }
+}
+
+String _formatCopperValue(int? value) {
+  if (value == null || value <= 0) return '-';
+  final gold = value ~/ 10000;
+  final silver = (value % 10000) ~/ 100;
+  final copper = value % 100;
+  return '${gold}g ${silver}s ${copper}c';
 }
 
 class _EconomyMetricChip extends StatelessWidget {
