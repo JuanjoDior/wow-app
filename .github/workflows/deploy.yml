@@ -4,6 +4,15 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      economy_assistant:
+        description: Activar Economy Assistant en web (despliegue controlado)
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 permissions:
   contents: write
@@ -11,6 +20,8 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      ECONOMY_ASSISTANT_WEB: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.economy_assistant || vars.PAGES_FEATURE_ECONOMY_ASSISTANT || 'false' }}
 
     steps:
       - name: Checkout
@@ -31,8 +42,21 @@ jobs:
       - name: Run i18n guards
         run: flutter test test/core/l10n/arb_glossary_guard_test.dart test/core/l10n/hardcoded_ui_strings_guard_test.dart
 
+      - name: Show release flags
+        run: |
+          echo "FEATURE_BUILD_INTELLIGENCE=true"
+          echo "FEATURE_WEEKLY_PLANNER=true"
+          echo "FEATURE_ECONOMY_ASSISTANT=${ECONOMY_ASSISTANT_WEB}"
+
       - name: Build Web
-        run: flutter build web --release --base-href "/wow-app/" --dart-define=BUILD_VERIFICATION_V2=true --dart-define=CATALOG_SEARCH_V2=true --dart-define=FEATURE_BUILD_INTELLIGENCE=true --dart-define=FEATURE_WEEKLY_PLANNER=true --dart-define=FEATURE_ECONOMY_ASSISTANT=false
+        run: |
+          flutter build web --release \
+            --base-href "/wow-app/" \
+            --dart-define=BUILD_VERIFICATION_V2=true \
+            --dart-define=CATALOG_SEARCH_V2=true \
+            --dart-define=FEATURE_BUILD_INTELLIGENCE=true \
+            --dart-define=FEATURE_WEEKLY_PLANNER=true \
+            --dart-define=FEATURE_ECONOMY_ASSISTANT=${ECONOMY_ASSISTANT_WEB}
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
