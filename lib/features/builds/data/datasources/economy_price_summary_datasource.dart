@@ -24,6 +24,7 @@ class EconomyPriceSummaryDataSource {
   Future<EconomyPriceSummary> getPriceSummary({
     required String region,
     required List<int> itemIds,
+    String? realm,
     int? connectedRealmId,
     bool force = false,
   }) async {
@@ -55,6 +56,9 @@ class EconomyPriceSummaryDataSource {
 
     final query = <String, dynamic>{
       'region': region.toLowerCase(),
+      ...?(realm == null || realm.trim().isEmpty
+          ? null
+          : {'realm': realm.trim().toLowerCase()}),
       'item_ids': normalizedIds.join(','),
       ...?(connectedRealmId == null
           ? null

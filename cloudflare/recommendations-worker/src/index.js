@@ -1133,9 +1133,10 @@ async function handleEconomyPriceSummaryV1(url, env) {
   const endpoint = '/v1/economy/price-summary';
 
   const region = (url.searchParams.get('region') || '').toLowerCase().trim();
+  const realm = (url.searchParams.get('realm') || '').trim();
   const itemIds = parseEconomyItemIds(url.searchParams.get('item_ids'));
   const connectedRealmRaw = url.searchParams.get('connected_realm_id');
-  const connectedRealmId = parseOptionalPositiveInt(connectedRealmRaw);
+  let connectedRealmId = parseOptionalPositiveInt(connectedRealmRaw);
   const force = url.searchParams.get('force') === '1';
 
   if (!BLIZZARD_API_BASE[region]) {
@@ -1170,7 +1171,24 @@ async function handleEconomyPriceSummaryV1(url, env) {
     }, 400);
   }
 
-  const market = connectedRealmId == null ? 'commodities' : 'auctions';
+  let token = null;
+  if (connectedRealmId == null && realm.length > 0 && env.BLIZZARD_CLIENT_SECRET) {
+    try {
+      token = await getBlizzardToken(region, env);
+      connectedRealmId = await resolveConnectedRealmId(
+        region,
+        realm,
+        token,
+        env,
+      );
+    } catch (_) {
+      connectedRealmId = null;
+    }
+  }
+
+  const market = connectedRealmId == null
+    ? 'commodities'
+    : 'auctions';
   const cacheKey = buildEconomyPriceSummaryCacheKey(region, itemIds, connectedRealmId);
 
   if (!force) {
@@ -1190,7 +1208,7 @@ async function handleEconomyPriceSummaryV1(url, env) {
   }
 
   try {
-    const token = await getBlizzardToken(region, env);
+    token = token ?? await getBlizzardToken(region, env);
     const payload = connectedRealmId == null
       ? await fetchBlizzardCommodityAuctions(region, token)
       : await fetchBlizzardConnectedRealmAuctions(region, connectedRealmId, token);
@@ -1222,6 +1240,7 @@ async function handleEconomyPriceSummaryV1(url, env) {
       },
       context: {
         region,
+        realm: realm || null,
         item_ids: itemIds,
         connected_realm_id: connectedRealmId ?? null,
       },
@@ -1305,6 +1324,315 @@ async function fetchBlizzardConnectedRealmAuctions(region, connectedRealmId, tok
   }
 
   return response.json();
+}
+
+async function resolveConnectedRealmId(region, realmInput, token, env) {
+  const normalizedRealm = normalizeRealmLookupValue(realmInput);
+  if (!normalizedRealm) return null;
+
+  const cacheKey = buildConnectedRealmLookupKey(region, normalizedRealm);
+  try {
+    const cached = await env.RECS_CACHE.get(cacheKey);
+    const parsed = parseOptionalPositiveInt(cached);
+    if (parsed != null) return parsed;
+  } catch (_) {
+    // Ignorar error de cache y continuar con resolución remota.
+  }
+
+  let realmSlug = null;
+  try {
+    realmSlug = await resolveRealmSlug(region, realmInput, token, env);
+  } catch (_) {
+    return null;
+  }
+  if (!realmSlug) return null;
+
+  const slugCacheKey = buildConnectedRealmBySlugKey(region, realmSlug);
+  try {
+    const cachedBySlug = await env.RECS_CACHE.get(slugCacheKey);
+    const parsedBySlug = parseOptionalPositiveInt(cachedBySlug);
+    if (parsedBySlug != null) {
+      try {
+        const ttl = getCacheTtlSeconds(env, 'realmSlug');
+        await env.RECS_CACHE.put(cacheKey, String(parsedBySlug), {
+          expirationTtl: ttl,
+        });
+      } catch (_) {
+        // Ignorar error de cache secundario.
+      }
+      return parsedBySlug;
+    }
+  } catch (_) {
+    // Ignorar error de cache y continuar con resolución remota.
+  }
+
+  const base = BLIZZARD_API_BASE[region];
+  const namespace = `dynamic-${region}`;
+  const locale = 'en_US';
+  const headers = { Authorization: `Bearer ${token}` };
+  const url =
+    `${base}/data/wow/realm/${encodeURIComponent(realmSlug)}` +
+    `?namespace=${namespace}&locale=${locale}`;
+
+  try {
+    const response = await fetch(url, { headers });
+    if (response.ok) {
+      const realmPayload = await response.json();
+      const connectedRealmId = extractConnectedRealmId(realmPayload);
+      if (connectedRealmId != null) {
+        try {
+          const ttl = getCacheTtlSeconds(env, 'realmSlug');
+          await env.RECS_CACHE.put(cacheKey, String(connectedRealmId), {
+            expirationTtl: ttl,
+          });
+          await env.RECS_CACHE.put(slugCacheKey, String(connectedRealmId), {
+            expirationTtl: ttl,
+          });
+        } catch (_) {
+          // Fallo de cache no debe romper la resolución.
+        }
+        return connectedRealmId;
+      }
+
+      const realmId = parseOptionalPositiveInt(realmPayload?.id);
+      const connectedByRealmId = await resolveConnectedRealmIdByRealmIdSearch(
+        region,
+        realmId,
+        token,
+      );
+      if (connectedByRealmId != null) {
+        try {
+          const ttl = getCacheTtlSeconds(env, 'realmSlug');
+          await env.RECS_CACHE.put(cacheKey, String(connectedByRealmId), {
+            expirationTtl: ttl,
+          });
+          await env.RECS_CACHE.put(slugCacheKey, String(connectedByRealmId), {
+            expirationTtl: ttl,
+          });
+        } catch (_) {
+          // Fallo de cache no debe romper la resolución.
+        }
+        return connectedByRealmId;
+      }
+    }
+  } catch (_) {
+    // Ignorar fallo y continuar con fallback de búsqueda.
+  }
+
+  try {
+    const fromSearch = await resolveConnectedRealmIdByRealmSearch(
+      region,
+      realmInput,
+      token,
+      realmSlug,
+    );
+    const resolvedConnectedRealmId = fromSearch ??
+      await resolveConnectedRealmIdByConnectedRealmSearch(
+        region,
+        realmInput,
+        token,
+      );
+    if (resolvedConnectedRealmId == null) return null;
+    try {
+      const ttl = getCacheTtlSeconds(env, 'realmSlug');
+      await env.RECS_CACHE.put(cacheKey, String(resolvedConnectedRealmId), {
+        expirationTtl: ttl,
+      });
+      await env.RECS_CACHE.put(slugCacheKey, String(resolvedConnectedRealmId), {
+        expirationTtl: ttl,
+      });
+    } catch (_) {
+      // Fallo de cache no debe romper la resolución.
+    }
+    return resolvedConnectedRealmId;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function resolveConnectedRealmIdByRealmSearch(
+  region,
+  realmInput,
+  token,
+  expectedSlug = null,
+) {
+  const base = BLIZZARD_API_BASE[region];
+  const namespace = `dynamic-${region}`;
+  const rawInput = String(realmInput || '').trim();
+  const normalizedInput = normalizeRealmLookupValue(rawInput);
+  if (!rawInput || !normalizedInput) return null;
+
+  const locales = REALM_SEARCH_LOCALES[region] || ['en_US'];
+  const headers = { Authorization: `Bearer ${token}` };
+  let fallbackConnectedRealmId = null;
+
+  for (const locale of locales) {
+    const searchFields = [`name.${locale}`, 'name.en_US'];
+    for (const searchField of [...new Set(searchFields)]) {
+      const searchParams = new URLSearchParams({
+        namespace,
+        locale,
+        _pageSize: '50',
+      });
+      searchParams.set(searchField, rawInput);
+
+      const url = `${base}/data/wow/search/realm?${searchParams.toString()}`;
+      let response;
+      try {
+        response = await fetch(url, { headers });
+      } catch (_) {
+        continue;
+      }
+      if (!response.ok) continue;
+
+      const payload = await response.json();
+      const entries = extractRealmSearchEntries(payload);
+      for (const entry of entries) {
+        const connectedRealmId = extractConnectedRealmId(entry);
+        if (connectedRealmId == null) continue;
+
+        if (fallbackConnectedRealmId == null) {
+          fallbackConnectedRealmId = connectedRealmId;
+        }
+
+        const slug = getRealmSlugFromEntry(entry);
+        if (expectedSlug != null && slug === expectedSlug) {
+          return connectedRealmId;
+        }
+
+        const isExactName = getRealmNamesFromEntry(entry)
+          .map(normalizeRealmLookupValue)
+          .some((name) => name === normalizedInput);
+        if (isExactName) {
+          return connectedRealmId;
+        }
+      }
+    }
+  }
+
+  return fallbackConnectedRealmId;
+}
+
+async function resolveConnectedRealmIdByConnectedRealmSearch(
+  region,
+  realmInput,
+  token,
+) {
+  const base = BLIZZARD_API_BASE[region];
+  const namespace = `dynamic-${region}`;
+  const rawInput = String(realmInput || '').trim();
+  const normalizedInput = normalizeRealmLookupValue(rawInput);
+  if (!rawInput || !normalizedInput) return null;
+
+  const locales = REALM_SEARCH_LOCALES[region] || ['en_US'];
+  const headers = { Authorization: `Bearer ${token}` };
+  let fallbackConnectedRealmId = null;
+
+  for (const locale of locales) {
+    const searchFields = [`realms.name.${locale}`, 'realms.name.en_US'];
+    for (const searchField of [...new Set(searchFields)]) {
+      const searchParams = new URLSearchParams({
+        namespace,
+        locale,
+        _pageSize: '50',
+      });
+      searchParams.set(searchField, rawInput);
+
+      const url = `${base}/data/wow/search/connected-realm?${searchParams.toString()}`;
+      let response;
+      try {
+        response = await fetch(url, { headers });
+      } catch (_) {
+        continue;
+      }
+      if (!response.ok) continue;
+
+      const payload = await response.json();
+      const entries = extractRealmSearchEntries(payload);
+      for (const entry of entries) {
+        const connectedRealmId = parseOptionalPositiveInt(entry?.id);
+        if (connectedRealmId == null) continue;
+        if (fallbackConnectedRealmId == null) {
+          fallbackConnectedRealmId = connectedRealmId;
+        }
+
+        const isExactNameOrSlug = getConnectedRealmSearchNames(entry)
+          .map(normalizeRealmLookupValue)
+          .some((value) => value === normalizedInput);
+        if (isExactNameOrSlug) {
+          return connectedRealmId;
+        }
+      }
+    }
+  }
+
+  return fallbackConnectedRealmId;
+}
+
+function getConnectedRealmSearchNames(entry) {
+  const names = [];
+  const realms = Array.isArray(entry?.realms) ? entry.realms : [];
+  for (const realm of realms) {
+    if (typeof realm?.slug === 'string' && realm.slug.trim().length > 0) {
+      names.push(realm.slug.trim());
+    }
+    const realmNames = getRealmNamesFromEntry(realm);
+    for (const name of realmNames) {
+      names.push(name);
+    }
+  }
+  return [...new Set(names)];
+}
+
+async function resolveConnectedRealmIdByRealmIdSearch(region, realmId, token) {
+  const safeRealmId = parseOptionalPositiveInt(realmId);
+  if (safeRealmId == null) return null;
+
+  const base = BLIZZARD_API_BASE[region];
+  const namespace = `dynamic-${region}`;
+  const headers = { Authorization: `Bearer ${token}` };
+  const searchParams = new URLSearchParams({
+    namespace,
+    locale: 'en_US',
+    _pageSize: '5',
+  });
+  searchParams.set('realms.id', String(safeRealmId));
+
+  const url = `${base}/data/wow/search/connected-realm?${searchParams.toString()}`;
+  try {
+    const response = await fetch(url, { headers });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    const entries = extractRealmSearchEntries(payload);
+    for (const entry of entries) {
+      const connectedRealmId = parseOptionalPositiveInt(entry?.id);
+      if (connectedRealmId != null) {
+        return connectedRealmId;
+      }
+    }
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function extractConnectedRealmId(realmPayload) {
+  const directId = parseOptionalPositiveInt(
+    realmPayload?.connected_realm?.id ?? realmPayload?.connected_realm_id,
+  );
+  if (directId != null) return directId;
+
+  const href = realmPayload?.connected_realm?.href ??
+    realmPayload?.connected_realm?.key?.href;
+  if (typeof href === 'string' && href.trim().length > 0) {
+    const match = href.match(/\/connected-realm\/(\d+)(?:\/|$)/i);
+    if (match) {
+      const parsed = parseOptionalPositiveInt(match[1]);
+      if (parsed != null) return parsed;
+    }
+  }
+
+  return null;
 }
 
 function extractEconomyRows(payload, requestedItemIds) {
@@ -1462,6 +1790,7 @@ async function handleBuildVerificationV2(url, env, compat = null) {
     analysis: baseAnalysis,
     env,
     region,
+    realm,
     enabled: capabilities.economy_assistant,
   });
 
@@ -1491,6 +1820,7 @@ async function enrichBuildVerificationWithEconomy({
   analysis,
   env,
   region,
+  realm,
   enabled,
 }) {
   if (!enabled || !analysis || !Array.isArray(analysis.actions) || analysis.actions.length === 0) {
@@ -1510,6 +1840,9 @@ async function enrichBuildVerificationWithEconomy({
   try {
     const economyUrl = new URL('https://worker.local/v1/economy/price-summary');
     economyUrl.searchParams.set('region', region);
+    if (typeof realm === 'string' && realm.trim().length > 0) {
+      economyUrl.searchParams.set('realm', realm.trim());
+    }
     economyUrl.searchParams.set('item_ids', actionItemIds.join(','));
 
     const economyResponse = await handleEconomyPriceSummaryV1(economyUrl, env);
@@ -1972,7 +2305,7 @@ async function resolveRealmSlug(region, realmInput, token, env) {
 
   const candidates = buildRealmSlugCandidates(realmInput);
   for (const candidate of candidates) {
-    const resolved = await tryFetchRealmBySlug(region, candidate, token);
+    const resolved = await tryFetchRealmBySlug(region, candidate, token, env);
     if (!resolved) continue;
 
     try {
@@ -2003,7 +2336,7 @@ async function resolveRealmSlug(region, realmInput, token, env) {
   throw err;
 }
 
-async function tryFetchRealmBySlug(region, slug, token) {
+async function tryFetchRealmBySlug(region, slug, token, env = null) {
   if (!slug || !isSafeRealmSlug(slug)) return null;
 
   const base = BLIZZARD_API_BASE[region];
@@ -2020,7 +2353,25 @@ async function tryFetchRealmBySlug(region, slug, token) {
     if (!response.ok) return null;
     const data = await response.json();
     const resolved = String(data?.slug || slug).toLowerCase().trim();
-    return isSafeRealmSlug(resolved) ? resolved : slug;
+    const safeResolved = isSafeRealmSlug(resolved) ? resolved : slug;
+    const connectedRealmId = extractConnectedRealmId(data);
+    if (
+      env?.RECS_CACHE &&
+      Number.isInteger(connectedRealmId) &&
+      connectedRealmId > 0
+    ) {
+      try {
+        const ttl = getCacheTtlSeconds(env, 'realmSlug');
+        await env.RECS_CACHE.put(
+          buildConnectedRealmBySlugKey(region, safeResolved),
+          String(connectedRealmId),
+          { expirationTtl: ttl },
+        );
+      } catch (_) {
+        // Ignorar error de cache.
+      }
+    }
+    return safeResolved;
   } catch (_) {
     return null;
   }
@@ -3075,6 +3426,14 @@ function buildTokenKey(region) {
 
 function buildRealmSlugKey(region, normalizedRealm) {
   return `realm_slug:${region}:${normalizedRealm}`;
+}
+
+function buildConnectedRealmLookupKey(region, normalizedRealm) {
+  return `connected_realm:${region}:${normalizedRealm}`;
+}
+
+function buildConnectedRealmBySlugKey(region, realmSlug) {
+  return `connected_realm_slug:${region}:${realmSlug}`;
 }
 
 function buildItemIconKey(region, itemId) {

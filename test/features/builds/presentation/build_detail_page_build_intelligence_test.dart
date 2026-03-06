@@ -497,6 +497,7 @@ void main() {
       () => economyDataSource.getPriceSummary(
         region: any(named: 'region'),
         itemIds: any(named: 'itemIds'),
+        realm: any(named: 'realm'),
         connectedRealmId: any(named: 'connectedRealmId'),
         force: any(named: 'force'),
       ),

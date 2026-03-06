@@ -99,6 +99,7 @@ void main() {
 
     final summary = await datasource.getPriceSummary(
       region: 'eu',
+      realm: 'sanguino',
       itemIds: const [213743, 212495],
       force: true,
     );
@@ -116,6 +117,7 @@ void main() {
       ),
     ).captured;
     final query = captured.whereType<Map<String, dynamic>>().single;
+    expect(query['realm'], 'sanguino');
     expect(query['item_ids'], '213743,212495');
     expect(query['force'], '1');
   });

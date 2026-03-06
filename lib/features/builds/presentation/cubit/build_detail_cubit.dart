@@ -414,6 +414,7 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     }
 
     final region = _regionForBuild(build);
+    final realm = _realmForBuild(build);
     final itemIds = _collectEconomyItemIds(build);
 
     final current = state;
@@ -425,6 +426,7 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
       final summary = await _economyPriceSummaryDataSource.getPriceSummary(
         region: region,
         itemIds: itemIds,
+        realm: realm,
         force: force,
       );
       final latest = state;
@@ -445,6 +447,14 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     final parts = refKey.split('-');
     if (parts.isEmpty) return 'eu';
     return parts.first.toLowerCase();
+  }
+
+  String? _realmForBuild(Build build) {
+    final refKey = build.characterRefKey;
+    if (refKey == null) return null;
+    final parts = refKey.split('-');
+    if (parts.length < 2) return null;
+    return parts[1].toLowerCase();
   }
 
   List<int> _collectEconomyItemIds(Build build) {

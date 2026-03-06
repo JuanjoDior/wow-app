@@ -101,6 +101,7 @@ Resumen objetivo de mercado por `item_id` usando subastas oficiales Blizzard.
 |-------|-----|-------------|
 | `region` | ✓ | `us`, `eu`, `kr`, `tw` |
 | `item_ids` | ✓ | IDs separados por coma (máximo 50) |
+| `realm` | - | Reino del personaje para resolver `connected_realm_id` automáticamente |
 | `connected_realm_id` | - | Si se envía, usa subasta de connected realm; si no, usa commodities |
 | `force` | - | `force=1` para saltar caché |
 
@@ -117,8 +118,9 @@ Resumen objetivo de mercado por `item_id` usando subastas oficiales Blizzard.
   },
   "context": {
     "region": "eu",
+    "realm": "sanguino",
     "item_ids": [213743, 212495],
-    "connected_realm_id": null
+    "connected_realm_id": 1080
   },
   "results": [
     {
