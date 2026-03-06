@@ -556,6 +556,49 @@ class SEn extends S {
   }
 
   @override
+  String get economyAssistantTitle => 'Economy Assistant';
+
+  @override
+  String get economyAssistantSubtitle =>
+      'Objective price snapshot for enchants, gems and consumables';
+
+  @override
+  String get economyAssistantNoData => 'No market data available.';
+
+  @override
+  String get economyAssistantEmptyBuild =>
+      'Add enchants, gems or consumables to estimate costs.';
+
+  @override
+  String get economyAssistantPricedItems => 'Priced items';
+
+  @override
+  String get economyAssistantMissingItems => 'Missing prices';
+
+  @override
+  String get economyAssistantMarket => 'Market';
+
+  @override
+  String get economyAssistantTopItems => 'Top market costs';
+
+  @override
+  String get economyAssistantMedianPrice => 'Median';
+
+  @override
+  String get economyAssistantMarketCommodities => 'Commodities';
+
+  @override
+  String get economyAssistantMarketAuctions => 'Realm auctions';
+
+  @override
+  String get economyAssistantMarketUnknown => 'Unknown';
+
+  @override
+  String economyAssistantItemFallback(int id) {
+    return 'Item #$id';
+  }
+
+  @override
   String get weeklyPlannerTitle => 'Weekly Planner';
 
   @override

@@ -1135,6 +1135,84 @@ abstract class S {
   /// **'Replace gem with {name}'**
   String buildIntelligenceActionGemMismatch(String name);
 
+  /// No description provided for @economyAssistantTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Economy Assistant'**
+  String get economyAssistantTitle;
+
+  /// No description provided for @economyAssistantSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Objective price snapshot for enchants, gems and consumables'**
+  String get economyAssistantSubtitle;
+
+  /// No description provided for @economyAssistantNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No market data available.'**
+  String get economyAssistantNoData;
+
+  /// No description provided for @economyAssistantEmptyBuild.
+  ///
+  /// In en, this message translates to:
+  /// **'Add enchants, gems or consumables to estimate costs.'**
+  String get economyAssistantEmptyBuild;
+
+  /// No description provided for @economyAssistantPricedItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Priced items'**
+  String get economyAssistantPricedItems;
+
+  /// No description provided for @economyAssistantMissingItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing prices'**
+  String get economyAssistantMissingItems;
+
+  /// No description provided for @economyAssistantMarket.
+  ///
+  /// In en, this message translates to:
+  /// **'Market'**
+  String get economyAssistantMarket;
+
+  /// No description provided for @economyAssistantTopItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Top market costs'**
+  String get economyAssistantTopItems;
+
+  /// No description provided for @economyAssistantMedianPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Median'**
+  String get economyAssistantMedianPrice;
+
+  /// No description provided for @economyAssistantMarketCommodities.
+  ///
+  /// In en, this message translates to:
+  /// **'Commodities'**
+  String get economyAssistantMarketCommodities;
+
+  /// No description provided for @economyAssistantMarketAuctions.
+  ///
+  /// In en, this message translates to:
+  /// **'Realm auctions'**
+  String get economyAssistantMarketAuctions;
+
+  /// No description provided for @economyAssistantMarketUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get economyAssistantMarketUnknown;
+
+  /// No description provided for @economyAssistantItemFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Item #{id}'**
+  String economyAssistantItemFallback(int id);
+
   /// No description provided for @weeklyPlannerTitle.
   ///
   /// In en, this message translates to:

@@ -213,6 +213,24 @@
   "@buildIntelligenceActionGemMismatch": {
     "placeholders": { "name": { "type": "String" } }
   },
+  "economyAssistantTitle": "Economy Assistant",
+  "economyAssistantSubtitle": "Objective price snapshot for enchants, gems and consumables",
+  "economyAssistantNoData": "No market data available.",
+  "economyAssistantEmptyBuild": "Add enchants, gems or consumables to estimate costs.",
+  "economyAssistantPricedItems": "Priced items",
+  "economyAssistantMissingItems": "Missing prices",
+  "economyAssistantMarket": "Market",
+  "economyAssistantTopItems": "Top market costs",
+  "economyAssistantMedianPrice": "Median",
+  "economyAssistantMarketCommodities": "Commodities",
+  "economyAssistantMarketAuctions": "Realm auctions",
+  "economyAssistantMarketUnknown": "Unknown",
+  "economyAssistantItemFallback": "Item #{id}",
+  "@economyAssistantItemFallback": {
+    "placeholders": {
+      "id": { "type": "int" }
+    }
+  },
   "weeklyPlannerTitle": "Weekly Planner",
   "weeklyPlannerTooltip": "Open Weekly Planner",
   "weeklyPlannerUnavailable": "Weekly Planner is disabled right now.",

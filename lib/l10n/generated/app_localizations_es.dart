@@ -559,6 +559,49 @@ class SEs extends S {
   }
 
   @override
+  String get economyAssistantTitle => 'Asistente de Economía';
+
+  @override
+  String get economyAssistantSubtitle =>
+      'Instantánea objetiva de precios para encantamientos, gemas y consumibles';
+
+  @override
+  String get economyAssistantNoData => 'No hay datos de mercado disponibles.';
+
+  @override
+  String get economyAssistantEmptyBuild =>
+      'Añade encantamientos, gemas o consumibles para estimar costes.';
+
+  @override
+  String get economyAssistantPricedItems => 'Objetos con precio';
+
+  @override
+  String get economyAssistantMissingItems => 'Precios faltantes';
+
+  @override
+  String get economyAssistantMarket => 'Mercado';
+
+  @override
+  String get economyAssistantTopItems => 'Costes de mercado más altos';
+
+  @override
+  String get economyAssistantMedianPrice => 'Mediana';
+
+  @override
+  String get economyAssistantMarketCommodities => 'Commodities';
+
+  @override
+  String get economyAssistantMarketAuctions => 'Subastas de reino';
+
+  @override
+  String get economyAssistantMarketUnknown => 'Desconocido';
+
+  @override
+  String economyAssistantItemFallback(int id) {
+    return 'Objeto #$id';
+  }
+
+  @override
   String get weeklyPlannerTitle => 'Planificador Semanal';
 
   @override

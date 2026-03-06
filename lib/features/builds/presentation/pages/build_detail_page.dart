@@ -5,6 +5,7 @@ import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/builds/domain/entities/build_gap_analysis.dart';
+import 'package:wow_companion/features/builds/domain/entities/economy_price_summary.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/build_detail_cubit.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/build_detail_state.dart';
 import 'package:wow_companion/features/builds/presentation/widgets/item_search_dialog.dart';
@@ -55,6 +56,19 @@ extension WowSlotL10n on WowSlot {
   };
 }
 
+String _itemNameForLocale(BuildContext context, Item item) {
+  final localeCode = Localizations.localeOf(context).languageCode;
+  final localized = item.localizedName?.trim();
+  final canonical = item.canonicalNameEn?.trim() ?? item.name;
+  if (localeCode == 'es' &&
+      localized != null &&
+      localized.isNotEmpty &&
+      localized.toLowerCase() != canonical.toLowerCase()) {
+    return '$localized · $canonical';
+  }
+  return canonical;
+}
+
 // ─── Slot columns ─────────────────────────────────────────────────────────────
 const _leftSlots = [
   WowSlot.head,
@@ -81,19 +95,26 @@ const _rightSlots = [
 // ─── Page ─────────────────────────────────────────────────────────────────────
 class BuildDetailPage extends StatelessWidget {
   final String buildId;
-  const BuildDetailPage({super.key, required this.buildId});
+  final bool showEconomyAssistant;
+  const BuildDetailPage({
+    super.key,
+    required this.buildId,
+    bool? showEconomyAssistant,
+  }) : showEconomyAssistant =
+           showEconomyAssistant ?? FeatureFlags.economyAssistant;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => sl<BuildDetailCubit>()..loadBuild(buildId),
-      child: const _BuildDetailView(),
+      child: _BuildDetailView(showEconomyAssistant: showEconomyAssistant),
     );
   }
 }
 
 class _BuildDetailView extends StatelessWidget {
-  const _BuildDetailView();
+  final bool showEconomyAssistant;
+  const _BuildDetailView({required this.showEconomyAssistant});
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +144,9 @@ class _BuildDetailView extends StatelessWidget {
             buildData: state.build,
             gapAnalysis: state.gapAnalysis,
             gapAnalysisLoading: state.isGapAnalysisLoading,
+            showEconomyAssistant: showEconomyAssistant,
+            economySummary: state.economySummary,
+            economyLoading: state.isEconomyLoading,
           );
         }
         return const SizedBox.shrink();
@@ -136,11 +160,17 @@ class _BuildDetailContent extends StatefulWidget {
   final Build buildData;
   final BuildGapAnalysis? gapAnalysis;
   final bool gapAnalysisLoading;
+  final bool showEconomyAssistant;
+  final EconomyPriceSummary? economySummary;
+  final bool economyLoading;
 
   const _BuildDetailContent({
     required this.buildData,
     required this.gapAnalysis,
     required this.gapAnalysisLoading,
+    required this.showEconomyAssistant,
+    required this.economySummary,
+    required this.economyLoading,
   });
 
   @override
@@ -229,6 +259,22 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
                       gapAnalysis: widget.gapAnalysis,
                       loading: widget.gapAnalysisLoading,
                       hasCharacter: hasCharacter,
+                    ),
+                  ),
+                ),
+              if (widget.showEconomyAssistant)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      isMobile ? 12 : 16,
+                      4,
+                      isMobile ? 12 : 16,
+                      4,
+                    ),
+                    child: _BuildEconomySection(
+                      buildData: build,
+                      economySummary: widget.economySummary,
+                      loading: widget.economyLoading,
                     ),
                   ),
                 ),
@@ -710,6 +756,260 @@ class _BuildIntelligenceSummary extends StatelessWidget {
             ),
           )
           .toList(),
+    );
+  }
+}
+
+class _BuildEconomySection extends StatelessWidget {
+  final Build buildData;
+  final EconomyPriceSummary? economySummary;
+  final bool loading;
+
+  const _BuildEconomySection({
+    required this.buildData,
+    required this.economySummary,
+    required this.loading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = S.of(context)!;
+    final itemMap = _collectEconomyItems(buildData);
+    final hasTargets = itemMap.isNotEmpty;
+    final pricedResults =
+        (economySummary?.results ?? <EconomyPriceResult>[])
+            .where((entry) => entry.listingCount > 0)
+            .toList()
+          ..sort((a, b) {
+            final left = a.medianPrice ?? a.p95Price ?? a.minPrice ?? 0;
+            final right = b.medianPrice ?? b.p95Price ?? b.minPrice ?? 0;
+            return right.compareTo(left);
+          });
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        t.economyAssistantTitle,
+                        style: const TextStyle(
+                          color: WowTheme.primaryGold,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        t.economyAssistantSubtitle,
+                        style: TextStyle(
+                          color: WowTheme.textSecondary.withValues(alpha: 0.8),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.refresh,
+                    size: 18,
+                    color: WowTheme.textSecondary,
+                  ),
+                  tooltip: t.retry,
+                  onPressed: loading || !hasTargets
+                      ? null
+                      : () => context.read<BuildDetailCubit>().refreshEconomy(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (!hasTargets)
+              Text(
+                t.economyAssistantEmptyBuild,
+                style: const TextStyle(color: WowTheme.textSecondary),
+              )
+            else if (loading && economySummary == null)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: WowTheme.primaryGold,
+                    strokeWidth: 2,
+                  ),
+                ),
+              )
+            else if (economySummary == null)
+              Text(
+                t.economyAssistantNoData,
+                style: const TextStyle(color: WowTheme.textSecondary),
+              )
+            else ...[
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _EconomyMetricChip(
+                    label: t.economyAssistantPricedItems,
+                    value:
+                        '${economySummary!.summary.resolvedItems}/${economySummary!.summary.requestedItems}',
+                  ),
+                  _EconomyMetricChip(
+                    label: t.economyAssistantMissingItems,
+                    value: '${economySummary!.summary.missingItems}',
+                  ),
+                  _EconomyMetricChip(
+                    label: t.economyAssistantMarket,
+                    value: _marketLabel(t, economySummary!.source?.market),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                t.economyAssistantTopItems,
+                style: const TextStyle(
+                  color: WowTheme.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              if (pricedResults.isEmpty)
+                Text(
+                  t.economyAssistantNoData,
+                  style: const TextStyle(color: WowTheme.textSecondary),
+                )
+              else
+                ...pricedResults.take(5).map((entry) {
+                  final item = itemMap[entry.itemId];
+                  final label = item == null
+                      ? t.economyAssistantItemFallback(entry.itemId)
+                      : _itemNameForLocale(context, item);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: const TextStyle(
+                              color: WowTheme.textSecondary,
+                              fontSize: 13,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${t.economyAssistantMedianPrice}: ${_formatCopper(entry.medianPrice)}',
+                          style: const TextStyle(
+                            color: WowTheme.textPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _marketLabel(S t, String? market) {
+    switch ((market ?? '').toLowerCase().trim()) {
+      case 'commodities':
+        return t.economyAssistantMarketCommodities;
+      case 'auctions':
+        return t.economyAssistantMarketAuctions;
+      default:
+        return t.economyAssistantMarketUnknown;
+    }
+  }
+
+  String _formatCopper(int? value) {
+    if (value == null || value <= 0) return '-';
+    final gold = value ~/ 10000;
+    final silver = (value % 10000) ~/ 100;
+    final copper = value % 100;
+    return '${gold}g ${silver}s ${copper}c';
+  }
+
+  Map<int, Item> _collectEconomyItems(Build build) {
+    final items = <int, Item>{};
+    for (final slot in build.slots) {
+      final enchant = slot.enchantment;
+      if (enchant != null && enchant.id > 0) {
+        items[enchant.id] = enchant;
+      }
+      for (final gem in slot.gems) {
+        if (gem.id > 0) {
+          items[gem.id] = gem;
+        }
+      }
+    }
+
+    final consumables = build.guide.consumables;
+    if (consumables.flask != null && consumables.flask!.id > 0) {
+      items[consumables.flask!.id] = consumables.flask!;
+    }
+    if (consumables.potion != null && consumables.potion!.id > 0) {
+      items[consumables.potion!.id] = consumables.potion!;
+    }
+    if (consumables.food != null && consumables.food!.id > 0) {
+      items[consumables.food!.id] = consumables.food!;
+    }
+
+    return items;
+  }
+}
+
+class _EconomyMetricChip extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _EconomyMetricChip({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: WowTheme.surfaceLight,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: WowTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: WowTheme.textSecondary.withValues(alpha: 0.85),
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              color: WowTheme.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1799,16 +2099,7 @@ class _SlotSheetContent extends StatelessWidget {
   }
 
   String _formatItemName(BuildContext context, Item item) {
-    final localeCode = Localizations.localeOf(context).languageCode;
-    final localized = item.localizedName?.trim();
-    final canonical = item.canonicalNameEn?.trim() ?? item.name;
-    if (localeCode == 'es' &&
-        localized != null &&
-        localized.isNotEmpty &&
-        localized.toLowerCase() != canonical.toLowerCase()) {
-      return '$localized · $canonical';
-    }
-    return canonical;
+    return _itemNameForLocale(context, item);
   }
 }
 
