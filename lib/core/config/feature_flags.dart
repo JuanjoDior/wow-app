@@ -8,7 +8,7 @@ class FeatureFlags {
 
   static const bool weeklyPlanner = bool.fromEnvironment(
     'FEATURE_WEEKLY_PLANNER',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   static const bool economyAssistant = bool.fromEnvironment(

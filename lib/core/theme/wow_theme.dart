@@ -83,24 +83,83 @@ class WowTheme {
     );
   }
 
-  /// Get color for WoW class
+  static const Map<String, Color> _classColors = {
+    'warrior': Color(0xFFC79C6E),
+    'paladin': Color(0xFFF58CBA),
+    'hunter': Color(0xFFABD473),
+    'rogue': Color(0xFFFFF569),
+    'priest': Color(0xFFFFFFFF),
+    'death knight': Color(0xFFC41F3B),
+    'shaman': Color(0xFF0070DE),
+    'mage': Color(0xFF69CCF0),
+    'warlock': Color(0xFF9482C9),
+    'monk': Color(0xFF00FF96),
+    'druid': Color(0xFFFF7D0A),
+    'demon hunter': Color(0xFFA330C9),
+    'evoker': Color(0xFF33937F),
+  };
+
+  static const Map<String, String> _classAliases = {
+    // EN
+    'warrior': 'warrior',
+    'paladin': 'paladin',
+    'hunter': 'hunter',
+    'rogue': 'rogue',
+    'priest': 'priest',
+    'death knight': 'death knight',
+    'shaman': 'shaman',
+    'mage': 'mage',
+    'warlock': 'warlock',
+    'monk': 'monk',
+    'druid': 'druid',
+    'demon hunter': 'demon hunter',
+    'evoker': 'evoker',
+    // ES
+    'guerrero': 'warrior',
+    'cazador': 'hunter',
+    'picaro': 'rogue',
+    'sacerdote': 'priest',
+    'caballero de la muerte': 'death knight',
+    'chaman': 'shaman',
+    'mago': 'mage',
+    'brujo': 'warlock',
+    'monje': 'monk',
+    'druida': 'druid',
+    'cazador de demonios': 'demon hunter',
+    'evocador': 'evoker',
+    // Alias cortos habituales
+    'dk': 'death knight',
+    'dh': 'demon hunter',
+  };
+
+  /// Get color for WoW class.
+  /// Soporta nombres canónicos y localizados (ES/EN).
   static Color getClassColor(String className) {
-    final colors = {
-      'warrior': const Color(0xFFC79C6E),
-      'paladin': const Color(0xFFF58CBA),
-      'hunter': const Color(0xFFABD473),
-      'rogue': const Color(0xFFFFF569),
-      'priest': const Color(0xFFFFFFFF),
-      'death knight': const Color(0xFFC41F3B),
-      'shaman': const Color(0xFF0070DE),
-      'mage': const Color(0xFF69CCF0),
-      'warlock': const Color(0xFF9482C9),
-      'monk': const Color(0xFF00FF96),
-      'druid': const Color(0xFFFF7D0A),
-      'demon hunter': const Color(0xFFA330C9),
-      'evoker': const Color(0xFF33937F),
+    final normalized = _normalizeClassName(className);
+    final canonical = _classAliases[normalized] ?? normalized;
+    return _classColors[canonical] ?? Colors.white;
+  }
+
+  static String _normalizeClassName(String value) {
+    var normalized = value.trim().toLowerCase();
+    if (normalized.isEmpty) return normalized;
+
+    const replacements = {
+      'á': 'a',
+      'é': 'e',
+      'í': 'i',
+      'ó': 'o',
+      'ú': 'u',
+      'ü': 'u',
     };
-    return colors[className.toLowerCase()] ?? Colors.white;
+    replacements.forEach((from, to) {
+      normalized = normalized.replaceAll(from, to);
+    });
+
+    normalized = normalized.replaceAll(RegExp(r'[_-]+'), ' ');
+    normalized = normalized.replaceAll("'", '');
+    normalized = normalized.replaceAll(RegExp(r'\s+'), ' ');
+    return normalized;
   }
 
   /// Get color for item quality

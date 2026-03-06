@@ -13,7 +13,7 @@ class WeeklyPlannerDataSource {
   static const _healthEndpoint = '$_workerUrl/health';
   static const _enabledByFlag = bool.fromEnvironment(
     'FEATURE_WEEKLY_PLANNER',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   bool? _supportsWeeklyPlanner;
