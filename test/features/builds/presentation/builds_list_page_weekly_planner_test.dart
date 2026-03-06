@@ -41,12 +41,12 @@ void main() {
     await sl.reset();
   });
 
-  Widget appWidget() {
+  Widget appWidget({Widget? home}) {
     return MaterialApp(
       locale: const Locale('es'),
       supportedLocales: S.supportedLocales,
       localizationsDelegates: S.localizationsDelegates,
-      home: const BuildsListPage(showWeeklyPlannerCard: true),
+      home: home ?? const BuildsListPage(showWeeklyPlannerCard: true),
     );
   }
 
@@ -129,6 +129,40 @@ void main() {
       ),
     ).called(1);
   });
+
+  testWidgets(
+    'muestra tarjeta semanal por defecto cuando la feature esta activa',
+    (tester) async {
+      final builds = [
+        buildFixture(
+          id: '1',
+          refKey: 'eu-sanguino-apastar',
+          refDisplay: 'Apastar - Sanguino',
+        ),
+      ];
+
+      when(() => cubit.state).thenReturn(BuildsLoaded(builds));
+      whenListen(
+        cubit,
+        const Stream<BuildsState>.empty(),
+        initialState: BuildsLoaded(builds),
+      );
+
+      when(
+        () => plannerDataSource.getWeeklyPlanner(
+          region: any(named: 'region'),
+          realm: any(named: 'realm'),
+          name: any(named: 'name'),
+          force: any(named: 'force'),
+        ),
+      ).thenAnswer((_) async => plannerFixture());
+
+      await tester.pumpWidget(appWidget(home: const BuildsListPage()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Resumen semanal'), findsOneWidget);
+    },
+  );
 
   testWidgets('no muestra tarjeta semanal si no hay builds vinculadas', (
     tester,
