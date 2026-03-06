@@ -27,7 +27,7 @@ BLIZZARD_ECONOMY_SUMMARY_CACHE_TTL = "300"
 # Feature flags de módulo (F0-04)
 FEATURE_BUILD_INTELLIGENCE = "true"
 FEATURE_WEEKLY_PLANNER = "true"
-FEATURE_ECONOMY_ASSISTANT = "false"
+FEATURE_ECONOMY_ASSISTANT = "true"
 
 # Secrets — añadir via CLI, NUNCA en este archivo:
 #   wrangler secret put BLIZZARD_CLIENT_SECRET
