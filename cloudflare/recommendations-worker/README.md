@@ -12,6 +12,7 @@ Worker orientado a datos objetivos de personaje/build usando Blizzard API.
 | GET | `/v2/build/verification?region=eu&realm=sanguino&name=apastar` | activo | Verificación objetiva build vs personaje |
 | GET | `/v2/catalog/search?q=blasphemite&mode=gem&locale=es_ES` | activo | Búsqueda objetiva de items/enchants/gemas |
 | GET | `/v1/planner/weekly?region=eu&realm=sanguino&name=apastar` | activo (flag) | Plan semanal objetivo del personaje |
+| GET | `/v1/economy/price-summary?region=eu&item_ids=213743,212495` | activo (flag) | Resumen de precios (min/mediana/p95) |
 | GET | `/v1/build/gap-analysis?region=eu&realm=sanguino&name=apastar` | compat | Alias compatible de V2 |
 | GET | `/recommendations` | deprecated | Ya no se sirven recomendaciones estáticas |
 | GET | `/specs` | deprecated | Catálogo de recomendaciones retirado |
@@ -23,13 +24,14 @@ Worker orientado a datos objetivos de personaje/build usando Blizzard API.
 {
   "status": "ok",
   "patch": "12.0.1",
-  "service_version": "5.1.0",
+  "service_version": "5.2.0",
   "capabilities": {
     "build_intelligence": true,
     "weekly_planner": false,
     "economy_assistant": false,
     "build_verification_v2": true,
-    "catalog_search_v2": true
+    "catalog_search_v2": true,
+    "economy_price_summary_v1": false
   }
 }
 ```
@@ -85,6 +87,55 @@ Planificador semanal objetivo con checklist basado en:
     "checks_completed": 3,
     "completion_pct": 60,
     "actions_count": 2
+  }
+}
+```
+
+## GET /v1/economy/price-summary
+
+Resumen objetivo de mercado por `item_id` usando subastas oficiales Blizzard.
+
+### Query params
+
+| Param | Req | Descripción |
+|-------|-----|-------------|
+| `region` | ✓ | `us`, `eu`, `kr`, `tw` |
+| `item_ids` | ✓ | IDs separados por coma (máximo 50) |
+| `connected_realm_id` | - | Si se envía, usa subasta de connected realm; si no, usa commodities |
+| `force` | - | `force=1` para saltar caché |
+
+### Success response (resumen)
+
+```json
+{
+  "version": "v1",
+  "endpoint": "/v1/economy/price-summary",
+  "source": {
+    "policy": "official_only",
+    "market": "commodities",
+    "data": "blizzard"
+  },
+  "context": {
+    "region": "eu",
+    "item_ids": [213743, 212495],
+    "connected_realm_id": null
+  },
+  "results": [
+    {
+      "item_id": 213743,
+      "market": "commodities",
+      "currency": "copper",
+      "min_price": 1890000,
+      "median_price": 2100000,
+      "p95_price": 2600000,
+      "total_quantity": 180,
+      "listing_count": 24
+    }
+  ],
+  "summary": {
+    "requested_items": 2,
+    "resolved_items": 1,
+    "missing_items": 1
   }
 }
 ```
@@ -218,3 +269,4 @@ wrangler deploy
 - `FEATURE_BUILD_INTELLIGENCE` (default `true`)
 - `FEATURE_WEEKLY_PLANNER` (default `false`)
 - `FEATURE_ECONOMY_ASSISTANT` (default `false`)
+- `BLIZZARD_ECONOMY_SUMMARY_CACHE_TTL` (default `300`)

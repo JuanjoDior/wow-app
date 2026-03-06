@@ -9,6 +9,7 @@
  *   GET  /v2/build/verification      (objective verification)
  *   GET  /v2/catalog/search          (objective catalog search)
  *   GET  /v1/planner/weekly          (planificador semanal objetivo)
+ *   GET  /v1/economy/price-summary   (resumen de precios objetivo)
  *   GET  /recommendations            (deprecated)
  *   GET  /specs                      (deprecated)
  *   POST /invalidate                 (deprecated)
@@ -35,6 +36,7 @@ const CACHE_TTLS = Object.freeze({
   itemIcon: { envKey: 'BLIZZARD_ITEM_ICON_CACHE_TTL', fallback: 604800 },
   catalogSearch: { envKey: 'BLIZZARD_CATALOG_SEARCH_CACHE_TTL', fallback: 1800 },
   weeklyPlanner: { envKey: 'BLIZZARD_WEEKLY_PLANNER_CACHE_TTL', fallback: 300 },
+  economySummary: { envKey: 'BLIZZARD_ECONOMY_SUMMARY_CACHE_TTL', fallback: 300 },
 });
 
 // ─── Blizzard API base URLs ───────────────────────────────────────────────────
@@ -130,6 +132,16 @@ export default {
           response = featureFlagDisabled('/v1/planner/weekly', 'weekly_planner', 'v1');
         } else {
           response = await handlePlannerWeeklyV1(url, env);
+        }
+      } else if (url.pathname === '/v1/economy/price-summary' && request.method === 'GET') {
+        if (!capabilities.economy_assistant) {
+          response = featureFlagDisabled(
+            '/v1/economy/price-summary',
+            'economy_assistant',
+            'v1',
+          );
+        } else {
+          response = await handleEconomyPriceSummaryV1(url, env);
         }
       } else if (url.pathname === '/invalidate' && request.method === 'POST') {
         response = await handleInvalidate(request, env);
@@ -1107,6 +1119,287 @@ async function handlePlannerWeeklyV1(url, env) {
   });
 
   return json({ ...payload, _source: 'planner' });
+}
+
+// ─── /v1/economy/price-summary ──────────────────────────────────────────────
+//
+// Resumen objetivo de mercado usando únicamente APIs oficiales Blizzard.
+// - Sin catálogos estáticos/manuales.
+// - Devuelve min/mediana/p95 en cobre por item.
+// - Soporta mercado de commodities o subasta de connected realm.
+
+async function handleEconomyPriceSummaryV1(url, env) {
+  const version = 'v1';
+  const endpoint = '/v1/economy/price-summary';
+
+  const region = (url.searchParams.get('region') || '').toLowerCase().trim();
+  const itemIds = parseEconomyItemIds(url.searchParams.get('item_ids'));
+  const connectedRealmRaw = url.searchParams.get('connected_realm_id');
+  const connectedRealmId = parseOptionalPositiveInt(connectedRealmRaw);
+  const force = url.searchParams.get('force') === '1';
+
+  if (!BLIZZARD_API_BASE[region]) {
+    return json({
+      version,
+      endpoint,
+      error: `Unknown region: ${region}. Use: us, eu, kr, tw`,
+    }, 400);
+  }
+
+  if (itemIds.length === 0) {
+    return json({
+      version,
+      endpoint,
+      error: 'Missing required param: item_ids (comma-separated positive integers).',
+    }, 400);
+  }
+
+  if (itemIds.length > 50) {
+    return json({
+      version,
+      endpoint,
+      error: 'Too many item_ids. Maximum allowed: 50.',
+    }, 400);
+  }
+
+  if (connectedRealmRaw != null && connectedRealmRaw.trim().length > 0 && connectedRealmId == null) {
+    return json({
+      version,
+      endpoint,
+      error: 'Invalid connected_realm_id. Use a positive integer.',
+    }, 400);
+  }
+
+  const market = connectedRealmId == null ? 'commodities' : 'auctions';
+  const cacheKey = buildEconomyPriceSummaryCacheKey(region, itemIds, connectedRealmId);
+
+  if (!force) {
+    const cached = await env.RECS_CACHE.get(cacheKey, 'json');
+    if (cached) {
+      return json({ ...cached, _source: 'cache' });
+    }
+  }
+
+  if (!env.BLIZZARD_CLIENT_SECRET) {
+    return json({
+      version,
+      endpoint,
+      error:
+        'Blizzard API not configured (missing BLIZZARD_CLIENT_SECRET secret)',
+    }, 503);
+  }
+
+  try {
+    const token = await getBlizzardToken(region, env);
+    const payload = connectedRealmId == null
+      ? await fetchBlizzardCommodityAuctions(region, token)
+      : await fetchBlizzardConnectedRealmAuctions(region, connectedRealmId, token);
+
+    const rows = extractEconomyRows(payload, itemIds);
+    const results = itemIds.map((itemId) => {
+      const summary = computeEconomyItemSummary(itemId, rows);
+      return {
+        item_id: itemId,
+        market,
+        currency: 'copper',
+        min_price: summary.minPrice,
+        median_price: summary.medianPrice,
+        p95_price: summary.p95Price,
+        total_quantity: summary.totalQuantity,
+        listing_count: summary.listingCount,
+      };
+    });
+
+    const resolvedItems = results.filter((entry) => entry.listing_count > 0).length;
+    const response = {
+      version,
+      endpoint,
+      generated_at: new Date().toISOString(),
+      source: {
+        policy: 'official_only',
+        market,
+        data: 'blizzard',
+      },
+      context: {
+        region,
+        item_ids: itemIds,
+        connected_realm_id: connectedRealmId ?? null,
+      },
+      results,
+      summary: {
+        requested_items: itemIds.length,
+        resolved_items: resolvedItems,
+        missing_items: Math.max(0, itemIds.length - resolvedItems),
+      },
+    };
+
+    const ttl = getCacheTtlSeconds(env, 'economySummary');
+    await env.RECS_CACHE.put(cacheKey, JSON.stringify(response), {
+      expirationTtl: ttl,
+    });
+
+    return json({ ...response, _source: 'economy' });
+  } catch (error) {
+    return json({
+      version,
+      endpoint,
+      error: error?.message || 'Economy lookup failed',
+    }, error?.status || 502);
+  }
+}
+
+function parseEconomyItemIds(rawValue) {
+  const text = String(rawValue || '').trim();
+  if (!text) return [];
+
+  const dedupe = new Set();
+  for (const token of text.split(',')) {
+    const parsed = Number.parseInt(token.trim(), 10);
+    if (!Number.isInteger(parsed) || parsed <= 0) continue;
+    dedupe.add(parsed);
+  }
+
+  return [...dedupe];
+}
+
+async function fetchBlizzardCommodityAuctions(region, token) {
+  const base = BLIZZARD_API_BASE[region];
+  const namespace = `dynamic-${region}`;
+  const locale = 'en_US';
+  const headers = { Authorization: `Bearer ${token}` };
+  const url =
+    `${base}/data/wow/auctions/commodities` +
+    `?namespace=${namespace}&locale=${locale}`;
+
+  const response = await fetch(url, { headers });
+  if (!response.ok) {
+    const err = new Error(`Blizzard commodities API error: ${response.status}`);
+    err.status = 502;
+    throw err;
+  }
+
+  return response.json();
+}
+
+async function fetchBlizzardConnectedRealmAuctions(region, connectedRealmId, token) {
+  const base = BLIZZARD_API_BASE[region];
+  const namespace = `dynamic-${region}`;
+  const locale = 'en_US';
+  const headers = { Authorization: `Bearer ${token}` };
+  const url =
+    `${base}/data/wow/connected-realm/${connectedRealmId}/auctions` +
+    `?namespace=${namespace}&locale=${locale}`;
+
+  const response = await fetch(url, { headers });
+  if (response.status === 404) {
+    const err = new Error(`Connected realm not found: ${connectedRealmId}`);
+    err.status = 404;
+    throw err;
+  }
+  if (!response.ok) {
+    const err = new Error(
+      `Blizzard connected realm auctions API error: ${response.status}`,
+    );
+    err.status = 502;
+    throw err;
+  }
+
+  return response.json();
+}
+
+function extractEconomyRows(payload, requestedItemIds) {
+  const auctions = Array.isArray(payload?.auctions) ? payload.auctions : [];
+  const itemIdSet = new Set(requestedItemIds);
+  const rows = [];
+
+  for (const auction of auctions) {
+    const itemId = Number(auction?.item?.id);
+    if (!Number.isInteger(itemId) || !itemIdSet.has(itemId)) continue;
+
+    const quantity = parsePositiveInt(auction?.quantity, 1);
+    const unitPrice = extractAuctionUnitPrice(auction, quantity);
+    if (!Number.isInteger(unitPrice) || unitPrice <= 0) continue;
+
+    rows.push({
+      itemId,
+      unitPrice,
+      quantity,
+    });
+  }
+
+  return rows;
+}
+
+function extractAuctionUnitPrice(auction, quantity) {
+  if (!auction || typeof auction !== 'object') return null;
+
+  const unitPrice = Number(auction.unit_price);
+  if (Number.isFinite(unitPrice) && unitPrice > 0) {
+    return Math.round(unitPrice);
+  }
+
+  const buyout = Number(auction.buyout);
+  if (Number.isFinite(buyout) && buyout > 0) {
+    const perUnit = quantity > 0 ? buyout / quantity : buyout;
+    return Math.round(perUnit);
+  }
+
+  const bid = Number(auction.bid);
+  if (Number.isFinite(bid) && bid > 0) {
+    const perUnit = quantity > 0 ? bid / quantity : bid;
+    return Math.round(perUnit);
+  }
+
+  return null;
+}
+
+function computeEconomyItemSummary(itemId, rows) {
+  const itemRows = rows
+    .filter((row) => row.itemId === itemId)
+    .sort((a, b) => a.unitPrice - b.unitPrice);
+
+  if (itemRows.length === 0) {
+    return {
+      minPrice: null,
+      medianPrice: null,
+      p95Price: null,
+      totalQuantity: 0,
+      listingCount: 0,
+    };
+  }
+
+  const totalQuantity = itemRows.reduce(
+    (acc, row) => acc + parsePositiveInt(row.quantity, 1),
+    0,
+  );
+  const minPrice = itemRows[0]?.unitPrice ?? null;
+  const medianPrice = weightedPercentilePrice(itemRows, totalQuantity, 0.5);
+  const p95Price = weightedPercentilePrice(itemRows, totalQuantity, 0.95);
+
+  return {
+    minPrice,
+    medianPrice,
+    p95Price,
+    totalQuantity,
+    listingCount: itemRows.length,
+  };
+}
+
+function weightedPercentilePrice(sortedRows, totalQuantity, quantile) {
+  if (!Array.isArray(sortedRows) || sortedRows.length === 0) return null;
+  if (!Number.isFinite(totalQuantity) || totalQuantity <= 0) return null;
+  const q = Math.min(1, Math.max(0, Number(quantile)));
+  const threshold = totalQuantity * q;
+  let cumulative = 0;
+
+  for (const row of sortedRows) {
+    cumulative += parsePositiveInt(row.quantity, 1);
+    if (cumulative >= threshold) {
+      return row.unitPrice;
+    }
+  }
+
+  return sortedRows[sortedRows.length - 1]?.unitPrice ?? null;
 }
 
 // ─── /v1/build/gap-analysis (compat) + /v2/build/verification ───────────────
@@ -2608,12 +2901,14 @@ function parseFeatureFlag(rawValue, defaultValue = false) {
 
 function resolveWorkerCapabilities(env) {
   const buildIntelligence = parseFeatureFlag(env.FEATURE_BUILD_INTELLIGENCE, true);
+  const economyAssistant = parseFeatureFlag(env.FEATURE_ECONOMY_ASSISTANT, false);
   return {
     build_intelligence: buildIntelligence,
     weekly_planner: parseFeatureFlag(env.FEATURE_WEEKLY_PLANNER, false),
-    economy_assistant: parseFeatureFlag(env.FEATURE_ECONOMY_ASSISTANT, false),
+    economy_assistant: economyAssistant,
     build_verification_v2: buildIntelligence,
     catalog_search_v2: true,
+    economy_price_summary_v1: economyAssistant,
   };
 }
 
@@ -2628,6 +2923,14 @@ function featureFlagDisabled(endpoint, featureName, version = 'v1') {
 function parsePositiveInt(value, fallback) {
   const parsed = parseInt(String(value ?? ''), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseOptionalPositiveInt(value) {
+  if (value == null) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 function getCacheTtlSeconds(env, cacheType) {
@@ -2674,6 +2977,18 @@ function buildWeeklyPlannerCacheKey(region, realm, name) {
   const normalizedRealm = normalizeRealmLookupValue(realm).replace(/\s+/g, '-');
   const normalizedName = String(name || '').toLowerCase().trim();
   return `planner:v1:${normalizedRegion}:${normalizedRealm}:${normalizedName}`;
+}
+
+function buildEconomyPriceSummaryCacheKey(region, itemIds, connectedRealmId) {
+  const normalizedRegion = String(region || '').toLowerCase().trim();
+  const normalizedIds = [...itemIds]
+    .filter((value) => Number.isInteger(value) && value > 0)
+    .sort((a, b) => a - b)
+    .join(',');
+  const marketScope = connectedRealmId == null
+    ? 'commodities'
+    : `connected-realm-${connectedRealmId}`;
+  return `economy:v1:${normalizedRegion}:${marketScope}:${normalizedIds}`;
 }
 
 function notImplementedV1(endpoint) {

@@ -42,6 +42,7 @@ test('health exposes capabilities with module feature flags', async () => {
   assert.equal(body.capabilities?.economy_assistant, false);
   assert.equal(body.capabilities?.build_verification_v2, true);
   assert.equal(body.capabilities?.catalog_search_v2, true);
+  assert.equal(body.capabilities?.economy_price_summary_v1, false);
 });
 
 test('health honors explicit module feature flags from env', async () => {
@@ -59,6 +60,7 @@ test('health honors explicit module feature flags from env', async () => {
   assert.equal(body.capabilities?.weekly_planner, true);
   assert.equal(body.capabilities?.economy_assistant, true);
   assert.equal(body.capabilities?.build_verification_v2, false);
+  assert.equal(body.capabilities?.economy_price_summary_v1, true);
 });
 
 test('character cache is isolated by locale', async () => {
