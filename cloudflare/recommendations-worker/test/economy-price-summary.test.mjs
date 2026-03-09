@@ -334,3 +334,46 @@ test('economy price summary resolves connected realm via realms.id search', asyn
     assert.equal(auctionsCalls, 1);
   });
 });
+
+test('economy price summary falls back to commodities when realm auctions fail', async () => {
+  const { env } = createEnv({ FEATURE_ECONOMY_ASSISTANT: 'true' });
+  let auctionsCalls = 0;
+  let commoditiesCalls = 0;
+
+  await withMockedFetch(async (url) => {
+    if (url.hostname === 'oauth.battle.net') {
+      return jsonResponse({ access_token: 'token' });
+    }
+    if (url.pathname === '/data/wow/realm/sanguino') {
+      return jsonResponse({
+        id: 1303,
+        slug: 'sanguino',
+        connected_realm: { id: 1080 },
+      });
+    }
+    if (url.pathname === '/data/wow/connected-realm/1080/auctions') {
+      auctionsCalls += 1;
+      return new Response('Bad Gateway', { status: 502 });
+    }
+    if (url.pathname === '/data/wow/auctions/commodities') {
+      commoditiesCalls += 1;
+      return jsonResponse({
+        auctions: [{ item: { id: 111 }, unit_price: 250, quantity: 4 }],
+      });
+    }
+    return new Response('Not Found', { status: 404 });
+  }, async () => {
+    const req = new Request(
+      'https://worker.example/v1/economy/price-summary?region=eu&realm=sanguino&item_ids=111',
+    );
+    const res = await worker.fetch(req, env);
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(body.source?.market, 'commodities');
+    assert.equal(body.source?.market_fallback_from_realm, true);
+    assert.equal(body.context?.connected_realm_id, null);
+    assert.equal(auctionsCalls, 1);
+    assert.equal(commoditiesCalls, 1);
+  });
+});

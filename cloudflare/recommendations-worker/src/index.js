@@ -1186,7 +1186,8 @@ async function handleEconomyPriceSummaryV1(url, env) {
     }
   }
 
-  const market = connectedRealmId == null
+  const requestedConnectedRealmId = connectedRealmId;
+  let market = connectedRealmId == null
     ? 'commodities'
     : 'auctions';
   const cacheKey = buildEconomyPriceSummaryCacheKey(region, itemIds, connectedRealmId);
@@ -1209,9 +1210,23 @@ async function handleEconomyPriceSummaryV1(url, env) {
 
   try {
     token = token ?? await getBlizzardToken(region, env);
-    const payload = connectedRealmId == null
-      ? await fetchBlizzardCommodityAuctions(region, token)
-      : await fetchBlizzardConnectedRealmAuctions(region, connectedRealmId, token);
+    let payload;
+    if (connectedRealmId == null) {
+      payload = await fetchBlizzardCommodityAuctions(region, token);
+    } else {
+      try {
+        payload = await fetchBlizzardConnectedRealmAuctions(
+          region,
+          connectedRealmId,
+          token,
+        );
+      } catch (_) {
+        // Fallback estable: si falla subasta de reino, degradar a commodities.
+        connectedRealmId = null;
+        market = 'commodities';
+        payload = await fetchBlizzardCommodityAuctions(region, token);
+      }
+    }
 
     const rows = extractEconomyRows(payload, itemIds);
     const results = itemIds.map((itemId) => {
@@ -1237,6 +1252,10 @@ async function handleEconomyPriceSummaryV1(url, env) {
         policy: 'official_only',
         market,
         data: 'blizzard',
+        market_fallback_from_realm:
+          requestedConnectedRealmId != null &&
+          connectedRealmId == null &&
+          market === 'commodities',
       },
       context: {
         region,
