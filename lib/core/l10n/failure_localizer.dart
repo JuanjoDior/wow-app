@@ -3,9 +3,6 @@ import 'package:wow_companion/l10n/generated/app_localizations.dart';
 String localizeFailureMessage(S t, String message) {
   final normalized = message.trim().toLowerCase();
 
-  if (normalized.contains('feature disabled: weekly_planner')) {
-    return t.weeklyPlannerUnavailable;
-  }
   if (normalized.contains('character not found')) return t.characterNotFound;
   if (normalized.contains('data not found for the selected character') ||
       normalized.contains('not found for the selected character/spec')) {

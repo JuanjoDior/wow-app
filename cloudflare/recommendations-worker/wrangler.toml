@@ -8,7 +8,7 @@ id = "bf433eaa4bf948da9b555646f5b287d8"
 
 [vars]
 CURRENT_PATCH = "12.0.1"
-SERVICE_VERSION = "5.2.0"
+SERVICE_VERSION = "6.0.0"
 CACHE_TTL_SECONDS = "604800"
 # Blizzard API — client_id es público, va aquí. El secret va como wrangler secret.
 BLIZZARD_CLIENT_ID = "078c6007e3954e70be67706d98cb818d"
@@ -20,15 +20,8 @@ BLIZZARD_TOKEN_CACHE_TTL = "82800"
 BLIZZARD_REALM_CACHE_TTL = "2592000"
 # TTL del caché por icono de item (7 días).
 BLIZZARD_ITEM_ICON_CACHE_TTL = "604800"
-# TTL del planificador semanal (5 min).
-BLIZZARD_WEEKLY_PLANNER_CACHE_TTL = "300"
-# TTL del resumen de economía (5 min).
-BLIZZARD_ECONOMY_SUMMARY_CACHE_TTL = "300"
 # Feature flags de módulo (F0-04)
 FEATURE_BUILD_INTELLIGENCE = "true"
-FEATURE_WEEKLY_PLANNER = "true"
-FEATURE_ECONOMY_ASSISTANT = "true"
 
 # Secrets — añadir via CLI, NUNCA en este archivo:
 #   wrangler secret put BLIZZARD_CLIENT_SECRET
-#   wrangler secret put INVALIDATE_SECRET   (opcional, protege /invalidate)

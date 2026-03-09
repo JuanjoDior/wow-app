@@ -213,56 +213,6 @@
   "@buildIntelligenceActionGemMismatch": {
     "placeholders": { "name": { "type": "String" } }
   },
-  "buildIntelligenceEstimatedCostShort": "Coste",
-  "buildIntelligenceRoiShort": "ROI",
-  "buildIntelligenceSummaryEstimatedCost": "Coste estimado",
-  "buildIntelligenceSummaryPricedActions": "Acciones con precio",
-  "economyAssistantTitle": "Asistente de Economía",
-  "economyAssistantSubtitle": "Instantánea objetiva de precios para encantamientos, gemas y consumibles",
-  "economyAssistantNoData": "No hay datos de mercado disponibles.",
-  "economyAssistantEmptyBuild": "Añade encantamientos, gemas o consumibles para estimar costes.",
-  "economyAssistantPricedItems": "Objetos con precio",
-  "economyAssistantMissingItems": "Precios faltantes",
-  "economyAssistantMarket": "Mercado",
-  "economyAssistantTopItems": "Costes de mercado más altos",
-  "economyAssistantMedianPrice": "Mediana",
-  "economyAssistantMarketCommodities": "Commodities",
-  "economyAssistantMarketAuctions": "Subastas de reino",
-  "economyAssistantMarketUnknown": "Desconocido",
-  "economyAssistantItemFallback": "Objeto #{id}",
-  "@economyAssistantItemFallback": {
-    "placeholders": {
-      "id": { "type": "int" }
-    }
-  },
-  "weeklyPlannerTitle": "Planificador Semanal",
-  "weeklyPlannerTooltip": "Abrir Planificador Semanal",
-  "weeklyPlannerUnavailable": "El Planificador Semanal está desactivado ahora mismo.",
-  "weeklyPlannerSummaryTitle": "Resumen semanal",
-  "weeklyPlannerCompletion": "Completado",
-  "weeklyPlannerChecks": "Comprobaciones",
-  "weeklyPlannerRuns": "Mythic+ semanales",
-  "weeklyPlannerRating": "Puntuación",
-  "weeklyPlannerAffixes": "Afijos",
-  "weeklyPlannerNoAffixes": "Aún no hay datos de afijos disponibles.",
-  "weeklyPlannerChecklist": "Lista de tareas",
-  "weeklyPlannerResetLocalProgress": "Restablecer progreso local",
-  "weeklyPlannerObjectiveCompleted": "Completado con datos del personaje",
-  "weeklyPlannerActions": "Acciones prioritarias",
-  "weeklyPlannerNoActions": "No hay acciones pendientes.",
-  "weeklyPlannerTaskEnchantsCompleted": "Aplica encantamientos faltantes",
-  "weeklyPlannerTaskSocketsFilled": "Rellena sockets vacíos",
-  "weeklyPlannerTaskMplusOne": "Completa al menos 1 Mythic+",
-  "weeklyPlannerTaskMplusFour": "Completa 4 Mythic+",
-  "weeklyPlannerTaskMplusEight": "Completa 8 Mythic+",
-  "weeklyPlannerActionRemaining": "{label} ({remaining} pendientes)",
-  "@weeklyPlannerActionRemaining": {
-    "placeholders": {
-      "label": { "type": "String" },
-      "remaining": { "type": "int" }
-    }
-  },
-
   "guideTitle": "Guía de Build",
   "guideContent": "Contenido",
   "guideContentRaid": "Raid",

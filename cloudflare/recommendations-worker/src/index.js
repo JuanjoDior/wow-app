@@ -4,15 +4,9 @@
  * Endpoints:
  *   GET  /health
  *   GET  /character?region=eu&realm=sanguino&name=apastar[&force=1]
- *   GET  /v1/character/snapshot?region=eu&realm=sanguino&name=apastar[&force=1]
- *   GET  /v1/build/gap-analysis      (v1, compatibility alias)
+ *   GET  /v2/character/snapshot?region=eu&realm=sanguino&name=apastar[&force=1]
  *   GET  /v2/build/verification      (objective verification)
  *   GET  /v2/catalog/search          (objective catalog search)
- *   GET  /v1/planner/weekly          (planificador semanal objetivo)
- *   GET  /v1/economy/price-summary   (resumen de precios objetivo)
- *   GET  /recommendations            (deprecated)
- *   GET  /specs                      (deprecated)
- *   POST /invalidate                 (deprecated)
  *
  * Flujo /character:
  *  1. KV cache (TTL=5min)
@@ -24,7 +18,7 @@
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Invalidate-Secret',
+  'Access-Control-Allow-Headers': 'Content-Type',
   'Access-Control-Expose-Headers': 'X-Request-Id',
 };
 
@@ -35,8 +29,6 @@ const CACHE_TTLS = Object.freeze({
   realmSlug: { envKey: 'BLIZZARD_REALM_CACHE_TTL', fallback: 2592000 },
   itemIcon: { envKey: 'BLIZZARD_ITEM_ICON_CACHE_TTL', fallback: 604800 },
   catalogSearch: { envKey: 'BLIZZARD_CATALOG_SEARCH_CACHE_TTL', fallback: 1800 },
-  weeklyPlanner: { envKey: 'BLIZZARD_WEEKLY_PLANNER_CACHE_TTL', fallback: 300 },
-  economySummary: { envKey: 'BLIZZARD_ECONOMY_SUMMARY_CACHE_TTL', fallback: 300 },
 });
 
 // ─── Blizzard API base URLs ───────────────────────────────────────────────────
@@ -80,9 +72,6 @@ const CATALOG_QUERY_STOPWORDS = new Set([
   'y',
 ]);
 
-// ─── Legacy recommendation catalog (disabled in v2 objective mode) ──────────
-export const SUPPORTED_SPECS = [];
-
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export default {
@@ -103,7 +92,6 @@ export default {
         response = json({
           status: 'ok',
           patch: env.CURRENT_PATCH,
-          specs: SUPPORTED_SPECS.length,
           service_version: env.SERVICE_VERSION || 'v5',
           capabilities,
         });
@@ -115,38 +103,10 @@ export default {
         } else {
         response = await handleBuildVerificationV2(url, env);
         }
-      } else if (url.pathname === '/recommendations' && request.method === 'GET') {
-        response = await handleRecommendations(url, env);
       } else if (url.pathname === '/character' && request.method === 'GET') {
         response = await handleCharacter(url, env);
-      } else if (url.pathname === '/v1/character/snapshot' && request.method === 'GET') {
-        response = await handleCharacterSnapshotV1(url, env);
-      } else if (url.pathname === '/v1/build/gap-analysis' && request.method === 'GET') {
-        if (!capabilities.build_intelligence) {
-          response = featureFlagDisabled('/v1/build/gap-analysis', 'build_intelligence', 'v1');
-        } else {
-        response = await handleBuildGapAnalysisV1(url, env);
-        }
-      } else if (url.pathname === '/v1/planner/weekly' && request.method === 'GET') {
-        if (!capabilities.weekly_planner) {
-          response = featureFlagDisabled('/v1/planner/weekly', 'weekly_planner', 'v1');
-        } else {
-          response = await handlePlannerWeeklyV1(url, env);
-        }
-      } else if (url.pathname === '/v1/economy/price-summary' && request.method === 'GET') {
-        if (!capabilities.economy_assistant) {
-          response = featureFlagDisabled(
-            '/v1/economy/price-summary',
-            'economy_assistant',
-            'v1',
-          );
-        } else {
-          response = await handleEconomyPriceSummaryV1(url, env);
-        }
-      } else if (url.pathname === '/invalidate' && request.method === 'POST') {
-        response = await handleInvalidate(request, env);
-      } else if (url.pathname === '/specs' && request.method === 'GET') {
-        response = await handleSpecs(url, env);
+      } else if (url.pathname === '/v2/character/snapshot' && request.method === 'GET') {
+        response = await handleCharacterSnapshotV2(url, env);
       } else {
         response = new Response('Not Found', { status: 404, headers: CORS_HEADERS });
       }
@@ -174,14 +134,6 @@ export default {
     return response;
   },
 };
-
-// ─── /recommendations ─────────────────────────────────────────────────────────
-
-async function handleRecommendations(url, env) {
-  return json({
-    error: 'Deprecated endpoint. Use /v2/build/verification for objective analysis.',
-  }, 410);
-}
 
 // ─── /v2/catalog/search ──────────────────────────────────────────────────────
 
@@ -805,6 +757,12 @@ function normalizeCatalogToken(value) {
     .trim();
 }
 
+function stripDiacritics(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 function normalizeQualityToken(value) {
   if (typeof value !== 'string') return null;
   const normalized = value.trim().toUpperCase();
@@ -980,13 +938,12 @@ async function handleCharacter(url, env) {
   }
 }
 
-// ─── /v1/character/snapshot ──────────────────────────────────────────────────
+// ─── /v2/character/snapshot ──────────────────────────────────────────────────
 //
-// Contrato estable v1 para consumo de la app.
-// Conserva el payload de /character dentro de "snapshot" para no romper clientes
-// actuales y añadir versionado explícito.
+// Contrato estable v2 para consumo de la app.
+// Conserva el payload de /character dentro de "snapshot".
 
-async function handleCharacterSnapshotV1(url, env) {
+async function handleCharacterSnapshotV2(url, env) {
   const response = await handleCharacter(url, env);
   const contentType = response.headers.get('Content-Type') || '';
   if (!contentType.includes('application/json')) return response;
@@ -1000,776 +957,34 @@ async function handleCharacterSnapshotV1(url, env) {
 
   if (!response.ok) {
     return json({
-      version: 'v1',
-      endpoint: '/v1/character/snapshot',
+      version: 'v2',
+      endpoint: '/v2/character/snapshot',
       error: payload?.error || 'Unknown error',
     }, response.status);
   }
 
   const source = payload?._source ?? null;
   return json({
-    version: 'v1',
+    version: 'v2',
     source,
     generated_at: new Date().toISOString(),
     snapshot: payload,
   });
 }
 
-// ─── /v1/planner/weekly ─────────────────────────────────────────────────────
-//
-// Planificador semanal objetivo:
-// - Basado en datos oficiales Blizzard (personaje + perfil M+ cuando disponible).
-// - Si no hay perfil M+ disponible, el endpoint degrada con datos del personaje
-//   sin romper flujo.
-
-async function handlePlannerWeeklyV1(url, env) {
-  const version = 'v1';
-  const endpoint = '/v1/planner/weekly';
-
-  const region = (url.searchParams.get('region') || '').toLowerCase().trim();
-  const realm = (url.searchParams.get('realm') || '').trim();
-  const name = (url.searchParams.get('name') || '').trim();
-  const force = url.searchParams.get('force') === '1';
-
-  if (!region || !realm || !name) {
-    return json({
-      version,
-      endpoint,
-      error: 'Missing required params: region, realm, name',
-    }, 400);
-  }
-
-  const cacheKey = buildWeeklyPlannerCacheKey(region, realm, name);
-  if (!force) {
-    const cached = await env.RECS_CACHE.get(cacheKey, 'json');
-    if (cached) {
-      return json({ ...cached, _source: 'cache' });
-    }
-  }
-
-  const characterResponse = await handleCharacter(url, env);
-  const contentType = characterResponse.headers.get('Content-Type') || '';
-  if (!contentType.includes('application/json')) return characterResponse;
-
-  let characterPayload;
-  try {
-    characterPayload = await characterResponse.clone().json();
-  } catch {
-    return json({
-      version,
-      endpoint,
-      error: 'Invalid character payload',
-    }, 502);
-  }
-
-  if (!characterResponse.ok) {
-    return json({
-      version,
-      endpoint,
-      error: characterPayload?.error || 'Character lookup failed',
-    }, characterResponse.status);
-  }
-
-  let mythicProfile = null;
-  let plannerSource = 'unavailable';
-  if (env.BLIZZARD_CLIENT_SECRET) {
-    try {
-      const token = await getBlizzardToken(region, env);
-      const realmSlug = await resolveRealmSlug(region, realm, token, env);
-      mythicProfile = await fetchBlizzardMythicKeystoneProfile(
-        region,
-        realmSlug,
-        name,
-        token,
-      );
-      if (mythicProfile) {
-        plannerSource = 'blizzard';
-      }
-    } catch (_) {
-      mythicProfile = null;
-    }
-  }
-
-  const planner = computeWeeklyPlanner(characterPayload, mythicProfile);
-  const payload = {
-    version,
-    endpoint,
-    generated_at: new Date().toISOString(),
-    source: {
-      character: characterPayload?._source ?? null,
-      planner: plannerSource,
-      policy: 'official_only',
-    },
-    context: {
-      region,
-      realm,
-      name: name.toLowerCase(),
-    },
-    facts: planner.facts,
-    mythic: planner.mythic,
-    affixes: planner.affixes,
-    summary: planner.summary,
-    checklist: planner.checklist,
-    actions: planner.actions,
-  };
-
-  const ttl = getCacheTtlSeconds(env, 'weeklyPlanner');
-  await env.RECS_CACHE.put(cacheKey, JSON.stringify(payload), {
-    expirationTtl: ttl,
-  });
-
-  return json({ ...payload, _source: 'planner' });
-}
-
-// ─── /v1/economy/price-summary ──────────────────────────────────────────────
-//
-// Resumen objetivo de mercado usando únicamente APIs oficiales Blizzard.
-// - Sin catálogos estáticos/manuales.
-// - Devuelve min/mediana/p95 en cobre por item.
-// - Soporta mercado de commodities o subasta de connected realm.
-
-async function handleEconomyPriceSummaryV1(url, env) {
-  const version = 'v1';
-  const endpoint = '/v1/economy/price-summary';
-
-  const region = (url.searchParams.get('region') || '').toLowerCase().trim();
-  const realm = (url.searchParams.get('realm') || '').trim();
-  const itemIds = parseEconomyItemIds(url.searchParams.get('item_ids'));
-  const connectedRealmRaw = url.searchParams.get('connected_realm_id');
-  let connectedRealmId = parseOptionalPositiveInt(connectedRealmRaw);
-  const force = url.searchParams.get('force') === '1';
-
-  if (!BLIZZARD_API_BASE[region]) {
-    return json({
-      version,
-      endpoint,
-      error: `Unknown region: ${region}. Use: us, eu, kr, tw`,
-    }, 400);
-  }
-
-  if (itemIds.length === 0) {
-    return json({
-      version,
-      endpoint,
-      error: 'Missing required param: item_ids (comma-separated positive integers).',
-    }, 400);
-  }
-
-  if (itemIds.length > 50) {
-    return json({
-      version,
-      endpoint,
-      error: 'Too many item_ids. Maximum allowed: 50.',
-    }, 400);
-  }
-
-  if (connectedRealmRaw != null && connectedRealmRaw.trim().length > 0 && connectedRealmId == null) {
-    return json({
-      version,
-      endpoint,
-      error: 'Invalid connected_realm_id. Use a positive integer.',
-    }, 400);
-  }
-
-  let token = null;
-  if (connectedRealmId == null && realm.length > 0 && env.BLIZZARD_CLIENT_SECRET) {
-    try {
-      token = await getBlizzardToken(region, env);
-      connectedRealmId = await resolveConnectedRealmId(
-        region,
-        realm,
-        token,
-        env,
-      );
-    } catch (_) {
-      connectedRealmId = null;
-    }
-  }
-
-  const requestedConnectedRealmId = connectedRealmId;
-  let market = connectedRealmId == null
-    ? 'commodities'
-    : 'auctions';
-  const cacheKey = buildEconomyPriceSummaryCacheKey(region, itemIds, connectedRealmId);
-
-  if (!force) {
-    const cached = await env.RECS_CACHE.get(cacheKey, 'json');
-    if (cached) {
-      return json({ ...cached, _source: 'cache' });
-    }
-  }
-
-  if (!env.BLIZZARD_CLIENT_SECRET) {
-    return json({
-      version,
-      endpoint,
-      error:
-        'Blizzard API not configured (missing BLIZZARD_CLIENT_SECRET secret)',
-    }, 503);
-  }
-
-  try {
-    token = token ?? await getBlizzardToken(region, env);
-    let payload;
-    if (connectedRealmId == null) {
-      payload = await fetchBlizzardCommodityAuctions(region, token);
-    } else {
-      try {
-        payload = await fetchBlizzardConnectedRealmAuctions(
-          region,
-          connectedRealmId,
-          token,
-        );
-      } catch (_) {
-        // Fallback estable: si falla subasta de reino, degradar a commodities.
-        connectedRealmId = null;
-        market = 'commodities';
-        payload = await fetchBlizzardCommodityAuctions(region, token);
-      }
-    }
-
-    const rows = extractEconomyRows(payload, itemIds);
-    const results = itemIds.map((itemId) => {
-      const summary = computeEconomyItemSummary(itemId, rows);
-      return {
-        item_id: itemId,
-        market,
-        currency: 'copper',
-        min_price: summary.minPrice,
-        median_price: summary.medianPrice,
-        p95_price: summary.p95Price,
-        total_quantity: summary.totalQuantity,
-        listing_count: summary.listingCount,
-      };
-    });
-
-    const resolvedItems = results.filter((entry) => entry.listing_count > 0).length;
-    const response = {
-      version,
-      endpoint,
-      generated_at: new Date().toISOString(),
-      source: {
-        policy: 'official_only',
-        market,
-        data: 'blizzard',
-        market_fallback_from_realm:
-          requestedConnectedRealmId != null &&
-          connectedRealmId == null &&
-          market === 'commodities',
-      },
-      context: {
-        region,
-        realm: realm || null,
-        item_ids: itemIds,
-        connected_realm_id: connectedRealmId ?? null,
-      },
-      results,
-      summary: {
-        requested_items: itemIds.length,
-        resolved_items: resolvedItems,
-        missing_items: Math.max(0, itemIds.length - resolvedItems),
-      },
-    };
-
-    const ttl = getCacheTtlSeconds(env, 'economySummary');
-    await env.RECS_CACHE.put(cacheKey, JSON.stringify(response), {
-      expirationTtl: ttl,
-    });
-
-    return json({ ...response, _source: 'economy' });
-  } catch (error) {
-    return json({
-      version,
-      endpoint,
-      error: error?.message || 'Economy lookup failed',
-    }, error?.status || 502);
-  }
-}
-
-function parseEconomyItemIds(rawValue) {
-  const text = String(rawValue || '').trim();
-  if (!text) return [];
-
-  const dedupe = new Set();
-  for (const token of text.split(',')) {
-    const parsed = Number.parseInt(token.trim(), 10);
-    if (!Number.isInteger(parsed) || parsed <= 0) continue;
-    dedupe.add(parsed);
-  }
-
-  return [...dedupe];
-}
-
-async function fetchBlizzardCommodityAuctions(region, token) {
-  const base = BLIZZARD_API_BASE[region];
-  const namespace = `dynamic-${region}`;
-  const locale = 'en_US';
-  const headers = { Authorization: `Bearer ${token}` };
-  const url =
-    `${base}/data/wow/auctions/commodities` +
-    `?namespace=${namespace}&locale=${locale}`;
-
-  const response = await fetch(url, { headers });
-  if (!response.ok) {
-    const err = new Error(`Blizzard commodities API error: ${response.status}`);
-    err.status = 502;
-    throw err;
-  }
-
-  return response.json();
-}
-
-async function fetchBlizzardConnectedRealmAuctions(region, connectedRealmId, token) {
-  const base = BLIZZARD_API_BASE[region];
-  const namespace = `dynamic-${region}`;
-  const locale = 'en_US';
-  const headers = { Authorization: `Bearer ${token}` };
-  const url =
-    `${base}/data/wow/connected-realm/${connectedRealmId}/auctions` +
-    `?namespace=${namespace}&locale=${locale}`;
-
-  const response = await fetch(url, { headers });
-  if (response.status === 404) {
-    const err = new Error(`Connected realm not found: ${connectedRealmId}`);
-    err.status = 404;
-    throw err;
-  }
-  if (!response.ok) {
-    const err = new Error(
-      `Blizzard connected realm auctions API error: ${response.status}`,
-    );
-    err.status = 502;
-    throw err;
-  }
-
-  return response.json();
-}
-
-async function resolveConnectedRealmId(region, realmInput, token, env) {
-  const normalizedRealm = normalizeRealmLookupValue(realmInput);
-  if (!normalizedRealm) return null;
-
-  const cacheKey = buildConnectedRealmLookupKey(region, normalizedRealm);
-  try {
-    const cached = await env.RECS_CACHE.get(cacheKey);
-    const parsed = parseOptionalPositiveInt(cached);
-    if (parsed != null) return parsed;
-  } catch (_) {
-    // Ignorar error de cache y continuar con resolución remota.
-  }
-
-  let realmSlug = null;
-  try {
-    realmSlug = await resolveRealmSlug(region, realmInput, token, env);
-  } catch (_) {
-    return null;
-  }
-  if (!realmSlug) return null;
-
-  const slugCacheKey = buildConnectedRealmBySlugKey(region, realmSlug);
-  try {
-    const cachedBySlug = await env.RECS_CACHE.get(slugCacheKey);
-    const parsedBySlug = parseOptionalPositiveInt(cachedBySlug);
-    if (parsedBySlug != null) {
-      try {
-        const ttl = getCacheTtlSeconds(env, 'realmSlug');
-        await env.RECS_CACHE.put(cacheKey, String(parsedBySlug), {
-          expirationTtl: ttl,
-        });
-      } catch (_) {
-        // Ignorar error de cache secundario.
-      }
-      return parsedBySlug;
-    }
-  } catch (_) {
-    // Ignorar error de cache y continuar con resolución remota.
-  }
-
-  const base = BLIZZARD_API_BASE[region];
-  const namespace = `dynamic-${region}`;
-  const locale = 'en_US';
-  const headers = { Authorization: `Bearer ${token}` };
-  const url =
-    `${base}/data/wow/realm/${encodeURIComponent(realmSlug)}` +
-    `?namespace=${namespace}&locale=${locale}`;
-
-  try {
-    const response = await fetch(url, { headers });
-    if (response.ok) {
-      const realmPayload = await response.json();
-      const connectedRealmId = extractConnectedRealmId(realmPayload);
-      if (connectedRealmId != null) {
-        try {
-          const ttl = getCacheTtlSeconds(env, 'realmSlug');
-          await env.RECS_CACHE.put(cacheKey, String(connectedRealmId), {
-            expirationTtl: ttl,
-          });
-          await env.RECS_CACHE.put(slugCacheKey, String(connectedRealmId), {
-            expirationTtl: ttl,
-          });
-        } catch (_) {
-          // Fallo de cache no debe romper la resolución.
-        }
-        return connectedRealmId;
-      }
-
-      const realmId = parseOptionalPositiveInt(realmPayload?.id);
-      const connectedByRealmId = await resolveConnectedRealmIdByRealmIdSearch(
-        region,
-        realmId,
-        token,
-      );
-      if (connectedByRealmId != null) {
-        try {
-          const ttl = getCacheTtlSeconds(env, 'realmSlug');
-          await env.RECS_CACHE.put(cacheKey, String(connectedByRealmId), {
-            expirationTtl: ttl,
-          });
-          await env.RECS_CACHE.put(slugCacheKey, String(connectedByRealmId), {
-            expirationTtl: ttl,
-          });
-        } catch (_) {
-          // Fallo de cache no debe romper la resolución.
-        }
-        return connectedByRealmId;
-      }
-    }
-  } catch (_) {
-    // Ignorar fallo y continuar con fallback de búsqueda.
-  }
-
-  try {
-    const fromSearch = await resolveConnectedRealmIdByRealmSearch(
-      region,
-      realmInput,
-      token,
-      realmSlug,
-    );
-    const resolvedConnectedRealmId = fromSearch ??
-      await resolveConnectedRealmIdByConnectedRealmSearch(
-        region,
-        realmInput,
-        token,
-      );
-    if (resolvedConnectedRealmId == null) return null;
-    try {
-      const ttl = getCacheTtlSeconds(env, 'realmSlug');
-      await env.RECS_CACHE.put(cacheKey, String(resolvedConnectedRealmId), {
-        expirationTtl: ttl,
-      });
-      await env.RECS_CACHE.put(slugCacheKey, String(resolvedConnectedRealmId), {
-        expirationTtl: ttl,
-      });
-    } catch (_) {
-      // Fallo de cache no debe romper la resolución.
-    }
-    return resolvedConnectedRealmId;
-  } catch (_) {
-    return null;
-  }
-}
-
-async function resolveConnectedRealmIdByRealmSearch(
-  region,
-  realmInput,
-  token,
-  expectedSlug = null,
-) {
-  const base = BLIZZARD_API_BASE[region];
-  const namespace = `dynamic-${region}`;
-  const rawInput = String(realmInput || '').trim();
-  const normalizedInput = normalizeRealmLookupValue(rawInput);
-  if (!rawInput || !normalizedInput) return null;
-
-  const locales = REALM_SEARCH_LOCALES[region] || ['en_US'];
-  const headers = { Authorization: `Bearer ${token}` };
-  let fallbackConnectedRealmId = null;
-
-  for (const locale of locales) {
-    const searchFields = [`name.${locale}`, 'name.en_US'];
-    for (const searchField of [...new Set(searchFields)]) {
-      const searchParams = new URLSearchParams({
-        namespace,
-        locale,
-        _pageSize: '50',
-      });
-      searchParams.set(searchField, rawInput);
-
-      const url = `${base}/data/wow/search/realm?${searchParams.toString()}`;
-      let response;
-      try {
-        response = await fetch(url, { headers });
-      } catch (_) {
-        continue;
-      }
-      if (!response.ok) continue;
-
-      const payload = await response.json();
-      const entries = extractRealmSearchEntries(payload);
-      for (const entry of entries) {
-        const connectedRealmId = extractConnectedRealmId(entry);
-        if (connectedRealmId == null) continue;
-
-        if (fallbackConnectedRealmId == null) {
-          fallbackConnectedRealmId = connectedRealmId;
-        }
-
-        const slug = getRealmSlugFromEntry(entry);
-        if (expectedSlug != null && slug === expectedSlug) {
-          return connectedRealmId;
-        }
-
-        const isExactName = getRealmNamesFromEntry(entry)
-          .map(normalizeRealmLookupValue)
-          .some((name) => name === normalizedInput);
-        if (isExactName) {
-          return connectedRealmId;
-        }
-      }
-    }
-  }
-
-  return fallbackConnectedRealmId;
-}
-
-async function resolveConnectedRealmIdByConnectedRealmSearch(
-  region,
-  realmInput,
-  token,
-) {
-  const base = BLIZZARD_API_BASE[region];
-  const namespace = `dynamic-${region}`;
-  const rawInput = String(realmInput || '').trim();
-  const normalizedInput = normalizeRealmLookupValue(rawInput);
-  if (!rawInput || !normalizedInput) return null;
-
-  const locales = REALM_SEARCH_LOCALES[region] || ['en_US'];
-  const headers = { Authorization: `Bearer ${token}` };
-  let fallbackConnectedRealmId = null;
-
-  for (const locale of locales) {
-    const searchFields = [`realms.name.${locale}`, 'realms.name.en_US'];
-    for (const searchField of [...new Set(searchFields)]) {
-      const searchParams = new URLSearchParams({
-        namespace,
-        locale,
-        _pageSize: '50',
-      });
-      searchParams.set(searchField, rawInput);
-
-      const url = `${base}/data/wow/search/connected-realm?${searchParams.toString()}`;
-      let response;
-      try {
-        response = await fetch(url, { headers });
-      } catch (_) {
-        continue;
-      }
-      if (!response.ok) continue;
-
-      const payload = await response.json();
-      const entries = extractRealmSearchEntries(payload);
-      for (const entry of entries) {
-        const connectedRealmId = parseOptionalPositiveInt(entry?.id);
-        if (connectedRealmId == null) continue;
-        if (fallbackConnectedRealmId == null) {
-          fallbackConnectedRealmId = connectedRealmId;
-        }
-
-        const isExactNameOrSlug = getConnectedRealmSearchNames(entry)
-          .map(normalizeRealmLookupValue)
-          .some((value) => value === normalizedInput);
-        if (isExactNameOrSlug) {
-          return connectedRealmId;
-        }
-      }
-    }
-  }
-
-  return fallbackConnectedRealmId;
-}
-
-function getConnectedRealmSearchNames(entry) {
-  const names = [];
-  const realms = Array.isArray(entry?.realms) ? entry.realms : [];
-  for (const realm of realms) {
-    if (typeof realm?.slug === 'string' && realm.slug.trim().length > 0) {
-      names.push(realm.slug.trim());
-    }
-    const realmNames = getRealmNamesFromEntry(realm);
-    for (const name of realmNames) {
-      names.push(name);
-    }
-  }
-  return [...new Set(names)];
-}
-
-async function resolveConnectedRealmIdByRealmIdSearch(region, realmId, token) {
-  const safeRealmId = parseOptionalPositiveInt(realmId);
-  if (safeRealmId == null) return null;
-
-  const base = BLIZZARD_API_BASE[region];
-  const namespace = `dynamic-${region}`;
-  const headers = { Authorization: `Bearer ${token}` };
-  const searchParams = new URLSearchParams({
-    namespace,
-    locale: 'en_US',
-    _pageSize: '5',
-  });
-  searchParams.set('realms.id', String(safeRealmId));
-
-  const url = `${base}/data/wow/search/connected-realm?${searchParams.toString()}`;
-  try {
-    const response = await fetch(url, { headers });
-    if (!response.ok) return null;
-    const payload = await response.json();
-    const entries = extractRealmSearchEntries(payload);
-    for (const entry of entries) {
-      const connectedRealmId = parseOptionalPositiveInt(entry?.id);
-      if (connectedRealmId != null) {
-        return connectedRealmId;
-      }
-    }
-    return null;
-  } catch (_) {
-    return null;
-  }
-}
-
-function extractConnectedRealmId(realmPayload) {
-  const directId = parseOptionalPositiveInt(
-    realmPayload?.connected_realm?.id ?? realmPayload?.connected_realm_id,
-  );
-  if (directId != null) return directId;
-
-  const href = realmPayload?.connected_realm?.href ??
-    realmPayload?.connected_realm?.key?.href;
-  if (typeof href === 'string' && href.trim().length > 0) {
-    const match = href.match(/\/connected-realm\/(\d+)(?:\/|$)/i);
-    if (match) {
-      const parsed = parseOptionalPositiveInt(match[1]);
-      if (parsed != null) return parsed;
-    }
-  }
-
-  return null;
-}
-
-function extractEconomyRows(payload, requestedItemIds) {
-  const auctions = Array.isArray(payload?.auctions) ? payload.auctions : [];
-  const itemIdSet = new Set(requestedItemIds);
-  const rows = [];
-
-  for (const auction of auctions) {
-    const itemId = Number(auction?.item?.id);
-    if (!Number.isInteger(itemId) || !itemIdSet.has(itemId)) continue;
-
-    const quantity = parsePositiveInt(auction?.quantity, 1);
-    const unitPrice = extractAuctionUnitPrice(auction, quantity);
-    if (!Number.isInteger(unitPrice) || unitPrice <= 0) continue;
-
-    rows.push({
-      itemId,
-      unitPrice,
-      quantity,
-    });
-  }
-
-  return rows;
-}
-
-function extractAuctionUnitPrice(auction, quantity) {
-  if (!auction || typeof auction !== 'object') return null;
-
-  const unitPrice = Number(auction.unit_price);
-  if (Number.isFinite(unitPrice) && unitPrice > 0) {
-    return Math.round(unitPrice);
-  }
-
-  const buyout = Number(auction.buyout);
-  if (Number.isFinite(buyout) && buyout > 0) {
-    const perUnit = quantity > 0 ? buyout / quantity : buyout;
-    return Math.round(perUnit);
-  }
-
-  const bid = Number(auction.bid);
-  if (Number.isFinite(bid) && bid > 0) {
-    const perUnit = quantity > 0 ? bid / quantity : bid;
-    return Math.round(perUnit);
-  }
-
-  return null;
-}
-
-function computeEconomyItemSummary(itemId, rows) {
-  const itemRows = rows
-    .filter((row) => row.itemId === itemId)
-    .sort((a, b) => a.unitPrice - b.unitPrice);
-
-  if (itemRows.length === 0) {
-    return {
-      minPrice: null,
-      medianPrice: null,
-      p95Price: null,
-      totalQuantity: 0,
-      listingCount: 0,
-    };
-  }
-
-  const totalQuantity = itemRows.reduce(
-    (acc, row) => acc + parsePositiveInt(row.quantity, 1),
-    0,
-  );
-  const minPrice = itemRows[0]?.unitPrice ?? null;
-  const medianPrice = weightedPercentilePrice(itemRows, totalQuantity, 0.5);
-  const p95Price = weightedPercentilePrice(itemRows, totalQuantity, 0.95);
-
-  return {
-    minPrice,
-    medianPrice,
-    p95Price,
-    totalQuantity,
-    listingCount: itemRows.length,
-  };
-}
-
-function weightedPercentilePrice(sortedRows, totalQuantity, quantile) {
-  if (!Array.isArray(sortedRows) || sortedRows.length === 0) return null;
-  if (!Number.isFinite(totalQuantity) || totalQuantity <= 0) return null;
-  const q = Math.min(1, Math.max(0, Number(quantile)));
-  const threshold = totalQuantity * q;
-  let cumulative = 0;
-
-  for (const row of sortedRows) {
-    cumulative += parsePositiveInt(row.quantity, 1);
-    if (cumulative >= threshold) {
-      return row.unitPrice;
-    }
-  }
-
-  return sortedRows[sortedRows.length - 1]?.unitPrice ?? null;
-}
-
-// ─── /v1/build/gap-analysis (compat) + /v2/build/verification ───────────────
+// ─── /v2/build/verification ──────────────────────────────────────────────────
 //
 // Política actual:
 // - No usa recomendaciones estáticas/manuales.
 // - Compara únicamente datos oficiales Blizzard del personaje contra target local.
 // - Si no hay target local, devuelve facts objetivos del personaje.
 
-async function handleBuildGapAnalysisV1(url, env) {
-  return handleBuildVerificationV2(url, env, {
-    version: 'v1',
-    endpoint: '/v1/build/gap-analysis',
-  });
-}
-
-async function handleBuildVerificationV2(url, env, compat = null) {
+async function handleBuildVerificationV2(url, env) {
   const region = (url.searchParams.get('region') || '').toLowerCase().trim();
   const realm = (url.searchParams.get('realm') || '').trim();
   const name = (url.searchParams.get('name') || '').trim();
-
-  const version = compat?.version || 'v2';
-  const endpoint = compat?.endpoint || '/v2/build/verification';
+  const version = 'v2';
+  const endpoint = '/v2/build/verification';
 
   if (!region || !realm || !name) {
     return json({
@@ -1803,15 +1018,7 @@ async function handleBuildVerificationV2(url, env, compat = null) {
   }
 
   const localBuildSlots = parseBuildSlotsQuery(url.searchParams.get('build_slots'));
-  const baseAnalysis = computeObjectiveBuildVerification(characterPayload, localBuildSlots);
-  const capabilities = resolveWorkerCapabilities(env);
-  const analysis = await enrichBuildVerificationWithEconomy({
-    analysis: baseAnalysis,
-    env,
-    region,
-    realm,
-    enabled: capabilities.economy_assistant,
-  });
+  const analysis = computeObjectiveBuildVerification(characterPayload, localBuildSlots);
 
   return json({
     version,
@@ -1833,964 +1040,6 @@ async function handleBuildVerificationV2(url, env, compat = null) {
     summary: analysis.summary,
     actions: analysis.actions,
   });
-}
-
-async function enrichBuildVerificationWithEconomy({
-  analysis,
-  env,
-  region,
-  realm,
-  enabled,
-}) {
-  if (!enabled || !analysis || !Array.isArray(analysis.actions) || analysis.actions.length === 0) {
-    return analysis;
-  }
-
-  const actionItemIds = [
-    ...new Set(
-      analysis.actions
-        .map((action) => (Number.isInteger(action?.expected_id) ? action.expected_id : null))
-        .filter((itemId) => Number.isInteger(itemId)),
-    ),
-  ];
-  if (actionItemIds.length === 0) return analysis;
-
-  let economyPayload = null;
-  try {
-    const economyUrl = new URL('https://worker.local/v1/economy/price-summary');
-    economyUrl.searchParams.set('region', region);
-    if (typeof realm === 'string' && realm.trim().length > 0) {
-      economyUrl.searchParams.set('realm', realm.trim());
-    }
-    economyUrl.searchParams.set('item_ids', actionItemIds.join(','));
-
-    const economyResponse = await handleEconomyPriceSummaryV1(economyUrl, env);
-    const contentType = economyResponse.headers.get('Content-Type') || '';
-    if (!contentType.includes('application/json') || !economyResponse.ok) {
-      return analysis;
-    }
-    economyPayload = await economyResponse.clone().json();
-  } catch {
-    return analysis;
-  }
-
-  const economyResults = Array.isArray(economyPayload?.results)
-    ? economyPayload.results
-    : [];
-  const economyByItemId = new Map(
-    economyResults
-      .map((row) => {
-        const itemId = Number.isInteger(row?.item_id) ? row.item_id : null;
-        if (itemId == null) return null;
-        return [itemId, row];
-      })
-      .filter(Boolean),
-  );
-
-  let pricedActionsCount = 0;
-  let estimatedTotalCostCopper = 0;
-  const enrichedActions = analysis.actions.map((action) => {
-    const expectedId = Number.isInteger(action?.expected_id)
-      ? action.expected_id
-      : null;
-    if (expectedId == null) return action;
-
-    const economy = economyByItemId.get(expectedId);
-    const estimatedCostCopper = Number.isInteger(economy?.median_price)
-      ? economy.median_price
-      : null;
-    if (estimatedCostCopper == null || estimatedCostCopper <= 0) {
-      return action;
-    }
-
-    pricedActionsCount += 1;
-    estimatedTotalCostCopper += estimatedCostCopper;
-
-    return {
-      ...action,
-      estimated_cost_copper: estimatedCostCopper,
-      roi_score: computeActionRoiScore(action.priority_score, estimatedCostCopper),
-      price_market: typeof economy?.market === 'string' ? economy.market : null,
-    };
-  });
-
-  const nextSummary = {
-    ...analysis.summary,
-    priced_actions_count: pricedActionsCount,
-    actions_without_price_count: Math.max(0, analysis.actions.length - pricedActionsCount),
-  };
-  if (pricedActionsCount > 0) {
-    nextSummary.estimated_total_cost_copper = estimatedTotalCostCopper;
-  }
-
-  return {
-    ...analysis,
-    summary: nextSummary,
-    actions: enrichedActions,
-  };
-}
-
-function computeActionRoiScore(priorityScore, estimatedCostCopper) {
-  const safePriority = Number.isFinite(priorityScore) ? Number(priorityScore) : 0;
-  const safeCost = Number.isInteger(estimatedCostCopper) ? estimatedCostCopper : 0;
-  if (safePriority <= 0 || safeCost <= 0) return null;
-
-  const costGold = safeCost / 10000;
-  const denominator = Math.log10(costGold + 10);
-  const raw = (safePriority * 18) / denominator;
-  return Math.max(1, Math.min(100, Math.round(raw)));
-}
-
-async function fetchBlizzardMythicKeystoneProfile(region, realmSlug, name, token) {
-  const base = BLIZZARD_API_BASE[region];
-  const namespace = `profile-${region}`;
-  const locale = 'en_US';
-  const charName = encodeURIComponent(name.toLowerCase());
-  const headers = { Authorization: `Bearer ${token}` };
-  const url =
-    `${base}/profile/wow/character/${encodeURIComponent(realmSlug)}/${charName}` +
-    `/mythic-keystone-profile?namespace=${namespace}&locale=${locale}`;
-
-  const response = await fetch(url, { headers });
-  if (response.status === 404) return null;
-  if (!response.ok) {
-    const err = new Error(
-      `Blizzard mythic profile API error: ${response.status}`,
-    );
-    err.status = 502;
-    throw err;
-  }
-
-  return response.json();
-}
-
-function computeWeeklyPlanner(characterPayload, mythicProfile) {
-  const equipment = Array.isArray(characterPayload?.equipment)
-    ? characterPayload.equipment
-    : [];
-  const facts = computeCharacterFacts(equipment);
-  const mythic = extractMythicWeeklySummary(mythicProfile);
-
-  const checklist = [
-    buildWeeklyChecklistEntry({
-      id: 'enchants_completed',
-      label: 'Apply missing enchants',
-      current: facts.enchanted_items_count,
-      target: facts.equipped_items_count,
-      source: 'character',
-    }),
-    buildWeeklyChecklistEntry({
-      id: 'sockets_filled',
-      label: 'Fill empty sockets',
-      current: facts.sockets_filled_count,
-      target: facts.sockets_total_count,
-      source: 'character',
-    }),
-    buildWeeklyChecklistEntry({
-      id: 'mplus_one_run',
-      label: 'Complete at least 1 Mythic+ run',
-      current: mythic.weeklyRunsEstimated,
-      target: 1,
-      source: 'mythic_profile',
-    }),
-    buildWeeklyChecklistEntry({
-      id: 'mplus_four_runs',
-      label: 'Complete 4 Mythic+ runs',
-      current: mythic.weeklyRunsEstimated,
-      target: 4,
-      source: 'mythic_profile',
-    }),
-    buildWeeklyChecklistEntry({
-      id: 'mplus_eight_runs',
-      label: 'Complete 8 Mythic+ runs',
-      current: mythic.weeklyRunsEstimated,
-      target: 8,
-      source: 'mythic_profile',
-    }),
-  ];
-
-  const checksTotal = checklist.length;
-  const checksCompleted = checklist.filter((entry) => entry.done).length;
-  const completionPct = checksTotal > 0
-    ? Math.round((checksCompleted / checksTotal) * 100)
-    : 0;
-
-  const actions = checklist
-    .filter((entry) => !entry.done)
-    .map((entry) => ({
-      priority_score: getWeeklyChecklistPriority(entry.id),
-      type: entry.id,
-      label: entry.remaining > 0
-        ? `${entry.label} (${entry.remaining} remaining)`
-        : entry.label,
-      remaining: entry.remaining,
-      source: entry.source,
-    }))
-    .sort((a, b) => b.priority_score - a.priority_score);
-
-  return {
-    facts: {
-      equipped_items_count: facts.equipped_items_count,
-      enchanted_items_count: facts.enchanted_items_count,
-      sockets_total_count: facts.sockets_total_count,
-      sockets_filled_count: facts.sockets_filled_count,
-      sockets_empty_count: facts.sockets_empty_count,
-    },
-    mythic: {
-      rating: mythic.rating,
-      weekly_runs_estimated: mythic.weeklyRunsEstimated,
-      weekly_best_level: mythic.weeklyBestLevel,
-      season_best_level: mythic.seasonBestLevel,
-    },
-    affixes: {
-      current: mythic.affixes,
-      source: mythic.affixes.length > 0 ? 'blizzard_profile' : 'unavailable',
-    },
-    summary: {
-      analysis_mode: 'objective',
-      checks_total: checksTotal,
-      checks_completed: checksCompleted,
-      completion_pct: completionPct,
-      missing_enchants: Math.max(
-        0,
-        facts.equipped_items_count - facts.enchanted_items_count,
-      ),
-      missing_gems: facts.sockets_empty_count,
-      weekly_runs_estimated: mythic.weeklyRunsEstimated,
-      actions_count: actions.length,
-    },
-    checklist,
-    actions,
-  };
-}
-
-function buildWeeklyChecklistEntry({
-  id,
-  label,
-  current,
-  target,
-  source,
-}) {
-  const safeCurrent = Number.isFinite(current) ? Number(current) : 0;
-  const safeTarget = Number.isFinite(target) ? Math.max(0, Number(target)) : 0;
-  const done = safeCurrent >= safeTarget;
-  return {
-    id,
-    label,
-    current: safeCurrent,
-    target: safeTarget,
-    remaining: Math.max(0, safeTarget - safeCurrent),
-    done,
-    source,
-  };
-}
-
-function getWeeklyChecklistPriority(checkId) {
-  switch (checkId) {
-    case 'enchants_completed':
-      return 90;
-    case 'sockets_filled':
-      return 85;
-    case 'mplus_one_run':
-      return 80;
-    case 'mplus_four_runs':
-      return 70;
-    case 'mplus_eight_runs':
-      return 60;
-    default:
-      return 50;
-  }
-}
-
-function extractMythicWeeklySummary(profile) {
-  if (!profile || typeof profile !== 'object') {
-    return {
-      rating: null,
-      weeklyRunsEstimated: 0,
-      weeklyBestLevel: null,
-      seasonBestLevel: null,
-      affixes: [],
-    };
-  }
-
-  const weeklyRuns = pickMythicRuns(profile?.current_period?.best_runs);
-  const seasonRuns = pickMythicRuns(
-    profile?.season_best_runs || profile?.best_runs,
-  );
-
-  const weeklyLevels = weeklyRuns
-    .map((run) => extractMythicRunLevel(run))
-    .filter((level) => Number.isInteger(level));
-  const seasonLevels = seasonRuns
-    .map((run) => extractMythicRunLevel(run))
-    .filter((level) => Number.isInteger(level));
-
-  return {
-    rating: extractNumericStatValue(profile?.current_mythic_rating, [
-      'rating',
-      'value',
-    ]),
-    weeklyRunsEstimated: weeklyRuns.length,
-    weeklyBestLevel: weeklyLevels.length > 0 ? Math.max(...weeklyLevels) : null,
-    seasonBestLevel: seasonLevels.length > 0 ? Math.max(...seasonLevels) : null,
-    affixes: extractMythicAffixNames(profile, weeklyRuns),
-  };
-}
-
-function pickMythicRuns(rawRuns) {
-  if (!Array.isArray(rawRuns)) return [];
-  return rawRuns.filter((run) => run && typeof run === 'object');
-}
-
-function extractMythicRunLevel(run) {
-  if (!run || typeof run !== 'object') return null;
-
-  const candidates = [
-    run.keystone_level,
-    run.mythic_level,
-    run.completed_keystone_level,
-    run.level,
-    run?.challenge_mode?.level,
-  ];
-
-  for (const candidate of candidates) {
-    const normalized = normalizeMythicLevelValue(candidate);
-    if (normalized != null) return normalized;
-  }
-
-  return null;
-}
-
-function normalizeMythicLevelValue(value) {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return Math.trunc(value);
-  }
-  if (typeof value === 'string' && value.trim().length > 0) {
-    const parsed = Number.parseInt(value.trim(), 10);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  if (value && typeof value === 'object') {
-    const nested = [
-      value.level,
-      value.value,
-      value.keystone_level,
-      value.completed_keystone_level,
-    ];
-    for (const candidate of nested) {
-      const normalized = normalizeMythicLevelValue(candidate);
-      if (normalized != null) return normalized;
-    }
-  }
-  return null;
-}
-
-function extractMythicAffixNames(profile, weeklyRuns) {
-  const names = [];
-
-  const appendAffixName = (entry) => {
-    const name = extractCatalogName(
-      entry?.name || entry?.keystone_affix?.name || entry?.affix?.name,
-      'en_US',
-    );
-    if (name) names.push(name);
-  };
-
-  const currentPeriodAffixes = Array.isArray(profile?.current_period?.affixes)
-    ? profile.current_period.affixes
-    : [];
-  for (const affix of currentPeriodAffixes) {
-    appendAffixName(affix);
-  }
-
-  for (const run of weeklyRuns) {
-    const runAffixes = Array.isArray(run?.keystone_affixes)
-      ? run.keystone_affixes
-      : (Array.isArray(run?.affixes) ? run.affixes : []);
-    for (const affix of runAffixes) {
-      appendAffixName(affix);
-    }
-  }
-
-  return [...new Set(names)];
-}
-
-// ─── Blizzard: token OAuth2 (client_credentials) ─────────────────────────────
-//
-// El token dura 24h. Lo cacheamos en KV 23h para renovar con margen.
-// La clave de KV es `btoken:{region}` (tokens son region-independientes para
-// client_credentials, pero usamos clave por región por si cambia en el futuro).
-
-async function getBlizzardToken(region, env) {
-  const tokenKey = buildTokenKey(region);
-
-  // Intentar desde KV
-  const cached = await env.RECS_CACHE.get(tokenKey, 'json');
-  if (cached && cached.expires_at > Date.now()) {
-    return cached.access_token;
-  }
-
-  // Solicitar nuevo token
-  const credentials = btoa(`${env.BLIZZARD_CLIENT_ID}:${env.BLIZZARD_CLIENT_SECRET}`);
-  const response = await fetch(BLIZZARD_OAUTH_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${credentials}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: 'grant_type=client_credentials',
-  });
-
-  if (!response.ok) {
-    const err = new Error(`Blizzard OAuth failed: ${response.status}`);
-    err.status = 502;
-    throw err;
-  }
-
-  const tokenData = await response.json();
-
-  // Cachear 23h (el token dura 24h)
-  const ttl23h = getCacheTtlSeconds(env, 'oauthToken');
-  await env.RECS_CACHE.put(tokenKey, JSON.stringify({
-    access_token: tokenData.access_token,
-    expires_at:   Date.now() + ttl23h * 1000,
-  }), { expirationTtl: ttl23h });
-
-  return tokenData.access_token;
-}
-
-function stripDiacritics(str) {
-  return String(str || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-}
-
-function normalizeRealmLookupValue(value) {
-  return stripDiacritics(String(value || '').toLowerCase())
-    .replace(/[’']/g, '')
-    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
-    .replace(/[-_]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function slugifyRealmValue(value) {
-  return String(value || '')
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
-function buildRealmSlugCandidates(input) {
-  const raw = String(input || '').trim().toLowerCase();
-  if (!raw) return [];
-
-  const collapsedWhitespace = raw.replace(/\s+/g, ' ');
-  const withoutApostrophes = collapsedWhitespace.replace(/[’']/g, '');
-  const withoutDiacritics = stripDiacritics(withoutApostrophes);
-  const asciiOnly = withoutDiacritics.replace(/[^a-z0-9\s-]/g, ' ');
-
-  const candidates = [
-    slugifyRealmValue(raw),
-    slugifyRealmValue(collapsedWhitespace),
-    slugifyRealmValue(withoutApostrophes),
-    slugifyRealmValue(withoutDiacritics),
-    slugifyRealmValue(asciiOnly),
-  ].filter(Boolean);
-
-  return [...new Set(candidates)];
-}
-
-function isSafeRealmSlug(slug) {
-  return /^[a-z0-9-]+$/.test(slug);
-}
-
-async function resolveRealmSlug(region, realmInput, token, env) {
-  const normalizedRealm = normalizeRealmLookupValue(realmInput);
-  if (!normalizedRealm) {
-    const err = new Error('Character not found. Check region, realm and name.');
-    err.status = 404;
-    throw err;
-  }
-
-  const cacheKey = buildRealmSlugKey(region, normalizedRealm);
-  try {
-    const cached = await env.RECS_CACHE.get(cacheKey);
-    if (cached && isSafeRealmSlug(cached)) return cached;
-  } catch (_) {
-    // Ignore cache failures; realm resolution should still continue.
-  }
-
-  const candidates = buildRealmSlugCandidates(realmInput);
-  for (const candidate of candidates) {
-    const resolved = await tryFetchRealmBySlug(region, candidate, token, env);
-    if (!resolved) continue;
-
-    try {
-      const ttl = getCacheTtlSeconds(env, 'realmSlug');
-      await env.RECS_CACHE.put(cacheKey, resolved, { expirationTtl: ttl });
-    } catch (_) {
-      // Ignore cache failures.
-    }
-    return resolved;
-  }
-
-  const fromSearch = await searchRealmByName(region, realmInput, token);
-  if (fromSearch) {
-    try {
-      const ttl = getCacheTtlSeconds(env, 'realmSlug');
-      await env.RECS_CACHE.put(cacheKey, fromSearch, { expirationTtl: ttl });
-    } catch (_) {
-      // Ignore cache failures.
-    }
-    return fromSearch;
-  }
-
-  const fallbackCandidate = candidates.find(isSafeRealmSlug);
-  if (fallbackCandidate) return fallbackCandidate;
-
-  const err = new Error('Character not found. Check region, realm and name.');
-  err.status = 404;
-  throw err;
-}
-
-async function tryFetchRealmBySlug(region, slug, token, env = null) {
-  if (!slug || !isSafeRealmSlug(slug)) return null;
-
-  const base = BLIZZARD_API_BASE[region];
-  const namespace = `dynamic-${region}`;
-  const locale = 'en_US';
-  const headers = { 'Authorization': `Bearer ${token}` };
-
-  const url =
-    `${base}/data/wow/realm/${encodeURIComponent(slug)}` +
-    `?namespace=${namespace}&locale=${locale}`;
-
-  try {
-    const response = await fetch(url, { headers });
-    if (!response.ok) return null;
-    const data = await response.json();
-    const resolved = String(data?.slug || slug).toLowerCase().trim();
-    const safeResolved = isSafeRealmSlug(resolved) ? resolved : slug;
-    const connectedRealmId = extractConnectedRealmId(data);
-    if (
-      env?.RECS_CACHE &&
-      Number.isInteger(connectedRealmId) &&
-      connectedRealmId > 0
-    ) {
-      try {
-        const ttl = getCacheTtlSeconds(env, 'realmSlug');
-        await env.RECS_CACHE.put(
-          buildConnectedRealmBySlugKey(region, safeResolved),
-          String(connectedRealmId),
-          { expirationTtl: ttl },
-        );
-      } catch (_) {
-        // Ignorar error de cache.
-      }
-    }
-    return safeResolved;
-  } catch (_) {
-    return null;
-  }
-}
-
-async function searchRealmByName(region, realmInput, token) {
-  const base = BLIZZARD_API_BASE[region];
-  const namespace = `dynamic-${region}`;
-  const rawInput = String(realmInput || '').trim();
-  const normalizedLookup = normalizeRealmLookupValue(rawInput);
-  if (!rawInput || !normalizedLookup) return null;
-
-  const locales = REALM_SEARCH_LOCALES[region] || ['en_US'];
-  const headers = { 'Authorization': `Bearer ${token}` };
-  let fallbackSlug = null;
-
-  for (const locale of locales) {
-    const searchFields = [`name.${locale}`, 'name.en_US'];
-    for (const searchField of [...new Set(searchFields)]) {
-      const searchParams = new URLSearchParams({
-        namespace,
-        locale,
-        _pageSize: '50',
-      });
-      searchParams.set(searchField, rawInput);
-
-      const url = `${base}/data/wow/search/realm?${searchParams.toString()}`;
-      let response;
-      try {
-        response = await fetch(url, { headers });
-      } catch (_) {
-        continue;
-      }
-
-      if (!response.ok) continue;
-
-      const payload = await response.json();
-      const entries = extractRealmSearchEntries(payload);
-
-      for (const entry of entries) {
-        const slug = getRealmSlugFromEntry(entry);
-        if (!slug) continue;
-
-        if (fallbackSlug === null) fallbackSlug = slug;
-
-        const names = getRealmNamesFromEntry(entry);
-        const isExact = names
-          .map(normalizeRealmLookupValue)
-          .some(name => name === normalizedLookup);
-
-        if (isExact) return slug;
-      }
-    }
-  }
-
-  return fallbackSlug;
-}
-
-function extractRealmSearchEntries(payload) {
-  const results = Array.isArray(payload?.results) ? payload.results : [];
-  return results
-    .map(entry => entry?.data || entry)
-    .filter(Boolean);
-}
-
-function getRealmSlugFromEntry(entry) {
-  const candidates = [
-    entry?.slug,
-    entry?.realm?.slug,
-    entry?.key?.slug,
-  ];
-
-  for (const candidate of candidates) {
-    if (typeof candidate !== 'string') continue;
-    const normalized = candidate.trim().toLowerCase();
-    if (isSafeRealmSlug(normalized)) return normalized;
-  }
-
-  return null;
-}
-
-function getRealmNamesFromEntry(entry) {
-  const names = [];
-
-  const collect = (value) => {
-    if (typeof value === 'string' && value.trim().length > 0) {
-      names.push(value.trim());
-      return;
-    }
-    if (value && typeof value === 'object') {
-      for (const nested of Object.values(value)) {
-        if (typeof nested === 'string' && nested.trim().length > 0) {
-          names.push(nested.trim());
-        }
-      }
-    }
-  };
-
-  collect(entry?.name);
-  collect(entry?.realm?.name);
-  collect(entry?.display_string);
-
-  return [...new Set(names)];
-}
-
-function extractNumericStatValue(source, preferredKeys = []) {
-  if (typeof source === 'number' && Number.isFinite(source)) {
-    return source;
-  }
-  if (!source || typeof source !== 'object') {
-    return null;
-  }
-
-  const fallbackKeys = ['effective', 'value', 'max', 'base', 'current'];
-  const keys = [...preferredKeys, ...fallbackKeys];
-
-  for (const key of keys) {
-    const value = source[key];
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      return value;
-    }
-  }
-
-  return null;
-}
-
-function extractPowerTypeValue(source) {
-  if (typeof source === 'string') {
-    const normalized = source.trim().toUpperCase().replace(/\s+/g, '_');
-    if (/^[A-Z_]+$/.test(normalized)) {
-      return normalized;
-    }
-    return null;
-  }
-
-  if (!source || typeof source !== 'object') {
-    return null;
-  }
-
-  const keys = ['type', 'power_type', 'name', 'id'];
-  for (const key of keys) {
-    const nested = extractPowerTypeValue(source[key]);
-    if (nested) return nested;
-  }
-
-  return null;
-}
-
-// ─── Blizzard: fetch character data en paralelo ───────────────────────────────
-
-async function fetchBlizzardCharacter(
-  region,
-  realmSlug,
-  name,
-  token,
-  env,
-  locale = 'en_US',
-) {
-  const base      = BLIZZARD_API_BASE[region];
-  const namespace = `profile-${region}`;
-  const normalizedLocale = String(locale || 'en_US').trim() || 'en_US';
-
-  // Character name: lowercase + URL-encode (maneja caracteres especiales: Ä, ñ, etc.)
-  const charName   = encodeURIComponent(name.toLowerCase());
-
-  const charPath = `/profile/wow/character/${encodeURIComponent(realmSlug)}/${charName}`;
-  const qs       = `namespace=${namespace}&locale=${normalizedLocale}`;
-  const headers  = { 'Authorization': `Bearer ${token}` };
-
-  // 4 llamadas en paralelo → minimiza latencia
-  const mediaPromise = fetchCharacterMedia(base, charPath, qs, headers);
-  const [profileRes, equipRes, statsRes, media] = await Promise.all([
-    fetch(`${base}${charPath}?${qs}`,                          { headers }),
-    fetch(`${base}${charPath}/equipment?${qs}`,                { headers }),
-    fetch(`${base}${charPath}/statistics?${qs}`,               { headers }),
-    mediaPromise,
-  ]);
-
-  // Profile es el endpoint crítico; si falla → error al cliente
-  if (!profileRes.ok) {
-    const err = new Error(
-      profileRes.status === 404
-        ? 'Character not found. Check region, realm and name.'
-        : `Blizzard profile API error: ${profileRes.status}`
-    );
-    err.status = profileRes.status === 404 ? 404 : 502;
-    throw err;
-  }
-
-  // Parsear respuestas (los demás endpoints son opcionales — si fallan, usamos null)
-  const [profile, equip, stats] = await Promise.all([
-    profileRes.json(),
-    equipRes.ok  ? equipRes.json()  : null,
-    statsRes.ok  ? statsRes.json()  : null,
-  ]);
-
-  const iconUrlsByItemId = await resolveItemIcons(region, equip, token, env);
-  return normalizeCharacter(profile, equip, stats, media, region, iconUrlsByItemId);
-}
-
-async function fetchCharacterMedia(base, charPath, qs, headers) {
-  const mediaEndpoints = [
-    `${base}${charPath}/character-media?${qs}`,
-    `${base}${charPath}/character-media/summary?${qs}`,
-  ];
-
-  for (const endpoint of mediaEndpoints) {
-    try {
-      const response = await fetch(endpoint, { headers });
-      if (!response.ok) continue;
-      return await response.json();
-    } catch (_) {
-      // Intentar siguiente endpoint.
-    }
-  }
-
-  return null;
-}
-
-// ─── Normalización del personaje ─────────────────────────────────────────────
-
-function normalizeCharacter(profile, equip, stats, media, region, iconUrlsByItemId = {}) {
-
-  // ── Avatar / render ──────────────────────────────────────────────────────
-  const mediaUrls = extractCharacterMediaUrls(media);
-  const avatarUrl = mediaUrls.renderUrl;
-  const thumbnailUrl = mediaUrls.thumbnailUrl;
-
-  // ── Equipo ───────────────────────────────────────────────────────────────
-  const equipment = [];
-  if (equip?.equipped_items) {
-    for (const item of equip.equipped_items) {
-
-      // Encantamientos: sólo tipo PERMANENT (excluye BONUS_SOCKETS, TEMPORARY, etc.)
-      // display_string: "Enchanted: Chant of Burrowing Rapidity" → extraemos el nombre
-      const enchantments = [];
-      const enchantmentIds = [];
-      for (const enchant of item.enchantments || []) {
-        if (enchant?.enchantment_slot?.type !== 'PERMANENT') continue;
-
-        const enchantId = enchant?.source_item?.id;
-        if (Number.isInteger(enchantId)) {
-          enchantmentIds.push(enchantId);
-        }
-
-        const sourceName = enchant?.source_item?.name || '';
-        const parsedName = sourceName.includes(' - ')
-          ? sourceName.split(' - ').slice(1).join(' - ').trim()
-          : (enchant?.display_string || '').replace(/^Enchanted:\s*/i, '').trim();
-        if (parsedName.length > 0) {
-          enchantments.push(parsedName);
-        }
-      }
-
-      const sockets = Array.isArray(item.sockets) ? item.sockets : [];
-      const gems = [];
-      const gemIds = [];
-      for (const socket of sockets) {
-        const gemName = socket?.item?.name || '';
-        if (typeof gemName === 'string' && gemName.trim().length > 0) {
-          gems.push(gemName.trim());
-        }
-        const gemId = socket?.item?.id;
-        if (Number.isInteger(gemId)) {
-          gemIds.push(gemId);
-        }
-      }
-      const socketsTotal = sockets.length;
-      const socketsFilled = gemIds.length;
-
-      const itemId = item.item?.id ?? null;
-
-      equipment.push({
-        slot:         item.slot?.type  || 'UNKNOWN',
-        name:         item.name        || 'Unknown',
-        item_level:   item.level?.value ?? 0,
-        quality:      item.quality?.type || 'COMMON',
-        item_id:      itemId,
-        icon_url:     itemId != null ? (iconUrlsByItemId[itemId] ?? null) : null,
-        enchantments: enchantments,
-        enchantment_ids: enchantmentIds,
-        gems:         gems,
-        gem_ids:      gemIds,
-        sockets_total: socketsTotal,
-        sockets_filled: socketsFilled,
-        // Blizzard equipment summary no devuelve bonus_ids directamente
-        bonus_ids:    [],
-      });
-    }
-  }
-
-  // ── Estadísticas ─────────────────────────────────────────────────────────
-  let normalizedStats = null;
-  if (stats) {
-    // Crítico: melee y spell tienen el mismo rating para la mayoría de specs;
-    // usamos melee si existe, spell como fallback
-    const critValue =
-      extractNumericStatValue(stats.melee_crit, ['value']) ??
-      extractNumericStatValue(stats.spell_crit, ['value']);
-    const hasteValue =
-      extractNumericStatValue(stats.melee_haste, ['value']) ??
-      extractNumericStatValue(stats.spell_haste, ['value']);
-    const powerType =
-      extractPowerTypeValue(stats.power) ??
-      extractPowerTypeValue(stats.power_type) ??
-      'MANA';
-
-    normalizedStats = {
-      health:          extractNumericStatValue(stats.health, ['effective', 'max', 'value']),
-      mana:            extractNumericStatValue(stats.power, ['effective', 'value', 'max']),
-      power_type:      powerType,
-      strength:        extractNumericStatValue(stats.strength, ['effective', 'value', 'base']),
-      agility:         extractNumericStatValue(stats.agility, ['effective', 'value', 'base']),
-      intellect:       extractNumericStatValue(stats.intellect, ['effective', 'value', 'base']),
-      stamina:         extractNumericStatValue(stats.stamina, ['effective', 'value', 'base']),
-      critical_strike: critValue,
-      haste:           hasteValue,
-      mastery:         extractNumericStatValue(stats.mastery, ['value']),
-      // versatility_damage_done_bonus ya viene como porcentaje (e.g. 12.0)
-      versatility:
-        extractNumericStatValue(stats.versatility_damage_done_bonus, ['value']) ??
-        extractNumericStatValue(stats.versatility, ['damage_done_bonus', 'value']),
-    };
-  }
-
-  return {
-    name:              profile.name,
-    realm:             profile.realm?.name           || '',
-    region:            region.toUpperCase(),
-    level:             profile.level                 ?? 80,
-    race:              profile.race?.name            || 'Unknown',
-    class:             profile.character_class?.name || 'Unknown',
-    spec:              profile.active_spec?.name     ?? null,
-    guild:             profile.guild?.name           ?? null,
-    achievement_points: profile.achievement_points   ?? null,
-    average_item_level: profile.average_item_level   ?? null,
-    equipped_item_level: profile.equipped_item_level ?? null,
-    avatar_url:        avatarUrl,
-    thumbnail_url:     thumbnailUrl,
-    equipment:         equipment,
-    stats:             normalizedStats,
-  };
-}
-
-function extractCharacterMediaUrls(media) {
-  const renderUrl = findMediaAssetUrl(media, ['main-raw', 'main']);
-  const thumbnailUrl = findMediaAssetUrl(media, ['avatar', 'inset']) || renderUrl;
-
-  return { renderUrl, thumbnailUrl };
-}
-
-function findMediaAssetUrl(media, preferredKeys = []) {
-  const assets = Array.isArray(media?.assets) ? media.assets : [];
-  if (assets.length === 0) return null;
-
-  for (const key of preferredKeys) {
-    const matchedAsset = assets.find(asset => asset?.key === key);
-    const matchedUrl = extractMediaAssetUrl(matchedAsset);
-    if (matchedUrl) return matchedUrl;
-  }
-
-  for (const asset of assets) {
-    const assetUrl = extractMediaAssetUrl(asset);
-    if (assetUrl) return assetUrl;
-  }
-
-  return null;
-}
-
-function extractMediaAssetUrl(asset) {
-  if (!asset) return null;
-
-  const value = asset.value;
-  if (typeof value === 'string' && value.trim().length > 0) {
-    return value.trim();
-  }
-
-  if (value && typeof value === 'object') {
-    const href = value.href;
-    if (typeof href === 'string' && href.trim().length > 0) {
-      return href.trim();
-    }
-  }
-
-  return null;
-}
-
-async function resolveItemIcons(region, equip, token, env) {
-  const equippedItems = equip?.equipped_items;
-  if (!Array.isArray(equippedItems) || equippedItems.length === 0) {
-    return {};
-  }
-
-  const itemIds = [...new Set(
-    equippedItems
-      .map(item => item?.item?.id)
-      .filter(itemId => Number.isInteger(itemId))
-  )];
-
-  return resolveItemIconsByIds(region, itemIds, token, env);
 }
 
 async function resolveItemIconsByIds(region, itemIds, token, env) {
@@ -3351,22 +1600,6 @@ function getCharacterGemsForSlot(slotKey, equipBySlot) {
   return result;
 }
 
-// ─── /invalidate ─────────────────────────────────────────────────────────────
-
-async function handleInvalidate(request, env) {
-  return json({
-    error: 'Deprecated endpoint. Recommendation cache invalidation is no longer supported.',
-  }, 410);
-}
-
-// ─── /specs ───────────────────────────────────────────────────────────────────
-
-async function handleSpecs(url, env) {
-  return json({
-    error: 'Deprecated endpoint. Recommendation catalog has been removed.',
-  }, 410);
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function parseFeatureFlag(rawValue, defaultValue = false) {
@@ -3380,18 +1613,14 @@ function parseFeatureFlag(rawValue, defaultValue = false) {
 
 function resolveWorkerCapabilities(env) {
   const buildIntelligence = parseFeatureFlag(env.FEATURE_BUILD_INTELLIGENCE, true);
-  const economyAssistant = parseFeatureFlag(env.FEATURE_ECONOMY_ASSISTANT, false);
   return {
     build_intelligence: buildIntelligence,
-    weekly_planner: parseFeatureFlag(env.FEATURE_WEEKLY_PLANNER, false),
-    economy_assistant: economyAssistant,
     build_verification_v2: buildIntelligence,
     catalog_search_v2: true,
-    economy_price_summary_v1: economyAssistant,
   };
 }
 
-function featureFlagDisabled(endpoint, featureName, version = 'v1') {
+function featureFlagDisabled(endpoint, featureName, version = 'v2') {
   return json({
     version,
     endpoint,
@@ -3402,14 +1631,6 @@ function featureFlagDisabled(endpoint, featureName, version = 'v1') {
 function parsePositiveInt(value, fallback) {
   const parsed = parseInt(String(value ?? ''), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function parseOptionalPositiveInt(value) {
-  if (value == null) return null;
-  const trimmed = String(value).trim();
-  if (!trimmed) return null;
-  const parsed = Number.parseInt(trimmed, 10);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 function getCacheTtlSeconds(env, cacheType) {
@@ -3447,44 +1668,8 @@ function buildRealmSlugKey(region, normalizedRealm) {
   return `realm_slug:${region}:${normalizedRealm}`;
 }
 
-function buildConnectedRealmLookupKey(region, normalizedRealm) {
-  return `connected_realm:${region}:${normalizedRealm}`;
-}
-
-function buildConnectedRealmBySlugKey(region, realmSlug) {
-  return `connected_realm_slug:${region}:${realmSlug}`;
-}
-
 function buildItemIconKey(region, itemId) {
   return `itemicon:${region}:${itemId}`;
-}
-
-function buildWeeklyPlannerCacheKey(region, realm, name) {
-  const normalizedRegion = String(region || '').toLowerCase().trim();
-  const normalizedRealm = normalizeRealmLookupValue(realm).replace(/\s+/g, '-');
-  const normalizedName = String(name || '').toLowerCase().trim();
-  return `planner:v1:${normalizedRegion}:${normalizedRealm}:${normalizedName}`;
-}
-
-function buildEconomyPriceSummaryCacheKey(region, itemIds, connectedRealmId) {
-  const normalizedRegion = String(region || '').toLowerCase().trim();
-  const normalizedIds = [...itemIds]
-    .filter((value) => Number.isInteger(value) && value > 0)
-    .sort((a, b) => a - b)
-    .join(',');
-  const marketScope = connectedRealmId == null
-    ? 'commodities'
-    : `connected-realm-${connectedRealmId}`;
-  return `economy:v1:${normalizedRegion}:${marketScope}:${normalizedIds}`;
-}
-
-function notImplementedV1(endpoint) {
-  return json({
-    version: 'v1',
-    endpoint,
-    status: 'not_implemented',
-    message: 'Endpoint reserved for upcoming phase.',
-  }, 501);
 }
 
 function json(data, status = 200) {
@@ -3560,3 +1745,543 @@ function logWorkerError({ requestId, endpoint, method, error }) {
 }
 
 
+
+
+async function getBlizzardToken(region, env) {
+  const tokenKey = buildTokenKey(region);
+
+  // Intentar desde KV
+  const cached = await env.RECS_CACHE.get(tokenKey, 'json');
+  if (cached && cached.expires_at > Date.now()) {
+    return cached.access_token;
+  }
+
+  // Solicitar nuevo token
+  const credentials = btoa(`${env.BLIZZARD_CLIENT_ID}:${env.BLIZZARD_CLIENT_SECRET}`);
+  const response = await fetch(BLIZZARD_OAUTH_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${credentials}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'grant_type=client_credentials',
+  });
+
+  if (!response.ok) {
+    const err = new Error(`Blizzard OAuth failed: ${response.status}`);
+    err.status = 502;
+    throw err;
+  }
+
+  const tokenData = await response.json();
+
+  // Cachear 23h (el token dura 24h)
+  const ttl23h = getCacheTtlSeconds(env, 'oauthToken');
+  await env.RECS_CACHE.put(tokenKey, JSON.stringify({
+    access_token: tokenData.access_token,
+    expires_at:   Date.now() + ttl23h * 1000,
+  }), { expirationTtl: ttl23h });
+
+  return tokenData.access_token;
+}
+
+function normalizeRealmLookupValue(value) {
+  return stripDiacritics(String(value || '').toLowerCase())
+    .replace(/[’']/g, '')
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function slugifyRealmValue(value) {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function buildRealmSlugCandidates(input) {
+  const raw = String(input || '').trim().toLowerCase();
+  if (!raw) return [];
+
+  const collapsedWhitespace = raw.replace(/\s+/g, ' ');
+  const withoutApostrophes = collapsedWhitespace.replace(/[’']/g, '');
+  const withoutDiacritics = stripDiacritics(withoutApostrophes);
+  const asciiOnly = withoutDiacritics.replace(/[^a-z0-9\s-]/g, ' ');
+
+  const candidates = [
+    slugifyRealmValue(raw),
+    slugifyRealmValue(collapsedWhitespace),
+    slugifyRealmValue(withoutApostrophes),
+    slugifyRealmValue(withoutDiacritics),
+    slugifyRealmValue(asciiOnly),
+  ].filter(Boolean);
+
+  return [...new Set(candidates)];
+}
+
+function isSafeRealmSlug(slug) {
+  return /^[a-z0-9-]+$/.test(slug);
+}
+
+async function resolveRealmSlug(region, realmInput, token, env) {
+  const normalizedRealm = normalizeRealmLookupValue(realmInput);
+  if (!normalizedRealm) {
+    const err = new Error('Character not found. Check region, realm and name.');
+    err.status = 404;
+    throw err;
+  }
+
+  const cacheKey = buildRealmSlugKey(region, normalizedRealm);
+  try {
+    const cached = await env.RECS_CACHE.get(cacheKey);
+    if (cached && isSafeRealmSlug(cached)) return cached;
+  } catch (_) {
+    // Ignore cache failures; realm resolution should still continue.
+  }
+
+  const candidates = buildRealmSlugCandidates(realmInput);
+  for (const candidate of candidates) {
+    const resolved = await tryFetchRealmBySlug(region, candidate, token, env);
+    if (!resolved) continue;
+
+    try {
+      const ttl = getCacheTtlSeconds(env, 'realmSlug');
+      await env.RECS_CACHE.put(cacheKey, resolved, { expirationTtl: ttl });
+    } catch (_) {
+      // Ignore cache failures.
+    }
+    return resolved;
+  }
+
+  const fromSearch = await searchRealmByName(region, realmInput, token);
+  if (fromSearch) {
+    try {
+      const ttl = getCacheTtlSeconds(env, 'realmSlug');
+      await env.RECS_CACHE.put(cacheKey, fromSearch, { expirationTtl: ttl });
+    } catch (_) {
+      // Ignore cache failures.
+    }
+    return fromSearch;
+  }
+
+  const fallbackCandidate = candidates.find(isSafeRealmSlug);
+  if (fallbackCandidate) return fallbackCandidate;
+
+  const err = new Error('Character not found. Check region, realm and name.');
+  err.status = 404;
+  throw err;
+}
+
+async function tryFetchRealmBySlug(region, slug, token, env = null) {
+  if (!slug || !isSafeRealmSlug(slug)) return null;
+
+  const base = BLIZZARD_API_BASE[region];
+  const namespace = `dynamic-${region}`;
+  const locale = 'en_US';
+  const headers = { 'Authorization': `Bearer ${token}` };
+
+  const url =
+    `${base}/data/wow/realm/${encodeURIComponent(slug)}` +
+    `?namespace=${namespace}&locale=${locale}`;
+
+  try {
+    const response = await fetch(url, { headers });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const resolved = String(data?.slug || slug).toLowerCase().trim();
+    return isSafeRealmSlug(resolved) ? resolved : slug;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function searchRealmByName(region, realmInput, token) {
+  const base = BLIZZARD_API_BASE[region];
+  const namespace = `dynamic-${region}`;
+  const rawInput = String(realmInput || '').trim();
+  const normalizedLookup = normalizeRealmLookupValue(rawInput);
+  if (!rawInput || !normalizedLookup) return null;
+
+  const locales = REALM_SEARCH_LOCALES[region] || ['en_US'];
+  const headers = { 'Authorization': `Bearer ${token}` };
+  let fallbackSlug = null;
+
+  for (const locale of locales) {
+    const searchFields = [`name.${locale}`, 'name.en_US'];
+    for (const searchField of [...new Set(searchFields)]) {
+      const searchParams = new URLSearchParams({
+        namespace,
+        locale,
+        _pageSize: '50',
+      });
+      searchParams.set(searchField, rawInput);
+
+      const url = `${base}/data/wow/search/realm?${searchParams.toString()}`;
+      let response;
+      try {
+        response = await fetch(url, { headers });
+      } catch (_) {
+        continue;
+      }
+
+      if (!response.ok) continue;
+
+      const payload = await response.json();
+      const entries = extractRealmSearchEntries(payload);
+
+      for (const entry of entries) {
+        const slug = getRealmSlugFromEntry(entry);
+        if (!slug) continue;
+
+        if (fallbackSlug === null) fallbackSlug = slug;
+
+        const names = getRealmNamesFromEntry(entry);
+        const isExact = names
+          .map(normalizeRealmLookupValue)
+          .some(name => name === normalizedLookup);
+
+        if (isExact) return slug;
+      }
+    }
+  }
+
+  return fallbackSlug;
+}
+
+function extractRealmSearchEntries(payload) {
+  const results = Array.isArray(payload?.results) ? payload.results : [];
+  return results
+    .map(entry => entry?.data || entry)
+    .filter(Boolean);
+}
+
+function getRealmSlugFromEntry(entry) {
+  const candidates = [
+    entry?.slug,
+    entry?.realm?.slug,
+    entry?.key?.slug,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const normalized = candidate.trim().toLowerCase();
+    if (isSafeRealmSlug(normalized)) return normalized;
+  }
+
+  return null;
+}
+
+function getRealmNamesFromEntry(entry) {
+  const names = [];
+
+  const collect = (value) => {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      names.push(value.trim());
+      return;
+    }
+    if (value && typeof value === 'object') {
+      for (const nested of Object.values(value)) {
+        if (typeof nested === 'string' && nested.trim().length > 0) {
+          names.push(nested.trim());
+        }
+      }
+    }
+  };
+
+  collect(entry?.name);
+  collect(entry?.realm?.name);
+  collect(entry?.display_string);
+
+  return [...new Set(names)];
+}
+
+function extractNumericStatValue(source, preferredKeys = []) {
+  if (typeof source === 'number' && Number.isFinite(source)) {
+    return source;
+  }
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+
+  const fallbackKeys = ['effective', 'value', 'max', 'base', 'current'];
+  const keys = [...preferredKeys, ...fallbackKeys];
+
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function extractPowerTypeValue(source) {
+  if (typeof source === 'string') {
+    const normalized = source.trim().toUpperCase().replace(/\s+/g, '_');
+    if (/^[A-Z_]+$/.test(normalized)) {
+      return normalized;
+    }
+    return null;
+  }
+
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+
+  const keys = ['type', 'power_type', 'name', 'id'];
+  for (const key of keys) {
+    const nested = extractPowerTypeValue(source[key]);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
+// ─── Blizzard: fetch character data en paralelo ───────────────────────────────
+
+async function fetchBlizzardCharacter(
+  region,
+  realmSlug,
+  name,
+  token,
+  env,
+  locale = 'en_US',
+) {
+  const base      = BLIZZARD_API_BASE[region];
+  const namespace = `profile-${region}`;
+  const normalizedLocale = String(locale || 'en_US').trim() || 'en_US';
+
+  // Character name: lowercase + URL-encode (maneja caracteres especiales: Ä, ñ, etc.)
+  const charName   = encodeURIComponent(name.toLowerCase());
+
+  const charPath = `/profile/wow/character/${encodeURIComponent(realmSlug)}/${charName}`;
+  const qs       = `namespace=${namespace}&locale=${normalizedLocale}`;
+  const headers  = { 'Authorization': `Bearer ${token}` };
+
+  // 4 llamadas en paralelo → minimiza latencia
+  const mediaPromise = fetchCharacterMedia(base, charPath, qs, headers);
+  const [profileRes, equipRes, statsRes, media] = await Promise.all([
+    fetch(`${base}${charPath}?${qs}`,                          { headers }),
+    fetch(`${base}${charPath}/equipment?${qs}`,                { headers }),
+    fetch(`${base}${charPath}/statistics?${qs}`,               { headers }),
+    mediaPromise,
+  ]);
+
+  // Profile es el endpoint crítico; si falla → error al cliente
+  if (!profileRes.ok) {
+    const err = new Error(
+      profileRes.status === 404
+        ? 'Character not found. Check region, realm and name.'
+        : `Blizzard profile API error: ${profileRes.status}`
+    );
+    err.status = profileRes.status === 404 ? 404 : 502;
+    throw err;
+  }
+
+  // Parsear respuestas (los demás endpoints son opcionales — si fallan, usamos null)
+  const [profile, equip, stats] = await Promise.all([
+    profileRes.json(),
+    equipRes.ok  ? equipRes.json()  : null,
+    statsRes.ok  ? statsRes.json()  : null,
+  ]);
+
+  const itemIds = Array.isArray(equip?.equipped_items)
+    ? equip.equipped_items
+      .map((entry) => parsePositiveInt(entry?.item?.id, 0))
+      .filter((id) => Number.isInteger(id) && id > 0)
+    : [];
+  const iconUrlsByItemId = await resolveItemIconsByIds(region, itemIds, token, env);
+  return normalizeCharacter(profile, equip, stats, media, region, iconUrlsByItemId);
+}
+
+async function fetchCharacterMedia(base, charPath, qs, headers) {
+  const mediaEndpoints = [
+    `${base}${charPath}/character-media?${qs}`,
+    `${base}${charPath}/character-media/summary?${qs}`,
+  ];
+
+  for (const endpoint of mediaEndpoints) {
+    try {
+      const response = await fetch(endpoint, { headers });
+      if (!response.ok) continue;
+      return await response.json();
+    } catch (_) {
+      // Intentar siguiente endpoint.
+    }
+  }
+
+  return null;
+}
+
+// ─── Normalización del personaje ─────────────────────────────────────────────
+
+function normalizeCharacter(profile, equip, stats, media, region, iconUrlsByItemId = {}) {
+
+  // ── Avatar / render ──────────────────────────────────────────────────────
+  const mediaUrls = extractCharacterMediaUrls(media);
+  const avatarUrl = mediaUrls.renderUrl;
+  const thumbnailUrl = mediaUrls.thumbnailUrl;
+
+  // ── Equipo ───────────────────────────────────────────────────────────────
+  const equipment = [];
+  if (equip?.equipped_items) {
+    for (const item of equip.equipped_items) {
+
+      // Encantamientos: sólo tipo PERMANENT (excluye BONUS_SOCKETS, TEMPORARY, etc.)
+      // display_string: "Enchanted: Chant of Burrowing Rapidity" → extraemos el nombre
+      const enchantments = [];
+      const enchantmentIds = [];
+      for (const enchant of item.enchantments || []) {
+        if (enchant?.enchantment_slot?.type !== 'PERMANENT') continue;
+
+        const enchantId = enchant?.source_item?.id;
+        if (Number.isInteger(enchantId)) {
+          enchantmentIds.push(enchantId);
+        }
+
+        const sourceName = enchant?.source_item?.name || '';
+        const parsedName = sourceName.includes(' - ')
+          ? sourceName.split(' - ').slice(1).join(' - ').trim()
+          : (enchant?.display_string || '').replace(/^Enchanted:\s*/i, '').trim();
+        if (parsedName.length > 0) {
+          enchantments.push(parsedName);
+        }
+      }
+
+      const sockets = Array.isArray(item.sockets) ? item.sockets : [];
+      const gems = [];
+      const gemIds = [];
+      for (const socket of sockets) {
+        const gemName = socket?.item?.name || '';
+        if (typeof gemName === 'string' && gemName.trim().length > 0) {
+          gems.push(gemName.trim());
+        }
+        const gemId = socket?.item?.id;
+        if (Number.isInteger(gemId)) {
+          gemIds.push(gemId);
+        }
+      }
+      const socketsTotal = sockets.length;
+      const socketsFilled = gemIds.length;
+
+      const itemId = item.item?.id ?? null;
+
+      equipment.push({
+        slot:         item.slot?.type  || 'UNKNOWN',
+        name:         item.name        || 'Unknown',
+        item_level:   item.level?.value ?? 0,
+        quality:      item.quality?.type || 'COMMON',
+        item_id:      itemId,
+        icon_url:     itemId != null ? (iconUrlsByItemId[itemId] ?? null) : null,
+        enchantments: enchantments,
+        enchantment_ids: enchantmentIds,
+        gems:         gems,
+        gem_ids:      gemIds,
+        sockets_total: socketsTotal,
+        sockets_filled: socketsFilled,
+        // Blizzard equipment summary no devuelve bonus_ids directamente
+        bonus_ids:    [],
+      });
+    }
+  }
+
+  // ── Estadísticas ─────────────────────────────────────────────────────────
+  let normalizedStats = null;
+  if (stats) {
+    // Crítico: melee y spell tienen el mismo rating para la mayoría de specs;
+    // usamos melee si existe, spell como fallback
+    const critValue =
+      extractNumericStatValue(stats.melee_crit, ['value']) ??
+      extractNumericStatValue(stats.spell_crit, ['value']);
+    const hasteValue =
+      extractNumericStatValue(stats.melee_haste, ['value']) ??
+      extractNumericStatValue(stats.spell_haste, ['value']);
+    const powerType =
+      extractPowerTypeValue(stats.power) ??
+      extractPowerTypeValue(stats.power_type) ??
+      'MANA';
+
+    normalizedStats = {
+      health:          extractNumericStatValue(stats.health, ['effective', 'max', 'value']),
+      mana:            extractNumericStatValue(stats.power, ['effective', 'value', 'max']),
+      power_type:      powerType,
+      strength:        extractNumericStatValue(stats.strength, ['effective', 'value', 'base']),
+      agility:         extractNumericStatValue(stats.agility, ['effective', 'value', 'base']),
+      intellect:       extractNumericStatValue(stats.intellect, ['effective', 'value', 'base']),
+      stamina:         extractNumericStatValue(stats.stamina, ['effective', 'value', 'base']),
+      critical_strike: critValue,
+      haste:           hasteValue,
+      mastery:         extractNumericStatValue(stats.mastery, ['value']),
+      // versatility_damage_done_bonus ya viene como porcentaje (e.g. 12.0)
+      versatility:
+        extractNumericStatValue(stats.versatility_damage_done_bonus, ['value']) ??
+        extractNumericStatValue(stats.versatility, ['damage_done_bonus', 'value']),
+    };
+  }
+
+  return {
+    name:              profile.name,
+    realm:             profile.realm?.name           || '',
+    region:            region.toUpperCase(),
+    level:             profile.level                 ?? 80,
+    race:              profile.race?.name            || 'Unknown',
+    class:             profile.character_class?.name || 'Unknown',
+    spec:              profile.active_spec?.name     ?? null,
+    guild:             profile.guild?.name           ?? null,
+    achievement_points: profile.achievement_points   ?? null,
+    average_item_level: profile.average_item_level   ?? null,
+    equipped_item_level: profile.equipped_item_level ?? null,
+    avatar_url:        avatarUrl,
+    thumbnail_url:     thumbnailUrl,
+    equipment:         equipment,
+    stats:             normalizedStats,
+  };
+}
+
+function extractCharacterMediaUrls(media) {
+  const renderUrl = findMediaAssetUrl(media, ['main-raw', 'main']);
+  const thumbnailUrl = findMediaAssetUrl(media, ['avatar', 'inset']) || renderUrl;
+
+  return { renderUrl, thumbnailUrl };
+}
+
+function findMediaAssetUrl(media, preferredKeys = []) {
+  const assets = Array.isArray(media?.assets) ? media.assets : [];
+  if (assets.length === 0) return null;
+
+  for (const key of preferredKeys) {
+    const matchedAsset = assets.find(asset => asset?.key === key);
+    const matchedUrl = extractMediaAssetUrl(matchedAsset);
+    if (matchedUrl) return matchedUrl;
+  }
+
+  for (const asset of assets) {
+    const assetUrl = extractMediaAssetUrl(asset);
+    if (assetUrl) return assetUrl;
+  }
+
+  return null;
+}
+
+function extractMediaAssetUrl(asset) {
+  if (!asset) return null;
+
+  const value = asset.value;
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value.trim();
+  }
+
+  if (value && typeof value === 'object') {
+    const href = value.href;
+    if (typeof href === 'string' && href.trim().length > 0) {
+      return href.trim();
+    }
+  }
+
+  return null;
+}

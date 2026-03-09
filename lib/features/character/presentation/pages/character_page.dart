@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:wow_companion/core/config/feature_flags.dart';
 import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/l10n/failure_localizer.dart';
 import 'package:wow_companion/core/l10n/locale_notifier.dart';
@@ -122,18 +120,6 @@ class _CharacterPageState extends State<CharacterPage> {
                   : S.of(context)!.character,
             ),
             actions: [
-              if (state is CharacterLoaded && FeatureFlags.weeklyPlanner)
-                IconButton(
-                  tooltip: S.of(context)!.weeklyPlannerTooltip,
-                  icon: const Icon(Icons.calendar_month_outlined),
-                  onPressed: () => context.push(
-                    buildWeeklyPlannerRoute(
-                      region: widget.region,
-                      realm: widget.realm,
-                      name: widget.name,
-                    ),
-                  ),
-                ),
               if (state is CharacterLoaded)
                 IconButton(
                   icon: Icon(

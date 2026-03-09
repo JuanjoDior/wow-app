@@ -5,7 +5,6 @@ import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/builds/domain/repositories/builds_repository.dart';
 import 'package:wow_companion/features/builds/data/datasources/build_gap_analysis_datasource.dart';
-import 'package:wow_companion/features/builds/data/datasources/economy_price_summary_datasource.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/build_detail_state.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
 import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dart';
@@ -15,18 +14,12 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
   final BuildsRepository _repository;
   final CharacterMediaDataSource _mediaDataSource;
   final BuildGapAnalysisDataSource _gapAnalysisDataSource;
-  final EconomyPriceSummaryDataSource _economyPriceSummaryDataSource;
-  final bool _economyAssistantEnabled;
 
   BuildDetailCubit(
     this._repository,
     this._mediaDataSource,
     this._gapAnalysisDataSource,
-    this._economyPriceSummaryDataSource, {
-    bool? economyAssistantEnabled,
-  }) : _economyAssistantEnabled =
-           economyAssistantEnabled ?? FeatureFlags.economyAssistant,
-       super(const BuildDetailLoading());
+  ) : super(const BuildDetailLoading());
 
   Future<void> loadBuild(String id) async {
     try {
@@ -40,7 +33,6 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
       );
 
       await _loadGapAnalysisForBuild(build);
-      await _loadEconomyForBuild(build);
 
       // Cargar avatar si falta
       if (build.characterAvatarUrl == null && build.characterRefKey != null) {
@@ -275,12 +267,6 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     await _loadGapAnalysisForBuild(current, force: force);
   }
 
-  Future<void> refreshEconomy({bool force = true}) async {
-    final current = _currentBuild;
-    if (current == null) return;
-    await _loadEconomyForBuild(current, force: force);
-  }
-
   // ─── Private helpers ──────────────────────────────────────────────────────
 
   /// Guarda y emite el build actualizado.
@@ -289,11 +275,9 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     final current = state;
     if (current is BuildDetailLoaded) {
       emit(current.copyWith(build: updated));
-      await _loadEconomyForBuild(updated);
       return;
     }
     emit(BuildDetailLoaded(updated));
-    await _loadEconomyForBuild(updated);
   }
 
   Build? get _currentBuild {
@@ -336,11 +320,6 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
 
   bool _canLoadGapAnalysis(Build build) {
     return FeatureFlags.buildIntelligence && build.characterRefKey != null;
-  }
-
-  bool _canLoadEconomy(Build build) {
-    if (!_economyAssistantEnabled) return false;
-    return _collectEconomyItemIds(build).isNotEmpty;
   }
 
   Future<void> _loadGapAnalysisForBuild(
@@ -400,84 +379,5 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
         emit(latest.copyWith(isGapAnalysisLoading: false));
       }
     }
-  }
-
-  Future<void> _loadEconomyForBuild(Build build, {bool force = false}) async {
-    if (!_canLoadEconomy(build)) {
-      final current = state;
-      if (current is BuildDetailLoaded && current.build.id == build.id) {
-        emit(
-          current.copyWith(clearEconomySummary: true, isEconomyLoading: false),
-        );
-      }
-      return;
-    }
-
-    final region = _regionForBuild(build);
-    final realm = _realmForBuild(build);
-    final itemIds = _collectEconomyItemIds(build);
-
-    final current = state;
-    if (current is BuildDetailLoaded && current.build.id == build.id) {
-      emit(current.copyWith(isEconomyLoading: true));
-    }
-
-    try {
-      final summary = await _economyPriceSummaryDataSource.getPriceSummary(
-        region: region,
-        itemIds: itemIds,
-        realm: realm,
-        force: force,
-      );
-      final latest = state;
-      if (latest is BuildDetailLoaded && latest.build.id == build.id) {
-        emit(latest.copyWith(economySummary: summary, isEconomyLoading: false));
-      }
-    } catch (_) {
-      final latest = state;
-      if (latest is BuildDetailLoaded && latest.build.id == build.id) {
-        emit(latest.copyWith(isEconomyLoading: false));
-      }
-    }
-  }
-
-  String _regionForBuild(Build build) {
-    final refKey = build.characterRefKey;
-    if (refKey == null) return 'eu';
-    final parts = refKey.split('-');
-    if (parts.isEmpty) return 'eu';
-    return parts.first.toLowerCase();
-  }
-
-  String? _realmForBuild(Build build) {
-    final refKey = build.characterRefKey;
-    if (refKey == null) return null;
-    final parts = refKey.split('-');
-    if (parts.length < 2) return null;
-    return parts[1].toLowerCase();
-  }
-
-  List<int> _collectEconomyItemIds(Build build) {
-    final ids = <int>{};
-    for (final slot in build.slots) {
-      final enchantId = slot.enchantment?.id;
-      if (enchantId != null && enchantId > 0) ids.add(enchantId);
-      for (final gem in slot.gems) {
-        if (gem.id > 0) ids.add(gem.id);
-      }
-    }
-
-    final consumables = build.guide.consumables;
-    if (consumables.flask != null && consumables.flask!.id > 0) {
-      ids.add(consumables.flask!.id);
-    }
-    if (consumables.potion != null && consumables.potion!.id > 0) {
-      ids.add(consumables.potion!.id);
-    }
-    if (consumables.food != null && consumables.food!.id > 0) {
-      ids.add(consumables.food!.id);
-    }
-
-    return ids.toList(growable: false);
   }
 }

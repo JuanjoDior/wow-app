@@ -45,14 +45,3 @@ String buildCompareRoute({
   final rightName = Uri.encodeComponent(normalizeName(name2));
   return '/compare/$leftRegion/$leftRealm/$leftName/vs/$rightRegion/$rightRealm/$rightName';
 }
-
-String buildWeeklyPlannerRoute({
-  required String region,
-  required String realm,
-  required String name,
-}) {
-  final normalizedRegion = Uri.encodeComponent(normalizeRegion(region));
-  final normalizedRealm = Uri.encodeComponent(normalizeRealmForRequest(realm));
-  final normalizedName = Uri.encodeComponent(normalizeName(name));
-  return '/planner/$normalizedRegion/$normalizedRealm/$normalizedName';
-}

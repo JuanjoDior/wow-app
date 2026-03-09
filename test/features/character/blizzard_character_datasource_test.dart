@@ -144,13 +144,13 @@ void main() {
     });
   });
 
-  group('BlizzardCharacterDatasource v1 snapshot', () {
-    test('reads snapshot payload when Worker returns v1 envelope', () async {
+  group('BlizzardCharacterDatasource v2 snapshot', () {
+    test('reads snapshot payload when Worker returns v2 envelope', () async {
       final dio = Dio();
       dio.httpClientAdapter = _StaticResponseAdapter(
         statusCode: 200,
         body: {
-          'version': 'v1',
+          'version': 'v2',
           'source': 'blizzard',
           'generated_at': '2026-03-03T10:00:00Z',
           'snapshot': {
@@ -182,7 +182,7 @@ void main() {
       final adapter = _RouteAwareAdapter(
         responder: (options) async => ResponseBody.fromString(
           jsonEncode({
-            'version': 'v1',
+            'version': 'v2',
             'snapshot': {
               'name': 'Apastar',
               'realm': 'Sanguino',
@@ -214,11 +214,11 @@ void main() {
     });
 
     test(
-      'falls back to legacy /character when v1 endpoint is unavailable',
+      'falls back to legacy /character when v2 endpoint is unavailable',
       () async {
         final adapter = _RouteAwareAdapter(
           responder: (options) async {
-            if (options.path.endsWith('/v1/character/snapshot')) {
+            if (options.path.endsWith('/v2/character/snapshot')) {
               return ResponseBody.fromString(
                 'Not Found',
                 404,
@@ -268,7 +268,7 @@ void main() {
         expect(result.name, 'Apastar');
         expect(
           adapter.requestedPaths
-              .where((p) => p.endsWith('/v1/character/snapshot'))
+              .where((p) => p.endsWith('/v2/character/snapshot'))
               .length,
           1,
         );
@@ -280,15 +280,15 @@ void main() {
     );
 
     test(
-      'does not fallback when v1 returns character-not-found error',
+      'does not fallback when v2 returns character-not-found error',
       () async {
         final adapter = _RouteAwareAdapter(
           responder: (options) async {
-            if (options.path.endsWith('/v1/character/snapshot')) {
+            if (options.path.endsWith('/v2/character/snapshot')) {
               return ResponseBody.fromString(
                 jsonEncode({
-                  'version': 'v1',
-                  'endpoint': '/v1/character/snapshot',
+                  'version': 'v2',
+                  'endpoint': '/v2/character/snapshot',
                   'error': 'Character not found. Check region, realm and name.',
                 }),
                 404,

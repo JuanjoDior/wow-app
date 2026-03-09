@@ -213,56 +213,6 @@
   "@buildIntelligenceActionGemMismatch": {
     "placeholders": { "name": { "type": "String" } }
   },
-  "buildIntelligenceEstimatedCostShort": "Cost",
-  "buildIntelligenceRoiShort": "ROI",
-  "buildIntelligenceSummaryEstimatedCost": "Estimated cost",
-  "buildIntelligenceSummaryPricedActions": "Priced actions",
-  "economyAssistantTitle": "Economy Assistant",
-  "economyAssistantSubtitle": "Objective price snapshot for enchants, gems and consumables",
-  "economyAssistantNoData": "No market data available.",
-  "economyAssistantEmptyBuild": "Add enchants, gems or consumables to estimate costs.",
-  "economyAssistantPricedItems": "Priced items",
-  "economyAssistantMissingItems": "Missing prices",
-  "economyAssistantMarket": "Market",
-  "economyAssistantTopItems": "Top market costs",
-  "economyAssistantMedianPrice": "Median",
-  "economyAssistantMarketCommodities": "Commodities",
-  "economyAssistantMarketAuctions": "Realm auctions",
-  "economyAssistantMarketUnknown": "Unknown",
-  "economyAssistantItemFallback": "Item #{id}",
-  "@economyAssistantItemFallback": {
-    "placeholders": {
-      "id": { "type": "int" }
-    }
-  },
-  "weeklyPlannerTitle": "Weekly Planner",
-  "weeklyPlannerTooltip": "Open Weekly Planner",
-  "weeklyPlannerUnavailable": "Weekly Planner is disabled right now.",
-  "weeklyPlannerSummaryTitle": "Weekly summary",
-  "weeklyPlannerCompletion": "Completion",
-  "weeklyPlannerChecks": "Checks",
-  "weeklyPlannerRuns": "Weekly runs",
-  "weeklyPlannerRating": "Rating",
-  "weeklyPlannerAffixes": "Affixes",
-  "weeklyPlannerNoAffixes": "No affix data available yet.",
-  "weeklyPlannerChecklist": "Checklist",
-  "weeklyPlannerResetLocalProgress": "Reset local progress",
-  "weeklyPlannerObjectiveCompleted": "Completed from character data",
-  "weeklyPlannerActions": "Priority actions",
-  "weeklyPlannerNoActions": "No pending actions.",
-  "weeklyPlannerTaskEnchantsCompleted": "Apply missing enchants",
-  "weeklyPlannerTaskSocketsFilled": "Fill empty sockets",
-  "weeklyPlannerTaskMplusOne": "Complete at least 1 Mythic+ run",
-  "weeklyPlannerTaskMplusFour": "Complete 4 Mythic+ runs",
-  "weeklyPlannerTaskMplusEight": "Complete 8 Mythic+ runs",
-  "weeklyPlannerActionRemaining": "{label} ({remaining} remaining)",
-  "@weeklyPlannerActionRemaining": {
-    "placeholders": {
-      "label": { "type": "String" },
-      "remaining": { "type": "int" }
-    }
-  },
-
   "guideTitle": "Build Guide",
   "guideContent": "Content",
   "guideContentRaid": "Raid",

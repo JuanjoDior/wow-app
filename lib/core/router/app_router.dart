@@ -9,7 +9,6 @@ import 'package:wow_companion/features/search/presentation/home_page.dart';
 import 'package:wow_companion/shared/widgets/shell_layout.dart';
 import 'package:wow_companion/features/builds/presentation/pages/builds_list_page.dart';
 import 'package:wow_companion/features/builds/presentation/pages/build_detail_page.dart';
-import 'package:wow_companion/features/planner/presentation/pages/weekly_planner_page.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -100,15 +99,6 @@ final GoRouter appRouter = GoRouter(
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) =>
           BuildDetailPage(buildId: state.pathParameters['id']!),
-    ),
-    GoRoute(
-      path: '/planner/:region/:realm/:name',
-      parentNavigatorKey: _rootNavigatorKey,
-      builder: (context, state) => WeeklyPlannerPage(
-        region: state.pathParameters['region']!,
-        realm: state.pathParameters['realm']!,
-        name: state.pathParameters['name']!,
-      ),
     ),
   ],
 );

@@ -30,9 +30,6 @@ import 'package:wow_companion/features/builds/domain/usecases/search_spells.dart
 import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dart';
 import 'package:wow_companion/features/builds/data/datasources/character_media_datasource.dart';
 import 'package:wow_companion/features/builds/data/datasources/build_gap_analysis_datasource.dart';
-import 'package:wow_companion/features/builds/data/datasources/economy_price_summary_datasource.dart';
-import 'package:wow_companion/features/planner/data/datasources/weekly_planner_datasource.dart';
-import 'package:wow_companion/features/planner/data/repositories/weekly_planner_local_progress_repository.dart';
 
 final sl = GetIt.instance;
 
@@ -85,7 +82,7 @@ Future<void> initDependencies() async {
   // ── Builds Feature ────────────────────────────────────────────────────────
   sl.registerLazySingleton<BuildsRepository>(() => BuildsRepositoryImpl());
   sl.registerFactory(() => BuildsCubit(sl()));
-  sl.registerFactory(() => BuildDetailCubit(sl(), sl(), sl(), sl()));
+  sl.registerFactory(() => BuildDetailCubit(sl(), sl(), sl()));
 
   // ── Spells (Build Guide) ──────────────────────────────────────────────────
   sl.registerLazySingleton<SpellsDataSource>(() => SpellsDataSource(sl()));
@@ -100,16 +97,5 @@ Future<void> initDependencies() async {
   );
   sl.registerLazySingleton<BuildGapAnalysisDataSource>(
     () => BuildGapAnalysisDataSource(sl()),
-  );
-  sl.registerLazySingleton<EconomyPriceSummaryDataSource>(
-    () => EconomyPriceSummaryDataSource(sl()),
-  );
-
-  // ── Weekly Planner ────────────────────────────────────────────────────────
-  sl.registerLazySingleton<WeeklyPlannerDataSource>(
-    () => WeeklyPlannerDataSource(sl()),
-  );
-  sl.registerLazySingleton<WeeklyPlannerLocalProgressRepository>(
-    () => WeeklyPlannerLocalProgressRepository(),
   );
 }

@@ -17,22 +17,18 @@ void main() {
 
   test('localiza errores técnicos frecuentes del worker', () {
     expect(
-      localizeFailureMessage(t, 'Feature disabled: weekly_planner'),
-      t.weeklyPlannerUnavailable,
-    );
-    expect(
-      localizeFailureMessage(t, 'Invalid weekly planner query parameters.'),
+      localizeFailureMessage(t, 'Invalid build verification query parameters.'),
       t.checkRealmAndName,
     );
     expect(
       localizeFailureMessage(
         t,
-        'Weekly planner data not found for the selected character.',
+        'Build verification data not found for the selected character.',
       ),
       t.characterNotFound,
     );
     expect(
-      localizeFailureMessage(t, 'Unknown weekly planner error'),
+      localizeFailureMessage(t, 'Unknown build verification error'),
       t.serverError,
     );
   });

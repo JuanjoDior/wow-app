@@ -109,11 +109,6 @@ void main() {
         'buildIntelligenceTopActions',
         'buildIntelligenceEquippedItems',
         'buildIntelligenceActionEnchantMissing',
-        'weeklyPlannerTitle',
-        'weeklyPlannerChecklist',
-        'weeklyPlannerActions',
-        'weeklyPlannerTaskEnchantsCompleted',
-        'weeklyPlannerActionRemaining',
       ];
 
       for (final key in mustBeLocalized) {

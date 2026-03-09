@@ -8,22 +8,12 @@ import 'package:wow_companion/features/builds/domain/entities/build_gap_analysis
 
 class BuildGapAnalysisDataSource {
   final ApiClient _client;
-  final bool _v2Enabled;
 
   static const _workerUrl =
       'https://wow-recommendations.wow-comp-app.workers.dev';
-  static const _v1Endpoint = '$_workerUrl/v1/build/gap-analysis';
   static const _v2Endpoint = '$_workerUrl/v2/build/verification';
-  static const _healthEndpoint = '$_workerUrl/health';
-  static const _v2EnabledByFlag = bool.fromEnvironment(
-    'BUILD_VERIFICATION_V2',
-    defaultValue: false,
-  );
 
-  bool? _supportsV2;
-
-  BuildGapAnalysisDataSource(this._client, {bool? v2Enabled})
-    : _v2Enabled = v2Enabled ?? _v2EnabledByFlag;
+  BuildGapAnalysisDataSource(this._client);
 
   Future<BuildGapAnalysis> getGapAnalysis({
     required String region,
@@ -54,7 +44,12 @@ class BuildGapAnalysisDataSource {
     }
 
     try {
-      final data = await _getGapAnalysisPayload(query);
+      final data = await _requestV2(query);
+      if (!_looksLikeGapAnalysisPayload(data)) {
+        throw const ServerException(
+          message: 'Unexpected response from worker build verification.',
+        );
+      }
       return BuildGapAnalysis.fromJson(data);
     } on DioException catch (e) {
       final statusCode = e.response?.statusCode;
@@ -62,7 +57,7 @@ class BuildGapAnalysisDataSource {
 
       if (statusCode == 400) {
         throw ServerException(
-          message: workerError ?? 'Invalid gap-analysis query parameters.',
+          message: workerError ?? 'Invalid build verification query parameters.',
           statusCode: 400,
         );
       }
@@ -71,7 +66,7 @@ class BuildGapAnalysisDataSource {
         throw NotFoundException(
           message:
               workerError ??
-              'Gap analysis data not found for the selected character/spec.',
+              'Build verification data not found for the selected character.',
         );
       }
 
@@ -89,101 +84,18 @@ class BuildGapAnalysisDataSource {
       }
 
       throw ServerException(
-        message: workerError ?? e.message ?? 'Unknown gap-analysis error',
+        message: workerError ?? e.message ?? 'Unknown build verification error',
         statusCode: statusCode,
       );
     }
-  }
-
-  Future<Map<String, dynamic>> _getGapAnalysisPayload(
-    Map<String, dynamic> query,
-  ) async {
-    final canUseV2 = await _canUseV2();
-    if (!canUseV2) {
-      return _requestV1(query);
-    }
-
-    try {
-      final v2Data = await _requestV2(query);
-      if (_looksLikeGapAnalysisPayload(v2Data)) {
-        return v2Data;
-      }
-      return _requestV1(query);
-    } on DioException catch (error) {
-      if (_shouldFallbackToV1(error)) {
-        _supportsV2 = false;
-        return _requestV1(query);
-      }
-      rethrow;
-    } catch (_) {
-      return _requestV1(query);
-    }
-  }
-
-  Future<bool> _canUseV2() async {
-    if (!_v2Enabled) return false;
-    if (_supportsV2 != null) return _supportsV2!;
-
-    try {
-      final health = await _client.get(_healthEndpoint);
-      final capabilities = health['capabilities'];
-      if (capabilities is Map) {
-        final enabled = capabilities['build_verification_v2'];
-        _supportsV2 = enabled == true;
-      } else {
-        _supportsV2 = false;
-      }
-    } catch (_) {
-      _supportsV2 = false;
-    }
-    return _supportsV2!;
   }
 
   Future<Map<String, dynamic>> _requestV2(Map<String, dynamic> query) {
     return _client.get(
       _v2Endpoint,
       queryParameters: query,
-      expectedErrorStatusCodes: const {400, 404, 405, 501},
-    );
-  }
-
-  Future<Map<String, dynamic>> _requestV1(Map<String, dynamic> query) {
-    return _client.get(
-      _v1Endpoint,
-      queryParameters: query,
       expectedErrorStatusCodes: const {400, 404},
     );
-  }
-
-  bool _shouldFallbackToV1(DioException error) {
-    final status = error.response?.statusCode;
-    if (status == 405 || status == 501) {
-      return true;
-    }
-
-    if (status != 404) {
-      return false;
-    }
-
-    final data = error.response?.data;
-    if (data is! Map) {
-      return true;
-    }
-
-    final payload = Map<String, dynamic>.from(data);
-    final endpoint = payload['endpoint']?.toString();
-    if (endpoint == '/v2/build/verification') {
-      return false;
-    }
-
-    final workerError = payload['error']?.toString().toLowerCase().trim() ?? '';
-    if (workerError.contains('character not found') ||
-        workerError.contains('unknown region') ||
-        workerError.contains('missing required params')) {
-      return false;
-    }
-
-    return true;
   }
 
   bool _looksLikeGapAnalysisPayload(Map<String, dynamic> payload) {

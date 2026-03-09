@@ -1,43 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:wow_companion/core/config/feature_flags.dart';
 import 'package:wow_companion/core/di/injection.dart';
-import 'package:wow_companion/core/error/exceptions.dart';
-import 'package:wow_companion/core/l10n/failure_localizer.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
-import 'package:wow_companion/core/wow/character_search_input.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/builds_cubit.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/builds_state.dart';
 import 'package:wow_companion/features/builds/presentation/widgets/create_build_dialog.dart';
-import 'package:wow_companion/features/planner/data/datasources/weekly_planner_datasource.dart';
-import 'package:wow_companion/features/planner/data/repositories/weekly_planner_local_progress_repository.dart';
-import 'package:wow_companion/features/planner/domain/entities/weekly_planner.dart';
-import 'package:wow_companion/features/planner/domain/services/weekly_planner_local_progress.dart';
 import 'package:wow_companion/core/l10n/wow_translations.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
 
 class BuildsListPage extends StatelessWidget {
-  final bool showWeeklyPlannerCard;
-
-  const BuildsListPage({super.key, bool? showWeeklyPlannerCard})
-    : showWeeklyPlannerCard =
-          showWeeklyPlannerCard ?? FeatureFlags.weeklyPlanner;
+  const BuildsListPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => sl<BuildsCubit>()..loadBuilds(),
-      child: _BuildsListView(showWeeklyPlannerCard: showWeeklyPlannerCard),
+      child: const _BuildsListView(),
     );
   }
 }
 
 class _BuildsListView extends StatelessWidget {
-  final bool showWeeklyPlannerCard;
-
-  const _BuildsListView({required this.showWeeklyPlannerCard});
+  const _BuildsListView();
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +53,7 @@ class _BuildsListView extends StatelessWidget {
           }
           if (state is BuildsLoaded) {
             if (state.builds.isEmpty) return _buildEmpty(t);
-            return _buildList(context, state.builds, showWeeklyPlannerCard);
+            return _buildList(context, state.builds);
           }
           return const SizedBox.shrink();
         },
@@ -94,16 +80,11 @@ class _BuildsListView extends StatelessWidget {
     ),
   );
 
-  Widget _buildList(
-    BuildContext context,
-    List<Build> builds,
-    bool showWeeklyPlannerCard,
-  ) {
-    final children = <Widget>[
-      if (showWeeklyPlannerCard) _WeeklyPlannerSummaryCard(builds: builds),
-      ...builds.map((buildData) => _BuildCard(buildData: buildData)),
-    ];
-    return ListView(padding: const EdgeInsets.all(12), children: children);
+  Widget _buildList(BuildContext context, List<Build> builds) {
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: builds.map((buildData) => _BuildCard(buildData: buildData)).toList(),
+    );
   }
 
   void _showCreateDialog(BuildContext context) {
@@ -115,300 +96,6 @@ class _BuildsListView extends StatelessWidget {
       ),
     );
   }
-}
-
-class _WeeklyPlannerSummaryCard extends StatefulWidget {
-  final List<Build> builds;
-
-  const _WeeklyPlannerSummaryCard({required this.builds});
-
-  @override
-  State<_WeeklyPlannerSummaryCard> createState() =>
-      _WeeklyPlannerSummaryCardState();
-}
-
-class _WeeklyPlannerSummaryCardState extends State<_WeeklyPlannerSummaryCard> {
-  _PlannerTarget? _target;
-  bool _loading = false;
-  String? _errorMessage;
-  WeeklyPlanner? _planner;
-
-  @override
-  void initState() {
-    super.initState();
-    _refresh();
-  }
-
-  @override
-  void didUpdateWidget(covariant _WeeklyPlannerSummaryCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (_targetKey(oldWidget.builds) != _targetKey(widget.builds)) {
-      _refresh();
-    }
-  }
-
-  String? _targetKey(List<Build> builds) => _pickTarget(builds)?.key;
-
-  _PlannerTarget? _pickTarget(List<Build> builds) {
-    final linked = builds.where((build) {
-      final key = build.characterRefKey;
-      return key != null && key.trim().isNotEmpty;
-    }).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-    if (linked.isEmpty) return null;
-    final key = linked.first.characterRefKey!;
-    final parts = key.split('-');
-    if (parts.length < 3) return null;
-    return _PlannerTarget(
-      region: parts[0],
-      realm: parts[1],
-      name: parts.sublist(2).join('-'),
-    );
-  }
-
-  Future<void> _refresh() async {
-    final target = _pickTarget(widget.builds);
-    if (!mounted) return;
-    setState(() {
-      _target = target;
-      _loading = target != null;
-      _errorMessage = null;
-      _planner = null;
-    });
-
-    if (target == null) return;
-
-    try {
-      final plannerRaw = await sl<WeeklyPlannerDataSource>().getWeeklyPlanner(
-        region: target.region,
-        realm: target.realm,
-        name: target.name,
-      );
-      final progressRepository = sl<WeeklyPlannerLocalProgressRepository>();
-      final plannerKey = progressRepository.buildPlannerKey(
-        region: target.region,
-        realm: target.realm,
-        name: target.name,
-      );
-      final weekKey = progressRepository.buildWeekKey(
-        plannerRaw.generatedAt ?? DateTime.now().toUtc(),
-      );
-      final objectiveDoneTaskIds = plannerRaw.checklist
-          .where((entry) => entry.done)
-          .map((entry) => entry.id)
-          .toSet();
-      final localDoneTaskIds =
-          await progressRepository.getCompletedTaskIds(
-              plannerKey: plannerKey,
-              weekKey: weekKey,
-            )
-            ..removeWhere((taskId) => objectiveDoneTaskIds.contains(taskId));
-      final planner = applyWeeklyPlannerLocalProgress(
-        plannerRaw,
-        localDoneTaskIds,
-      );
-      if (!mounted) return;
-      setState(() {
-        _planner = planner;
-        _loading = false;
-      });
-    } on ServerException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = e.message;
-        _loading = false;
-      });
-    } on NotFoundException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = e.message;
-        _loading = false;
-      });
-    } on NetworkException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = e.message;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = '$e';
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final target = _target;
-    if (target == null) return const SizedBox.shrink();
-    final t = S.of(context)!;
-
-    return Card(
-      color: WowTheme.surfaceDark,
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        t.weeklyPlannerSummaryTitle,
-                        style: const TextStyle(
-                          color: WowTheme.primaryGold,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${target.name} · ${target.realm} · ${target.region.toUpperCase()}',
-                        style: const TextStyle(
-                          color: WowTheme.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: _loading ? null : _refresh,
-                  tooltip: t.retry,
-                  icon: const Icon(Icons.refresh, size: 18),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (_loading && _planner == null)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: CircularProgressIndicator(
-                    color: WowTheme.primaryGold,
-                    strokeWidth: 2,
-                  ),
-                ),
-              )
-            else if (_errorMessage != null)
-              Text(
-                localizeFailureMessage(t, _errorMessage!),
-                style: const TextStyle(color: WowTheme.textSecondary),
-              )
-            else if (_planner == null)
-              Text(
-                t.buildIntelligenceNoData,
-                style: const TextStyle(color: WowTheme.textSecondary),
-              )
-            else ...[
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _PlannerMetricChip(
-                    label: t.weeklyPlannerCompletion,
-                    value: '${_planner!.summary.completionPct}%',
-                  ),
-                  _PlannerMetricChip(
-                    label: t.weeklyPlannerRuns,
-                    value: '${_planner!.mythic.weeklyRunsEstimated}',
-                  ),
-                  _PlannerMetricChip(
-                    label: t.weeklyPlannerActions,
-                    value: '${_planner!.summary.actionsCount}',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    context.push(
-                      buildWeeklyPlannerRoute(
-                        region: target.region,
-                        realm: target.realm,
-                        name: target.name,
-                      ),
-                    );
-                  },
-                  icon: const Icon(
-                    Icons.calendar_month_outlined,
-                    size: 16,
-                    color: WowTheme.primaryGold,
-                  ),
-                  label: Text(
-                    t.weeklyPlannerTitle,
-                    style: const TextStyle(color: WowTheme.primaryGold),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: WowTheme.primaryGold),
-                    minimumSize: const Size(0, 36),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PlannerMetricChip extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _PlannerMetricChip({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: WowTheme.surfaceLight,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: WowTheme.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(color: WowTheme.textSecondary, fontSize: 11),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: const TextStyle(
-              color: WowTheme.textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PlannerTarget {
-  final String region;
-  final String realm;
-  final String name;
-
-  const _PlannerTarget({
-    required this.region,
-    required this.realm,
-    required this.name,
-  });
-
-  String get key => '$region-$realm-$name'.toLowerCase();
 }
 
 // ─── Build card ────────────────────────────────────────────────────────────

@@ -13,7 +13,7 @@ class BlizzardCharacterDatasource {
 
   static const String _workerBaseUrl =
       'https://wow-recommendations.wow-comp-app.workers.dev';
-  static const String _characterSnapshotPath = '/v1/character/snapshot';
+  static const String _characterSnapshotPath = '/v2/character/snapshot';
   static const String _characterLegacyPath = '/character';
 
   BlizzardCharacterDatasource({Dio? dio})
