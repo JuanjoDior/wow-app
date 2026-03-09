@@ -1,5 +1,5 @@
 /**
- * wow-recommendations Worker  v5
+ * wow-recommendations Worker  v6
  *
  * Endpoints:
  *   GET  /health

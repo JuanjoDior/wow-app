@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Archivos temporales de exploración/depuración local
+tmp_*.json
+tmp_*.js
+tmp_*.html
