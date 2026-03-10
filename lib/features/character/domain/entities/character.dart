@@ -110,7 +110,9 @@ class EquippedItem extends Equatable {
   final int? itemId;
   final String? iconUrl;
   final List<String> enchantments;
+  final List<int> enchantmentIds;
   final List<String> gems;
+  final List<int> gemIds;
   final List<int> bonusIds;
 
   const EquippedItem({
@@ -121,7 +123,9 @@ class EquippedItem extends Equatable {
     this.itemId,
     this.iconUrl,
     this.enchantments = const [],
+    this.enchantmentIds = const [],
     this.gems = const [],
+    this.gemIds = const [],
     this.bonusIds = const [],
   });
 

@@ -370,7 +370,31 @@ class SEs extends S {
   String get buildsSelectSpec => 'Selecciona spec';
 
   @override
+  String get buildsLinkedClass => 'Clase del personaje';
+
+  @override
+  String get buildsLinkedSpec => 'Spec de la build';
+
+  @override
+  String get buildsNameRequired => 'Introduce un nombre para la build.';
+
+  @override
+  String get buildsClassRequired => 'Selecciona una clase.';
+
+  @override
+  String get buildsSpecRequired => 'Selecciona una spec.';
+
+  @override
+  String get buildsFavoritesLoadError => 'No se pudieron cargar los favoritos.';
+
+  @override
+  String get buildsSaveError => 'No se pudo guardar la build.';
+
+  @override
   String get buildsCreate => 'Crear';
+
+  @override
+  String get buildsSaving => 'Guardando...';
 
   @override
   String get buildsCancel => 'Cancelar';
@@ -557,6 +581,26 @@ class SEs extends S {
   String buildIntelligenceActionGemMismatch(String name) {
     return 'Reemplaza gema por $name';
   }
+
+  @override
+  String get buildIntelligenceProgressSyncAction => 'Sincronizar progreso';
+
+  @override
+  String buildIntelligenceProgressSyncSuccess(
+    int matched,
+    int targeted,
+    int updated,
+  ) {
+    return 'Progreso sincronizado: $matched/$targeted objetos coinciden, $updated ranuras actualizadas.';
+  }
+
+  @override
+  String get buildIntelligenceProgressSyncErrorGeneric =>
+      'No se pudo sincronizar el progreso del personaje en este momento.';
+
+  @override
+  String get buildIntelligenceSyncErrorNoCharacter =>
+      'No hay un personaje vinculado válido para sincronizar.';
 
   @override
   String get guideTitle => 'Guía de Build';

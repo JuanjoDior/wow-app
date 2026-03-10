@@ -368,7 +368,31 @@ class SEn extends S {
   String get buildsSelectSpec => 'Select spec';
 
   @override
+  String get buildsLinkedClass => 'Character class';
+
+  @override
+  String get buildsLinkedSpec => 'Build spec';
+
+  @override
+  String get buildsNameRequired => 'Enter a build name.';
+
+  @override
+  String get buildsClassRequired => 'Select a class.';
+
+  @override
+  String get buildsSpecRequired => 'Select a spec.';
+
+  @override
+  String get buildsFavoritesLoadError => 'Could not load favorites.';
+
+  @override
+  String get buildsSaveError => 'Could not save the build.';
+
+  @override
   String get buildsCreate => 'Create';
+
+  @override
+  String get buildsSaving => 'Saving...';
 
   @override
   String get buildsCancel => 'Cancel';
@@ -554,6 +578,26 @@ class SEn extends S {
   String buildIntelligenceActionGemMismatch(String name) {
     return 'Replace gem with $name';
   }
+
+  @override
+  String get buildIntelligenceProgressSyncAction => 'Sync progress';
+
+  @override
+  String buildIntelligenceProgressSyncSuccess(
+    int matched,
+    int targeted,
+    int updated,
+  ) {
+    return 'Progress synced: $matched/$targeted items matched, $updated slots updated.';
+  }
+
+  @override
+  String get buildIntelligenceProgressSyncErrorGeneric =>
+      'Could not sync character progress right now.';
+
+  @override
+  String get buildIntelligenceSyncErrorNoCharacter =>
+      'No valid linked character found for sync.';
 
   @override
   String get guideTitle => 'Build Guide';

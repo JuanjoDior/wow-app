@@ -82,7 +82,9 @@ Future<void> initDependencies() async {
   // ── Builds Feature ────────────────────────────────────────────────────────
   sl.registerLazySingleton<BuildsRepository>(() => BuildsRepositoryImpl());
   sl.registerFactory(() => BuildsCubit(sl()));
-  sl.registerFactory(() => BuildDetailCubit(sl(), sl(), sl()));
+  sl.registerFactory(
+    () => BuildDetailCubit(sl(), sl(), sl(), sl(), sl(), sl()),
+  );
 
   // ── Spells (Build Guide) ──────────────────────────────────────────────────
   sl.registerLazySingleton<SpellsDataSource>(() => SpellsDataSource(sl()));

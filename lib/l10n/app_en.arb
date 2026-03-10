@@ -129,7 +129,15 @@
   "buildsClassAndSpec": "Class & Spec",
   "buildsSelectClass": "Select class",
   "buildsSelectSpec": "Select spec",
+  "buildsLinkedClass": "Character class",
+  "buildsLinkedSpec": "Build spec",
+  "buildsNameRequired": "Enter a build name.",
+  "buildsClassRequired": "Select a class.",
+  "buildsSpecRequired": "Select a spec.",
+  "buildsFavoritesLoadError": "Could not load favorites.",
+  "buildsSaveError": "Could not save the build.",
   "buildsCreate": "Create",
+  "buildsSaving": "Saving...",
   "buildsCancel": "Cancel",
   "buildsDeleteTitle": "Delete build",
   "buildsDeleteConfirm": "Delete \"{name}\"?",
@@ -213,6 +221,17 @@
   "@buildIntelligenceActionGemMismatch": {
     "placeholders": { "name": { "type": "String" } }
   },
+  "buildIntelligenceProgressSyncAction": "Sync progress",
+  "buildIntelligenceProgressSyncSuccess": "Progress synced: {matched}/{targeted} items matched, {updated} slots updated.",
+  "@buildIntelligenceProgressSyncSuccess": {
+    "placeholders": {
+      "matched": { "type": "int" },
+      "targeted": { "type": "int" },
+      "updated": { "type": "int" }
+    }
+  },
+  "buildIntelligenceProgressSyncErrorGeneric": "Could not sync character progress right now.",
+  "buildIntelligenceSyncErrorNoCharacter": "No valid linked character found for sync.",
   "guideTitle": "Build Guide",
   "guideContent": "Content",
   "guideContentRaid": "Raid",

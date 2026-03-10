@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import 'package:wow_companion/core/cache/memory_cache.dart';
 import 'package:wow_companion/core/error/exceptions.dart';
 import 'package:wow_companion/core/error/failures.dart';
+import 'package:wow_companion/core/l10n/wow_translations.dart';
 import 'package:wow_companion/features/character/data/datasources/blizzard_character_datasource.dart';
 import 'package:wow_companion/features/character/data/datasources/raiderio_datasource.dart';
 import 'package:wow_companion/features/character/domain/entities/character.dart';
@@ -134,8 +135,9 @@ class CharacterRepositoryImpl implements CharacterRepository {
     }
 
     // 4. Guardar en caché y retornar
-    cache.set(key, character);
-    return Right(character);
+    final canonicalCharacter = _canonicalizeCharacter(character);
+    cache.set(key, canonicalCharacter);
+    return Right(canonicalCharacter);
   }
 
   /// Convierte el primer error relevante en un [Failure].
@@ -197,7 +199,9 @@ class CharacterRepositoryImpl implements CharacterRepository {
             itemId: item.itemId,
             iconUrl: iconSource.iconUrl,
             enchantments: item.enchantments,
+            enchantmentIds: item.enchantmentIds,
             gems: item.gems,
+            gemIds: item.gemIds,
             bonusIds: item.bonusIds,
           );
         })
@@ -205,6 +209,20 @@ class CharacterRepositoryImpl implements CharacterRepository {
   }
 
   bool _isBlank(String? value) => value == null || value.trim().isEmpty;
+
+  Character _canonicalizeCharacter(Character base) {
+    final canonicalClass = WowTranslations.canonicalizeClass(
+      base.characterClass,
+    );
+    return base.copyWith(
+      characterClass: canonicalClass,
+      specialization: WowTranslations.canonicalizeSpec(
+        base.specialization,
+        className: canonicalClass,
+      ),
+      race: WowTranslations.canonicalizeRace(base.race),
+    );
+  }
 
   Character _withNormalizedRaidProgress(
     Character base,

@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:wow_companion/core/l10n/wow_translations.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
 
 // ─── BuildContent ─────────────────────────────────────────────────────────────
@@ -358,14 +359,25 @@ class Build extends Equatable {
   };
 
   factory Build.fromJson(Map<String, dynamic> json) {
+    final rawClass = json['characterClass'] as String?;
+    final canonicalClass = rawClass == null
+        ? null
+        : WowTranslations.canonicalizeClass(rawClass);
+    final rawSpec = json['characterSpec'] as String?;
+    final rawRace = json['characterRace'] as String?;
     return Build(
       id: json['id'] as String,
       name: json['name'] as String,
       characterRefKey: json['characterRefKey'] as String?,
       characterRefDisplay: json['characterRefDisplay'] as String?,
-      characterClass: json['characterClass'] as String?,
-      characterSpec: json['characterSpec'] as String?,
-      characterRace: json['characterRace'] as String?,
+      characterClass: canonicalClass,
+      characterSpec: WowTranslations.canonicalizeSpec(
+        rawSpec,
+        className: canonicalClass,
+      ),
+      characterRace: rawRace == null
+          ? null
+          : WowTranslations.canonicalizeRace(rawRace),
       characterAvatarUrl: json['characterAvatarUrl'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       slots: (json['slots'] as List<dynamic>)

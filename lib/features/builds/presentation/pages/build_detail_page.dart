@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wow_companion/core/config/feature_flags.dart';
 import 'package:wow_companion/core/di/injection.dart';
+import 'package:wow_companion/core/l10n/failure_localizer.dart';
+import 'package:wow_companion/core/l10n/item_name_localizer.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/builds/domain/entities/build_gap_analysis.dart';
@@ -53,19 +55,6 @@ extension WowSlotL10n on WowSlot {
     WowSlot.mainHand => t.wowSlotMainHand,
     WowSlot.offHand => t.wowSlotOffHand,
   };
-}
-
-String _itemNameForLocale(BuildContext context, Item item) {
-  final localeCode = Localizations.localeOf(context).languageCode;
-  final localized = item.localizedName?.trim();
-  final canonical = item.canonicalNameEn?.trim() ?? item.name;
-  if (localeCode == 'es' &&
-      localized != null &&
-      localized.isNotEmpty &&
-      localized.toLowerCase() != canonical.toLowerCase()) {
-    return '$localized · $canonical';
-  }
-  return canonical;
 }
 
 // ─── Slot columns ─────────────────────────────────────────────────────────────
@@ -136,6 +125,7 @@ class _BuildDetailView extends StatelessWidget {
             buildData: state.build,
             gapAnalysis: state.gapAnalysis,
             gapAnalysisLoading: state.isGapAnalysisLoading,
+            characterSyncLoading: state.isCharacterSyncLoading,
           );
         }
         return const SizedBox.shrink();
@@ -149,11 +139,13 @@ class _BuildDetailContent extends StatefulWidget {
   final Build buildData;
   final BuildGapAnalysis? gapAnalysis;
   final bool gapAnalysisLoading;
+  final bool characterSyncLoading;
 
   const _BuildDetailContent({
     required this.buildData,
     required this.gapAnalysis,
     required this.gapAnalysisLoading,
+    required this.characterSyncLoading,
   });
 
   @override
@@ -242,6 +234,7 @@ class _BuildDetailContentState extends State<_BuildDetailContent> {
                       gapAnalysis: widget.gapAnalysis,
                       loading: widget.gapAnalysisLoading,
                       hasCharacter: hasCharacter,
+                      isCharacterSyncLoading: widget.characterSyncLoading,
                     ),
                   ),
                 ),
@@ -336,7 +329,11 @@ class _BuildCharacterHeader extends StatelessWidget {
         WowTranslations.translateRace(buildData.characterRace!, localeCode),
       WowTranslations.translateClass(buildData.characterClass!, localeCode),
       if (buildData.characterSpec != null)
-        WowTranslations.translateSpec(buildData.characterSpec!, localeCode),
+        WowTranslations.translateSpec(
+          buildData.characterSpec!,
+          localeCode,
+          className: buildData.characterClass,
+        ),
     ];
 
     return Card(
@@ -435,11 +432,13 @@ class _BuildIntelligenceSection extends StatelessWidget {
   final BuildGapAnalysis? gapAnalysis;
   final bool loading;
   final bool hasCharacter;
+  final bool isCharacterSyncLoading;
 
   const _BuildIntelligenceSection({
     required this.gapAnalysis,
     required this.loading,
     required this.hasCharacter,
+    required this.isCharacterSyncLoading,
   });
 
   @override
@@ -477,18 +476,52 @@ class _BuildIntelligenceSection extends StatelessWidget {
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(
-                    Icons.refresh,
-                    size: 18,
-                    color: WowTheme.textSecondary,
-                  ),
-                  tooltip: t.retry,
-                  onPressed: loading || !hasCharacter
-                      ? null
-                      : () => context
-                            .read<BuildDetailCubit>()
-                            .refreshGapAnalysis(),
+                Wrap(
+                  spacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    TextButton.icon(
+                      onPressed:
+                          loading || !hasCharacter || isCharacterSyncLoading
+                          ? null
+                          : () => _runProgressSync(context),
+                      icon: isCharacterSyncLoading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: WowTheme.primaryGold,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.sync,
+                              size: 16,
+                              color: WowTheme.primaryGold,
+                            ),
+                      label: Text(
+                        t.buildIntelligenceProgressSyncAction,
+                        style: const TextStyle(
+                          color: WowTheme.primaryGold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.refresh,
+                        size: 18,
+                        color: WowTheme.textSecondary,
+                      ),
+                      tooltip: t.retry,
+                      onPressed:
+                          loading || !hasCharacter || isCharacterSyncLoading
+                          ? null
+                          : () => context
+                                .read<BuildDetailCubit>()
+                                .refreshGapAnalysis(),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -619,6 +652,46 @@ class _BuildIntelligenceSection extends StatelessWidget {
     final impact = action.estimatedImpact?.trim();
     if (impact == null || impact.isEmpty) return null;
     return impact;
+  }
+
+  Future<void> _runProgressSync(BuildContext context) async {
+    final t = S.of(context)!;
+    final cubit = context.read<BuildDetailCubit>();
+
+    try {
+      final result = await cubit.syncCharacterProgress(force: true);
+      if (!context.mounted) return;
+
+      final message = t.buildIntelligenceProgressSyncSuccess(
+        result.itemsMatched,
+        result.itemsTargeted,
+        result.slotsUpdated,
+      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_syncErrorMessage(t, error)),
+          backgroundColor: WowTheme.accentRed,
+        ),
+      );
+    }
+  }
+
+  String _syncErrorMessage(S t, Object error) {
+    final raw = error.toString().trim();
+    if (raw.contains(BuildDetailCubit.syncNoCharacterMessageCode)) {
+      return t.buildIntelligenceSyncErrorNoCharacter;
+    }
+
+    final localized = localizeFailureMessage(t, raw);
+    if (localized == raw) {
+      return t.buildIntelligenceProgressSyncErrorGeneric;
+    }
+    return localized;
   }
 }
 
@@ -841,73 +914,96 @@ class _PaperdollLayout extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final cfg = _paperdollConfigForWidth(constraints.maxWidth);
+        final slotColumnHeight = _slotColumnHeight(cfg);
+        final availableWidth =
+            constraints.maxWidth - (cfg.outerHorizontalPadding * 2);
+        final desiredWidth =
+            (cfg.sideColumnWidth * 2) + cfg.centerWidth + (cfg.gap * 2);
+        final layoutScale = availableWidth < desiredWidth
+            ? availableWidth / desiredWidth
+            : 1.0;
+        final sideColumnWidth = cfg.sideColumnWidth * layoutScale;
+        final centerWidth = cfg.centerWidth * layoutScale;
+        final gap = cfg.gap * layoutScale;
+        final layoutWidth = (sideColumnWidth * 2) + centerWidth + (gap * 2);
 
         return Padding(
           padding: EdgeInsets.symmetric(horizontal: cfg.outerHorizontalPadding),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Expanded(
-                flex: cfg.sideFlex,
-                child: Align(
-                  alignment: Alignment.topLeft,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: cfg.sideMaxWidth),
-                    child: Column(
-                      children: _leftSlots
-                          .map(
-                            (s) =>
-                                _SlotButton(wowSlot: s, align: SlotAlign.left),
-                          )
-                          .toList(),
+          child: Center(
+            child: SizedBox(
+              width: layoutWidth,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    key: const Key('paperdoll-left-column'),
+                    width: sideColumnWidth,
+                    child: _buildSlotColumn(
+                      slots: _leftSlots,
+                      align: SlotAlign.left,
+                      config: cfg,
                     ),
                   ),
-                ),
+                  SizedBox(width: gap),
+                  SizedBox(
+                    key: const Key('paperdoll-center-frame'),
+                    width: centerWidth,
+                    height: slotColumnHeight,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: cfg.centerInnerHorizontalPadding,
+                      ),
+                      child: _CharacterImage(
+                        renderUrl: renderUrl,
+                        loading: loadingImage,
+                        hasCharacter: hasCharacter,
+                        imageScale: cfg.imageScale,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: gap),
+                  SizedBox(
+                    key: const Key('paperdoll-right-column'),
+                    width: sideColumnWidth,
+                    child: _buildSlotColumn(
+                      slots: _rightSlots,
+                      align: SlotAlign.right,
+                      config: cfg,
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(width: cfg.gap),
-              Expanded(
-                flex: cfg.centerFlex,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: cfg.centerInnerHorizontalPadding,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minWidth: cfg.centerMinWidth,
-                      maxWidth: cfg.centerMaxWidth,
-                    ),
-                    child: _CharacterImage(
-                      renderUrl: renderUrl,
-                      loading: loadingImage,
-                      hasCharacter: hasCharacter,
-                      aspectRatio: cfg.centerAspectRatio,
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(width: cfg.gap),
-              Expanded(
-                flex: cfg.sideFlex,
-                child: Align(
-                  alignment: Alignment.topRight,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: cfg.sideMaxWidth),
-                    child: Column(
-                      children: _rightSlots
-                          .map(
-                            (s) =>
-                                _SlotButton(wowSlot: s, align: SlotAlign.right),
-                          )
-                          .toList(),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         );
       },
+    );
+  }
+
+  double _slotColumnHeight(_PaperdollResponsiveConfig config) {
+    final spacingCount = (_leftSlots.length - 1).clamp(0, _leftSlots.length);
+    return (_leftSlots.length * config.slotHeight) +
+        (spacingCount * config.slotSpacing);
+  }
+
+  Widget _buildSlotColumn({
+    required List<WowSlot> slots,
+    required SlotAlign align,
+    required _PaperdollResponsiveConfig config,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < slots.length; i++) ...[
+          _SlotButton(
+            wowSlot: slots[i],
+            align: align,
+            slotHeight: config.slotHeight,
+          ),
+          if (i < slots.length - 1) SizedBox(height: config.slotSpacing),
+        ],
+      ],
     );
   }
 
@@ -915,52 +1011,48 @@ class _PaperdollLayout extends StatelessWidget {
     if (width >= 1700) {
       return const _PaperdollResponsiveConfig(
         outerHorizontalPadding: 20,
-        sideFlex: 34,
-        centerFlex: 32,
+        sideColumnWidth: 390,
+        centerWidth: 364,
         gap: 28,
-        sideMaxWidth: 390,
-        centerMinWidth: 260,
-        centerMaxWidth: 380,
         centerInnerHorizontalPadding: 10,
-        centerAspectRatio: 0.64,
+        slotHeight: 74,
+        slotSpacing: 4,
+        imageScale: 1.12,
       );
     }
     if (width >= 1400) {
       return const _PaperdollResponsiveConfig(
         outerHorizontalPadding: 18,
-        sideFlex: 35,
-        centerFlex: 30,
+        sideColumnWidth: 360,
+        centerWidth: 332,
         gap: 24,
-        sideMaxWidth: 360,
-        centerMinWidth: 240,
-        centerMaxWidth: 340,
         centerInnerHorizontalPadding: 8,
-        centerAspectRatio: 0.6,
+        slotHeight: 72,
+        slotSpacing: 4,
+        imageScale: 1.14,
       );
     }
     if (width >= 1150) {
       return const _PaperdollResponsiveConfig(
         outerHorizontalPadding: 16,
-        sideFlex: 36,
-        centerFlex: 28,
+        sideColumnWidth: 330,
+        centerWidth: 304,
         gap: 20,
-        sideMaxWidth: 330,
-        centerMinWidth: 220,
-        centerMaxWidth: 310,
         centerInnerHorizontalPadding: 6,
-        centerAspectRatio: 0.57,
+        slotHeight: 70,
+        slotSpacing: 4,
+        imageScale: 1.16,
       );
     }
     return const _PaperdollResponsiveConfig(
       outerHorizontalPadding: 12,
-      sideFlex: 37,
-      centerFlex: 26,
+      sideColumnWidth: 285,
+      centerWidth: 252,
       gap: 12,
-      sideMaxWidth: 285,
-      centerMinWidth: 190,
-      centerMaxWidth: 260,
       centerInnerHorizontalPadding: 2,
-      centerAspectRatio: 0.53,
+      slotHeight: 66,
+      slotSpacing: 3,
+      imageScale: 1.18,
     );
   }
 }
@@ -1020,13 +1112,13 @@ class _CharacterImage extends StatelessWidget {
   final String? renderUrl;
   final bool loading;
   final bool hasCharacter;
-  final double aspectRatio;
+  final double imageScale;
 
   const _CharacterImage({
     required this.renderUrl,
     required this.loading,
     required this.hasCharacter,
-    required this.aspectRatio,
+    required this.imageScale,
   });
 
   @override
@@ -1044,7 +1136,7 @@ class _CharacterImage extends StatelessWidget {
       final imageUrl = renderUrl!;
       final avatarLike =
           imageUrl.contains('avatar') && !imageUrl.contains('main-raw');
-      final zoom = avatarLike ? 1.48 : 1.2;
+      final zoom = avatarLike ? imageScale + 0.24 : imageScale;
 
       content = Align(
         alignment: Alignment.topCenter,
@@ -1065,25 +1157,19 @@ class _CharacterImage extends StatelessWidget {
       content = _silhouette();
     }
 
-    return AspectRatio(
-      aspectRatio: aspectRatio,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              WowTheme.surfaceDark.withValues(alpha: 0.0),
-              WowTheme.surfaceDark.withValues(alpha: 0.6),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(8),
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            WowTheme.surfaceDark.withValues(alpha: 0.0),
+            WowTheme.surfaceDark.withValues(alpha: 0.6),
+          ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: content,
-        ),
+        borderRadius: BorderRadius.circular(8),
       ),
+      child: ClipRRect(borderRadius: BorderRadius.circular(8), child: content),
     );
   }
 
@@ -1098,25 +1184,23 @@ class _CharacterImage extends StatelessWidget {
 
 class _PaperdollResponsiveConfig {
   final double outerHorizontalPadding;
-  final int sideFlex;
-  final int centerFlex;
+  final double sideColumnWidth;
+  final double centerWidth;
   final double gap;
-  final double sideMaxWidth;
-  final double centerMinWidth;
-  final double centerMaxWidth;
   final double centerInnerHorizontalPadding;
-  final double centerAspectRatio;
+  final double slotHeight;
+  final double slotSpacing;
+  final double imageScale;
 
   const _PaperdollResponsiveConfig({
     required this.outerHorizontalPadding,
-    required this.sideFlex,
-    required this.centerFlex,
+    required this.sideColumnWidth,
+    required this.centerWidth,
     required this.gap,
-    required this.sideMaxWidth,
-    required this.centerMinWidth,
-    required this.centerMaxWidth,
     required this.centerInnerHorizontalPadding,
-    required this.centerAspectRatio,
+    required this.slotHeight,
+    required this.slotSpacing,
+    required this.imageScale,
   });
 }
 
@@ -1126,8 +1210,13 @@ enum SlotAlign { left, right }
 class _SlotButton extends StatefulWidget {
   final WowSlot wowSlot;
   final SlotAlign align;
+  final double slotHeight;
 
-  const _SlotButton({required this.wowSlot, required this.align});
+  const _SlotButton({
+    required this.wowSlot,
+    required this.align,
+    this.slotHeight = 82,
+  });
 
   @override
   State<_SlotButton> createState() => _SlotButtonState();
@@ -1173,63 +1262,84 @@ class _SlotButtonState extends State<_SlotButton> {
             ? WowTheme.primaryGold.withValues(alpha: 0.6)
             : qualityColor;
 
-        final Widget icon = hasItem && slot.item!.iconUrl != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: Image.network(
-                  slot.item!.iconUrl!,
-                  width: 28,
-                  height: 28,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) =>
-                      Icon(_slotIcon(slot.slot), size: 18, color: qualityColor),
-                ),
-              )
-            : Icon(
-                _slotIcon(slot.slot),
-                size: 18,
-                color: hasItem
-                    ? qualityColor
-                    : WowTheme.textSecondary.withValues(alpha: 0.5),
-              );
-
         final t = S.of(context)!;
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: GestureDetector(
-            onTap: () {
-              if (_checkboxJustTapped) {
-                _checkboxJustTapped = false;
-                return;
-              }
-              _openSlotSheet(context, cubit, slot);
-            },
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 62),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeInOut,
-                decoration: BoxDecoration(
-                  color: slot.obtained
-                      ? WowTheme.surfaceDark.withValues(alpha: 0.4)
-                      : WowTheme.surfaceDark,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: borderColor,
-                    width: hasItem ? 1.5 : 1,
-                  ),
+        return GestureDetector(
+          onTap: () {
+            if (_checkboxJustTapped) {
+              _checkboxJustTapped = false;
+              return;
+            }
+            _openSlotSheet(context, cubit, slot);
+          },
+          child: SizedBox(
+            height: widget.slotHeight,
+            child: AnimatedContainer(
+              key: Key('paperdoll-slot-${slot.slot.name}'),
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              decoration: BoxDecoration(
+                color: slot.obtained
+                    ? WowTheme.surfaceDark.withValues(alpha: 0.4)
+                    : WowTheme.surfaceDark,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: borderColor,
+                  width: hasItem ? 1.5 : 1,
                 ),
-                padding: const EdgeInsets.fromLTRB(5, 6, 5, 6),
-                child: align == SlotAlign.left
-                    ? _leftContent(icon, hasItem, qualityColor, cubit, t, slot)
-                    : _rightContent(
-                        icon,
-                        hasItem,
-                        qualityColor,
-                        cubit,
-                        t,
-                        slot,
-                      ),
+              ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final density = _SlotDensity.forSlot(
+                    width: constraints.maxWidth,
+                    slotHeight: widget.slotHeight,
+                  );
+
+                  final adaptedIcon = hasItem && slot.item!.iconUrl != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: Image.network(
+                            slot.item!.iconUrl!,
+                            width: density.imageSize,
+                            height: density.imageSize,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Icon(
+                              _slotIcon(slot.slot),
+                              size: density.iconSize,
+                              color: qualityColor,
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          _slotIcon(slot.slot),
+                          size: density.iconSize,
+                          color: hasItem
+                              ? qualityColor
+                              : WowTheme.textSecondary.withValues(alpha: 0.5),
+                        );
+
+                  return Padding(
+                    padding: density.padding,
+                    child: align == SlotAlign.left
+                        ? _leftContent(
+                            adaptedIcon,
+                            hasItem,
+                            qualityColor,
+                            cubit,
+                            t,
+                            slot,
+                            density,
+                          )
+                        : _rightContent(
+                            adaptedIcon,
+                            hasItem,
+                            qualityColor,
+                            cubit,
+                            t,
+                            slot,
+                            density,
+                          ),
+                  );
+                },
               ),
             ),
           ),
@@ -1242,18 +1352,19 @@ class _SlotButtonState extends State<_SlotButton> {
     required bool value,
     required Color color,
     required VoidCallback onToggle,
+    required double size,
     Color? borderColor,
   }) {
     return SizedBox(
-      width: 22,
-      height: 22,
+      width: size,
+      height: size,
       child: Checkbox(
         value: value,
         activeColor: color,
         checkColor: WowTheme.darkBackground,
         side: BorderSide(
           color: (borderColor ?? color).withValues(alpha: 0.8),
-          width: 1.2,
+          width: size <= 16 ? 1 : 1.2,
         ),
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         onChanged: (_) {
@@ -1272,12 +1383,16 @@ class _SlotButtonState extends State<_SlotButton> {
     BuildDetailCubit cubit,
     S t,
     BuildSlot slot,
+    _SlotDensity density,
   ) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        icon,
-        const SizedBox(width: 6),
+        SizedBox(
+          width: density.iconBoxWidth,
+          child: Center(child: icon),
+        ),
+        SizedBox(width: density.contentGap),
         Expanded(
           child: _slotText(
             hasItem,
@@ -1286,6 +1401,7 @@ class _SlotButtonState extends State<_SlotButton> {
             cubit,
             t,
             slot,
+            density,
           ),
         ),
       ],
@@ -1299,9 +1415,10 @@ class _SlotButtonState extends State<_SlotButton> {
     BuildDetailCubit cubit,
     S t,
     BuildSlot slot,
+    _SlotDensity density,
   ) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: _slotText(
@@ -1311,10 +1428,14 @@ class _SlotButtonState extends State<_SlotButton> {
             cubit,
             t,
             slot,
+            density,
           ),
         ),
-        const SizedBox(width: 6),
-        icon,
+        SizedBox(width: density.contentGap),
+        SizedBox(
+          width: density.iconBoxWidth,
+          child: Center(child: icon),
+        ),
       ],
     );
   }
@@ -1326,22 +1447,44 @@ class _SlotButtonState extends State<_SlotButton> {
     BuildDetailCubit cubit,
     S t,
     BuildSlot slot,
+    _SlotDensity density,
   ) {
+    final localeCode = Localizations.localeOf(context).languageCode;
     if (!hasItem) {
-      return Text(
-        slot.slot.localizedName(t),
-        textAlign: align,
-        style: TextStyle(
-          color: WowTheme.textSecondary.withValues(alpha: 0.7),
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+      return Column(
+        mainAxisSize: MainAxisSize.max,
+        crossAxisAlignment: align == TextAlign.left
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.end,
+        children: [
+          Text(
+            slot.slot.localizedName(t),
+            textAlign: align,
+            style: TextStyle(
+              color: WowTheme.textSecondary.withValues(alpha: 0.75),
+              fontSize: density.slotLabelFontSize,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const Spacer(),
+          Text(
+            t.slotAssignItem,
+            textAlign: align,
+            style: TextStyle(
+              color: WowTheme.textSecondary.withValues(alpha: 0.55),
+              fontSize: density.secondaryFontSize,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       );
     }
 
     return Column(
+      mainAxisSize: MainAxisSize.max,
       crossAxisAlignment: align == TextAlign.left
           ? CrossAxisAlignment.start
           : CrossAxisAlignment.end,
@@ -1351,113 +1494,229 @@ class _SlotButtonState extends State<_SlotButton> {
           textAlign: align,
           style: TextStyle(
             color: WowTheme.textSecondary.withValues(alpha: 0.6),
-            fontSize: 13,
+            fontSize: density.slotLabelFontSize,
+            fontWeight: FontWeight.w600,
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 1),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            if (align == TextAlign.right) ...[
-              _miniCheckbox(
-                value: slot.obtained,
-                color: WowTheme.primaryGold,
-                onToggle: () => cubit.toggleObtained(slot.slot),
-                borderColor: WowTheme.textSecondary,
-              ),
-              const SizedBox(width: 4),
-            ],
-            Expanded(
-              child: Text(
-                slot.item!.name,
-                textAlign: align,
-                style: TextStyle(
-                  color: qualityColor,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
+        SizedBox(height: density.nameTopGap),
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (align == TextAlign.right) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: _miniCheckbox(
+                    value: slot.obtained,
+                    color: WowTheme.primaryGold,
+                    onToggle: () => cubit.toggleObtained(slot.slot),
+                    borderColor: WowTheme.textSecondary,
+                    size: density.checkboxSize,
+                  ),
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                SizedBox(width: density.checkboxGap),
+              ],
+              Expanded(
+                child: Align(
+                  alignment: align == TextAlign.left
+                      ? Alignment.topLeft
+                      : Alignment.topRight,
+                  child: Tooltip(
+                    message: slot.item!.primaryNameForLanguage(localeCode),
+                    child: Text(
+                      key: Key('paperdoll-slot-item-name-${slot.slot.name}'),
+                      slot.item!.primaryNameForLanguage(localeCode),
+                      textAlign: align,
+                      style: TextStyle(
+                        color: qualityColor,
+                        fontSize: density.itemNameFontSize,
+                        fontWeight: FontWeight.w600,
+                        height: density.itemNameLineHeight,
+                      ),
+                      maxLines: density.itemNameMaxLines,
+                      softWrap: density.itemNameMaxLines > 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
               ),
-            ),
-            if (align == TextAlign.left) ...[
-              const SizedBox(width: 4),
-              _miniCheckbox(
-                value: slot.obtained,
-                color: WowTheme.primaryGold,
-                onToggle: () => cubit.toggleObtained(slot.slot),
-                borderColor: WowTheme.textSecondary,
-              ),
+              if (align == TextAlign.left) ...[
+                SizedBox(width: density.checkboxGap),
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: _miniCheckbox(
+                    value: slot.obtained,
+                    color: WowTheme.primaryGold,
+                    onToggle: () => cubit.toggleObtained(slot.slot),
+                    borderColor: WowTheme.textSecondary,
+                    size: density.checkboxSize,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
-        if (slot.item!.level != null)
-          Text(
-            '${t.ilvl} ${slot.item!.level}',
-            textAlign: align,
-            style: TextStyle(
-              color: WowTheme.textSecondary.withValues(alpha: 0.7),
-              fontSize: 11,
-            ),
-          ),
-        // Enchantment asignado O hint de sugerencia
-        if (slot.enchantment != null)
-          _inlineLabel(
-            icon: '\u2746',
-            label: slot.enchantment!.name,
-            obtained: slot.enchantmentObtained,
-            color: WowTheme.accentBlue,
-            align: align,
-            onToggle: () => cubit.toggleEnchantmentObtained(slot.slot),
-          ),
-        ...slot.gems.asMap().entries.map((e) {
-          final gemObtained = e.key < slot.gemsObtained.length
-              ? slot.gemsObtained[e.key]
-              : false;
-          return _inlineLabel(
-            icon: '\u25c6',
-            label: e.value.name,
-            obtained: gemObtained,
-            color: WowTheme.textSecondary.withValues(alpha: 0.8),
-            align: align,
-            onToggle: () => cubit.toggleGemObtained(slot.slot, e.key),
-          );
-        }),
+        SizedBox(height: density.footerTopGap),
+        _slotFooter(align, cubit, t, slot, density),
       ],
     );
   }
 
-  Widget _inlineLabel({
-    required String icon,
-    required String label,
-    required bool obtained,
-    required Color color,
-    required TextAlign align,
-    required VoidCallback onToggle,
-  }) {
-    final cb = _miniCheckbox(value: obtained, color: color, onToggle: onToggle);
-    final txt = Expanded(
-      child: Text(
-        '$icon $label',
-        textAlign: align,
-        style: TextStyle(
-          color: obtained ? color.withValues(alpha: 0.35) : color,
-          fontSize: 10,
-          decoration: obtained ? TextDecoration.lineThrough : null,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+  Widget _slotFooter(
+    TextAlign align,
+    BuildDetailCubit cubit,
+    S t,
+    BuildSlot slot,
+    _SlotDensity density,
+  ) {
+    final info = Text(
+      slot.item!.level != null ? '${t.ilvl} ${slot.item!.level}' : '',
+      textAlign: align,
+      style: TextStyle(
+        color: WowTheme.textSecondary.withValues(alpha: 0.72),
+        fontSize: density.footerFontSize,
+        fontWeight: FontWeight.w500,
       ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
-    return Padding(
-      padding: const EdgeInsets.only(top: 2),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: align == TextAlign.left
-            ? [txt, const SizedBox(width: 4), cb]
-            : [cb, const SizedBox(width: 4), txt],
+    final statusTrail = _statusTrail(cubit, slot, density);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: align == TextAlign.left
+          ? [
+              Expanded(child: info),
+              if (statusTrail != null) ...[
+                SizedBox(width: density.footerGap),
+                Flexible(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: statusTrail,
+                  ),
+                ),
+              ],
+            ]
+          : [
+              if (statusTrail != null) ...[
+                Flexible(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: statusTrail,
+                  ),
+                ),
+                SizedBox(width: density.footerGap),
+              ],
+              Expanded(child: info),
+            ],
+    );
+  }
+
+  Widget? _statusTrail(
+    BuildDetailCubit cubit,
+    BuildSlot slot,
+    _SlotDensity density,
+  ) {
+    final toggles = <Widget>[
+      if (slot.enchantment != null)
+        _statusToggle(
+          tooltip: slot.enchantment!.primaryNameForLanguage(
+            Localizations.localeOf(context).languageCode,
+          ),
+          color: WowTheme.accentBlue,
+          obtained: slot.enchantmentObtained,
+          onToggle: () => cubit.toggleEnchantmentObtained(slot.slot),
+          density: density,
+          child: const Icon(Icons.auto_fix_high),
+        ),
+      ...slot.gems.asMap().entries.map((entry) {
+        final index = entry.key;
+        final gem = entry.value;
+        final gemObtained = index < slot.gemsObtained.length
+            ? slot.gemsObtained[index]
+            : false;
+        return _statusToggle(
+          tooltip: gem.primaryNameForLanguage(
+            Localizations.localeOf(context).languageCode,
+          ),
+          color: WowTheme.primaryGold,
+          obtained: gemObtained,
+          onToggle: () => cubit.toggleGemObtained(slot.slot, index),
+          density: density,
+          child: const Text('\u25c6'),
+        );
+      }),
+    ];
+
+    if (toggles.isEmpty) return null;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < toggles.length; i++) ...[
+          if (i > 0) SizedBox(width: density.statusSpacing),
+          toggles[i],
+        ],
+      ],
+    );
+  }
+
+  Widget _statusToggle({
+    required String tooltip,
+    required Color color,
+    required bool obtained,
+    required VoidCallback onToggle,
+    required _SlotDensity density,
+    required Widget child,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: () {
+          _checkboxJustTapped = true;
+          Future.microtask(() => _checkboxJustTapped = false);
+          onToggle();
+        },
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          constraints: BoxConstraints(
+            minWidth: density.statusSize,
+            minHeight: density.statusSize,
+          ),
+          padding: EdgeInsets.symmetric(
+            horizontal: density.statusHorizontalPadding,
+            vertical: density.statusVerticalPadding,
+          ),
+          decoration: BoxDecoration(
+            color: obtained
+                ? color.withValues(alpha: 0.18)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: obtained
+                  ? color.withValues(alpha: 0.9)
+                  : color.withValues(alpha: 0.45),
+            ),
+          ),
+          child: Center(
+            child: IconTheme(
+              data: IconThemeData(
+                color: obtained ? color : color.withValues(alpha: 0.75),
+                size: density.statusContentSize,
+              ),
+              child: DefaultTextStyle.merge(
+                style: TextStyle(
+                  color: obtained ? color : color.withValues(alpha: 0.75),
+                  fontSize: density.statusContentSize,
+                  fontWeight: FontWeight.w700,
+                ),
+                child: child,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1478,6 +1737,138 @@ class _SlotButtonState extends State<_SlotButton> {
         value: cubit,
         child: _SlotSheet(wowSlot: slot.slot),
       ),
+    );
+  }
+}
+
+class _SlotDensity {
+  final EdgeInsets padding;
+  final double iconBoxWidth;
+  final double iconSize;
+  final double imageSize;
+  final double contentGap;
+  final double checkboxSize;
+  final double checkboxGap;
+  final double slotLabelFontSize;
+  final double secondaryFontSize;
+  final double itemNameFontSize;
+  final double itemNameLineHeight;
+  final int itemNameMaxLines;
+  final double nameTopGap;
+  final double footerTopGap;
+  final double footerFontSize;
+  final double footerGap;
+  final double statusSpacing;
+  final double statusSize;
+  final double statusHorizontalPadding;
+  final double statusVerticalPadding;
+  final double statusContentSize;
+
+  const _SlotDensity({
+    required this.padding,
+    required this.iconBoxWidth,
+    required this.iconSize,
+    required this.imageSize,
+    required this.contentGap,
+    required this.checkboxSize,
+    required this.checkboxGap,
+    required this.slotLabelFontSize,
+    required this.secondaryFontSize,
+    required this.itemNameFontSize,
+    required this.itemNameLineHeight,
+    required this.itemNameMaxLines,
+    required this.nameTopGap,
+    required this.footerTopGap,
+    required this.footerFontSize,
+    required this.footerGap,
+    required this.statusSpacing,
+    required this.statusSize,
+    required this.statusHorizontalPadding,
+    required this.statusVerticalPadding,
+    required this.statusContentSize,
+  });
+
+  factory _SlotDensity.forSlot({
+    required double width,
+    required double slotHeight,
+  }) {
+    final compact = width < 340 || slotHeight <= 70;
+    final ultraCompact = width < 290 || slotHeight <= 66;
+
+    if (ultraCompact) {
+      return const _SlotDensity(
+        padding: EdgeInsets.fromLTRB(5, 5, 5, 5),
+        iconBoxWidth: 28,
+        iconSize: 18,
+        imageSize: 26,
+        contentGap: 6,
+        checkboxSize: 16,
+        checkboxGap: 3,
+        slotLabelFontSize: 9,
+        secondaryFontSize: 9,
+        itemNameFontSize: 11,
+        itemNameLineHeight: 1.05,
+        itemNameMaxLines: 1,
+        nameTopGap: 1,
+        footerTopGap: 1,
+        footerFontSize: 8,
+        footerGap: 6,
+        statusSpacing: 3,
+        statusSize: 16,
+        statusHorizontalPadding: 2.5,
+        statusVerticalPadding: 1,
+        statusContentSize: 9,
+      );
+    }
+
+    if (compact) {
+      return const _SlotDensity(
+        padding: EdgeInsets.fromLTRB(6, 5, 6, 5),
+        iconBoxWidth: 30,
+        iconSize: 19,
+        imageSize: 28,
+        contentGap: 7,
+        checkboxSize: 17,
+        checkboxGap: 4,
+        slotLabelFontSize: 9,
+        secondaryFontSize: 9,
+        itemNameFontSize: 11.5,
+        itemNameLineHeight: 1.08,
+        itemNameMaxLines: 1,
+        nameTopGap: 1,
+        footerTopGap: 1,
+        footerFontSize: 8.5,
+        footerGap: 6,
+        statusSpacing: 3,
+        statusSize: 17,
+        statusHorizontalPadding: 2.5,
+        statusVerticalPadding: 1,
+        statusContentSize: 9,
+      );
+    }
+
+    return const _SlotDensity(
+      padding: EdgeInsets.fromLTRB(6, 6, 6, 6),
+      iconBoxWidth: 34,
+      iconSize: 20,
+      imageSize: 30,
+      contentGap: 8,
+      checkboxSize: 18,
+      checkboxGap: 4,
+      slotLabelFontSize: 10,
+      secondaryFontSize: 10,
+      itemNameFontSize: 12,
+      itemNameLineHeight: 1.12,
+      itemNameMaxLines: 2,
+      nameTopGap: 2,
+      footerTopGap: 1,
+      footerFontSize: 9,
+      footerGap: 8,
+      statusSpacing: 4,
+      statusSize: 18,
+      statusHorizontalPadding: 3,
+      statusVerticalPadding: 1.5,
+      statusContentSize: 10,
     );
   }
 }
@@ -1614,7 +2005,7 @@ class _SlotSheetContent extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          slot.item!.name,
+                          _formatItemName(context, slot.item!),
                           style: TextStyle(
                             color: qualityColor,
                             fontWeight: FontWeight.bold,
@@ -1830,7 +2221,9 @@ class _SlotSheetContent extends StatelessWidget {
   }
 
   String _formatItemName(BuildContext context, Item item) {
-    return _itemNameForLocale(context, item);
+    return item.primaryNameForLanguage(
+      Localizations.localeOf(context).languageCode,
+    );
   }
 }
 

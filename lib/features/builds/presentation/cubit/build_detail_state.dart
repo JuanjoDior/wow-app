@@ -16,26 +16,36 @@ class BuildDetailLoaded extends BuildDetailState {
   final Build build;
   final BuildGapAnalysis? gapAnalysis;
   final bool isGapAnalysisLoading;
+  final bool isCharacterSyncLoading;
 
   const BuildDetailLoaded(
     this.build, {
     this.gapAnalysis,
     this.isGapAnalysisLoading = false,
+    this.isCharacterSyncLoading = false,
   });
 
   BuildDetailLoaded copyWith({
     Build? build,
     BuildGapAnalysis? gapAnalysis,
     bool? isGapAnalysisLoading,
+    bool? isCharacterSyncLoading,
     bool clearGapAnalysis = false,
   }) => BuildDetailLoaded(
     build ?? this.build,
     gapAnalysis: clearGapAnalysis ? null : (gapAnalysis ?? this.gapAnalysis),
     isGapAnalysisLoading: isGapAnalysisLoading ?? this.isGapAnalysisLoading,
+    isCharacterSyncLoading:
+        isCharacterSyncLoading ?? this.isCharacterSyncLoading,
   );
 
   @override
-  List<Object?> get props => [build, gapAnalysis, isGapAnalysisLoading];
+  List<Object?> get props => [
+    build,
+    gapAnalysis,
+    isGapAnalysisLoading,
+    isCharacterSyncLoading,
+  ];
 }
 
 class BuildDetailError extends BuildDetailState {

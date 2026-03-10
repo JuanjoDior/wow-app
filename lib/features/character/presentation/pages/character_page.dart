@@ -220,6 +220,7 @@ class _CharacterPageState extends State<CharacterPage> {
                         WowTranslations.translateSpec(
                           char.specialization!,
                           localeCode,
+                          className: char.characterClass,
                         ),
                       if (char.guild != null) '< ${char.guild} >',
                     ].join('  ·  '),

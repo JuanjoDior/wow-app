@@ -129,7 +129,15 @@
   "buildsClassAndSpec": "Clase y Spec",
   "buildsSelectClass": "Selecciona clase",
   "buildsSelectSpec": "Selecciona spec",
+  "buildsLinkedClass": "Clase del personaje",
+  "buildsLinkedSpec": "Spec de la build",
+  "buildsNameRequired": "Introduce un nombre para la build.",
+  "buildsClassRequired": "Selecciona una clase.",
+  "buildsSpecRequired": "Selecciona una spec.",
+  "buildsFavoritesLoadError": "No se pudieron cargar los favoritos.",
+  "buildsSaveError": "No se pudo guardar la build.",
   "buildsCreate": "Crear",
+  "buildsSaving": "Guardando...",
   "buildsCancel": "Cancelar",
   "buildsDeleteTitle": "Eliminar build",
   "buildsDeleteConfirm": "¿Eliminar \"{name}\"?",
@@ -213,6 +221,17 @@
   "@buildIntelligenceActionGemMismatch": {
     "placeholders": { "name": { "type": "String" } }
   },
+  "buildIntelligenceProgressSyncAction": "Sincronizar progreso",
+  "buildIntelligenceProgressSyncSuccess": "Progreso sincronizado: {matched}/{targeted} objetos coinciden, {updated} ranuras actualizadas.",
+  "@buildIntelligenceProgressSyncSuccess": {
+    "placeholders": {
+      "matched": { "type": "int" },
+      "targeted": { "type": "int" },
+      "updated": { "type": "int" }
+    }
+  },
+  "buildIntelligenceProgressSyncErrorGeneric": "No se pudo sincronizar el progreso del personaje en este momento.",
+  "buildIntelligenceSyncErrorNoCharacter": "No hay un personaje vinculado válido para sincronizar.",
   "guideTitle": "Guía de Build",
   "guideContent": "Contenido",
   "guideContentRaid": "Raid",

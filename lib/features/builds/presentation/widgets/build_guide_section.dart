@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:wow_companion/core/l10n/item_name_localizer.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
 import 'package:wow_companion/features/builds/presentation/cubit/build_detail_cubit.dart';
@@ -600,6 +601,7 @@ class _ConsumableRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasItem = item != null;
+    final localeCode = Localizations.localeOf(context).languageCode;
     return GestureDetector(
       onTap: onPick,
       child: Container(
@@ -649,7 +651,7 @@ class _ConsumableRow extends StatelessWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            item!.name,
+                            item!.primaryNameForLanguage(localeCode),
                             style: const TextStyle(
                               color: WowTheme.textPrimary,
                               fontSize: 12,

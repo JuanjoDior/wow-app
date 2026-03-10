@@ -83,7 +83,9 @@ class _BuildsListView extends StatelessWidget {
   Widget _buildList(BuildContext context, List<Build> builds) {
     return ListView(
       padding: const EdgeInsets.all(12),
-      children: builds.map((buildData) => _BuildCard(buildData: buildData)).toList(),
+      children: builds
+          .map((buildData) => _BuildCard(buildData: buildData))
+          .toList(),
     );
   }
 
@@ -244,7 +246,11 @@ class _BuildCard extends StatelessWidget {
         WowTranslations.translateRace(buildData.characterRace!, localeCode),
       WowTranslations.translateClass(buildData.characterClass!, localeCode),
       if (buildData.characterSpec != null)
-        WowTranslations.translateSpec(buildData.characterSpec!, localeCode),
+        WowTranslations.translateSpec(
+          buildData.characterSpec!,
+          localeCode,
+          className: buildData.characterClass,
+        ),
     ];
     return parts.join('  ·  ');
   }

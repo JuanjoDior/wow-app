@@ -1,3 +1,4 @@
+import 'package:wow_companion/core/l10n/wow_translations.dart';
 import 'package:wow_companion/features/character/domain/entities/character.dart';
 
 /// Un personaje guardado como favorito
@@ -28,13 +29,17 @@ class FavoriteCharacter {
 
   /// Crear desde un Character completo
   factory FavoriteCharacter.fromCharacter(Character c) {
+    final canonicalClass = WowTranslations.canonicalizeClass(c.characterClass);
     return FavoriteCharacter(
       name: c.name,
       realm: c.realm,
       region: c.region,
-      characterClass: c.characterClass,
-      specialization: c.specialization,
-      race: c.race,
+      characterClass: canonicalClass,
+      specialization: WowTranslations.canonicalizeSpec(
+        c.specialization,
+        className: canonicalClass,
+      ),
+      race: WowTranslations.canonicalizeRace(c.race),
       itemLevel: c.equippedItemLevel,
     );
   }
@@ -52,13 +57,20 @@ class FavoriteCharacter {
   };
 
   factory FavoriteCharacter.fromJson(Map<String, dynamic> json) {
+    final rawClass = json['characterClass'] as String;
+    final canonicalClass = WowTranslations.canonicalizeClass(rawClass);
     return FavoriteCharacter(
       name: json['name'] as String,
       realm: json['realm'] as String,
       region: json['region'] as String,
-      characterClass: json['characterClass'] as String,
-      specialization: json['specialization'] as String?,
-      race: json['race'] as String?,
+      characterClass: canonicalClass,
+      specialization: WowTranslations.canonicalizeSpec(
+        json['specialization'] as String?,
+        className: canonicalClass,
+      ),
+      race: (json['race'] as String?) == null
+          ? null
+          : WowTranslations.canonicalizeRace(json['race'] as String),
       itemLevel: json['itemLevel'] as int?,
       addedAt: DateTime.parse(json['addedAt'] as String),
     );

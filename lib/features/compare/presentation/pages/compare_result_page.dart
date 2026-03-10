@@ -197,7 +197,7 @@ class _CompareResultPageState extends State<CompareResultPage> {
               textAlign: TextAlign.center,
             ),
             Text(
-              '${WowTranslations.translateSpec(c.specialization ?? c.characterClass, localeCode)} · ${WowTranslations.translateRace(c.race, localeCode)}',
+              '${c.specialization != null ? WowTranslations.translateSpec(c.specialization!, localeCode, className: c.characterClass) : WowTranslations.translateClass(c.characterClass, localeCode)} · ${WowTranslations.translateRace(c.race, localeCode)}',
               style: const TextStyle(
                 color: WowTheme.textSecondary,
                 fontSize: 11,

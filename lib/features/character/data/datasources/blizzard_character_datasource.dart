@@ -273,6 +273,16 @@ class CharacterBlizzardData {
             ?.map((e) => (e as num).toInt())
             .toList() ??
         [];
+    final enchantmentIds =
+        (item['enchantment_ids'] as List<dynamic>?)
+            ?.map((e) => (e as num).toInt())
+            .toList() ??
+        [];
+    final gemIds =
+        (item['gem_ids'] as List<dynamic>?)
+            ?.map((e) => (e as num).toInt())
+            .toList() ??
+        [];
 
     return EquippedItem(
       slot: rawSlot,
@@ -282,7 +292,9 @@ class CharacterBlizzardData {
       itemId: (item['item_id'] as num?)?.toInt(),
       iconUrl: iconUrl,
       enchantments: enchantments,
+      enchantmentIds: enchantmentIds,
       gems: gems,
+      gemIds: gemIds,
       bonusIds: bonusIds,
     );
   }

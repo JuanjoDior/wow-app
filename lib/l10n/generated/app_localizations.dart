@@ -793,11 +793,59 @@ abstract class S {
   /// **'Select spec'**
   String get buildsSelectSpec;
 
+  /// No description provided for @buildsLinkedClass.
+  ///
+  /// In en, this message translates to:
+  /// **'Character class'**
+  String get buildsLinkedClass;
+
+  /// No description provided for @buildsLinkedSpec.
+  ///
+  /// In en, this message translates to:
+  /// **'Build spec'**
+  String get buildsLinkedSpec;
+
+  /// No description provided for @buildsNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a build name.'**
+  String get buildsNameRequired;
+
+  /// No description provided for @buildsClassRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a class.'**
+  String get buildsClassRequired;
+
+  /// No description provided for @buildsSpecRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a spec.'**
+  String get buildsSpecRequired;
+
+  /// No description provided for @buildsFavoritesLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load favorites.'**
+  String get buildsFavoritesLoadError;
+
+  /// No description provided for @buildsSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the build.'**
+  String get buildsSaveError;
+
   /// No description provided for @buildsCreate.
   ///
   /// In en, this message translates to:
   /// **'Create'**
   String get buildsCreate;
+
+  /// No description provided for @buildsSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving...'**
+  String get buildsSaving;
 
   /// No description provided for @buildsCancel.
   ///
@@ -1134,6 +1182,34 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Replace gem with {name}'**
   String buildIntelligenceActionGemMismatch(String name);
+
+  /// No description provided for @buildIntelligenceProgressSyncAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync progress'**
+  String get buildIntelligenceProgressSyncAction;
+
+  /// No description provided for @buildIntelligenceProgressSyncSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress synced: {matched}/{targeted} items matched, {updated} slots updated.'**
+  String buildIntelligenceProgressSyncSuccess(
+    int matched,
+    int targeted,
+    int updated,
+  );
+
+  /// No description provided for @buildIntelligenceProgressSyncErrorGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not sync character progress right now.'**
+  String get buildIntelligenceProgressSyncErrorGeneric;
+
+  /// No description provided for @buildIntelligenceSyncErrorNoCharacter.
+  ///
+  /// In en, this message translates to:
+  /// **'No valid linked character found for sync.'**
+  String get buildIntelligenceSyncErrorNoCharacter;
 
   /// No description provided for @guideTitle.
   ///

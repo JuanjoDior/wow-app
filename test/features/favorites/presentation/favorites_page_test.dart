@@ -25,9 +25,9 @@ void main() {
     await sl.reset();
   });
 
-  Widget appWidget() {
+  Widget appWidget({Locale locale = const Locale('es')}) {
     return MaterialApp(
-      locale: const Locale('es'),
+      locale: locale,
       supportedLocales: S.supportedLocales,
       localizationsDelegates: S.localizationsDelegates,
       home: const FavoritesPage(),
@@ -59,5 +59,32 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sanguino · Venganza'), findsOneWidget);
+  });
+
+  testWidgets('normaliza favoritos guardados en español al cambiar a ingles', (
+    tester,
+  ) async {
+    final favorites = [
+      FavoriteCharacter(
+        name: 'Idrexii',
+        realm: 'Sanguino',
+        region: 'eu',
+        characterClass: 'Cazador de Demonios',
+        specialization: 'Venganza',
+        itemLevel: 140,
+      ),
+    ];
+
+    when(() => cubit.state).thenReturn(FavoritesLoaded(favorites));
+    whenListen(
+      cubit,
+      const Stream<FavoritesState>.empty(),
+      initialState: FavoritesLoaded(favorites),
+    );
+
+    await tester.pumpWidget(appWidget(locale: const Locale('en')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sanguino · Vengeance'), findsOneWidget);
   });
 }

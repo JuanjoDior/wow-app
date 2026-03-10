@@ -86,10 +86,20 @@ class _FavoritesPageState extends State<FavoritesPage> {
           itemCount: state.favorites.length,
           itemBuilder: (context, index) {
             final fav = state.favorites[index];
-            final detailRaw = fav.specialization ?? fav.characterClass;
-            final detailTranslated = fav.specialization != null
-                ? WowTranslations.translateSpec(detailRaw, localeCode)
-                : WowTranslations.translateClass(detailRaw, localeCode);
+            final canonicalClass = WowTranslations.canonicalizeClass(
+              fav.characterClass,
+            );
+            final canonicalSpec = WowTranslations.canonicalizeSpec(
+              fav.specialization,
+              className: canonicalClass,
+            );
+            final detailTranslated = canonicalSpec != null
+                ? WowTranslations.translateSpec(
+                    canonicalSpec,
+                    localeCode,
+                    className: canonicalClass,
+                  )
+                : WowTranslations.translateClass(canonicalClass, localeCode);
             return Dismissible(
               key: ValueKey(fav.key),
               direction: DismissDirection.endToStart,
@@ -106,11 +116,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
               child: Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
-                  leading: ClassIcon(className: fav.characterClass),
+                  leading: ClassIcon(className: canonicalClass),
                   title: Text(
                     fav.name,
                     style: TextStyle(
-                      color: WowTheme.getClassColor(fav.characterClass),
+                      color: WowTheme.getClassColor(canonicalClass),
                       fontWeight: FontWeight.w600,
                     ),
                   ),

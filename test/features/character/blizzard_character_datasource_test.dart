@@ -142,6 +142,33 @@ void main() {
       expect(data.equipment, hasLength(1));
       expect(data.equipment.first.iconUrl, isNull);
     });
+
+    test('parses enchantment_ids and gem_ids from equipment payload', () {
+      final data = CharacterBlizzardData.fromJson({
+        'name': 'Test',
+        'realm': 'Realm',
+        'region': 'eu',
+        'class': 'Mage',
+        'race': 'Human',
+        'equipment': [
+          {
+            'slot': 'HEAD',
+            'name': 'Helm',
+            'item_level': 626,
+            'quality': 'EPIC',
+            'item_id': 1001,
+            'enchantments': ['Authority of Radiant Power'],
+            'enchantment_ids': [2234],
+            'gems': ['Quick Ruby', 'Radiant Mastery'],
+            'gem_ids': [192982, 192983],
+          },
+        ],
+      });
+
+      expect(data.equipment, hasLength(1));
+      expect(data.equipment.first.enchantmentIds, [2234]);
+      expect(data.equipment.first.gemIds, [192982, 192983]);
+    });
   });
 
   group('BlizzardCharacterDatasource v2 snapshot', () {

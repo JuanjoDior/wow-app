@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/l10n/failure_localizer.dart';
+import 'package:wow_companion/core/l10n/item_name_localizer.dart';
 import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/builds/domain/entities/build.dart';
@@ -211,8 +212,8 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
         final item = _results[i];
         final color = WowTheme.getQualityColor(item.quality);
         final localeCode = Localizations.localeOf(context).languageCode;
-        final primaryName = _primaryName(item, localeCode);
-        final secondaryName = _secondaryName(item, localeCode);
+        final primaryName = item.primaryNameForLanguage(localeCode);
+        final secondaryName = item.secondaryNameForLanguage(localeCode);
         return ItemTooltipTrigger.forItemId(
           itemId: item.id,
           mode: ItemTooltipInteractionMode.actionFirstMode,
@@ -262,30 +263,6 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
         );
       },
     );
-  }
-
-  String _primaryName(Item item, String localeCode) {
-    if (localeCode == 'es') {
-      return item.localizedName?.trim().isNotEmpty == true
-          ? item.localizedName!
-          : item.name;
-    }
-    return item.canonicalNameEn?.trim().isNotEmpty == true
-        ? item.canonicalNameEn!
-        : item.name;
-  }
-
-  String? _secondaryName(Item item, String localeCode) {
-    final localized = item.localizedName?.trim();
-    final canonical = item.canonicalNameEn?.trim();
-    if (localized == null || localized.isEmpty) return null;
-    if (canonical == null || canonical.isEmpty) return null;
-    if (_normalizeName(localized) == _normalizeName(canonical)) return null;
-    return localeCode == 'es' ? canonical : localized;
-  }
-
-  String _normalizeName(String value) {
-    return value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
   }
 
   Item _persistableItem(Item item) {
