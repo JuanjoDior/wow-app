@@ -216,6 +216,8 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
         final secondaryName = item.secondaryNameForLanguage(localeCode);
         return ItemTooltipTrigger.forItemId(
           itemId: item.id,
+          entityKind: item.lookupKind,
+          fallbackItem: item,
           mode: ItemTooltipInteractionMode.actionFirstMode,
           enableWebOfficialTooltip: false,
           onPrimaryTap: () => Navigator.of(context).pop(_persistableItem(item)),
@@ -274,6 +276,7 @@ class _ItemSearchDialogState extends State<ItemSearchDialog> {
       id: item.id,
       name: nameForStorage,
       quality: item.quality,
+      lookupKind: item.lookupKind,
       level: item.level,
       requiredLevel: item.requiredLevel,
       itemClass: item.itemClass,

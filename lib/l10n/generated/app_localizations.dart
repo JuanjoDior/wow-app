@@ -979,6 +979,96 @@ abstract class S {
   /// **'Type'**
   String get tooltipType;
 
+  /// No description provided for @tooltipDroppedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Dropped by'**
+  String get tooltipDroppedBy;
+
+  /// No description provided for @tooltipSellPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Sell Price'**
+  String get tooltipSellPrice;
+
+  /// No description provided for @tooltipDurability.
+  ///
+  /// In en, this message translates to:
+  /// **'Durability'**
+  String get tooltipDurability;
+
+  /// No description provided for @tooltipBinding.
+  ///
+  /// In en, this message translates to:
+  /// **'Binding'**
+  String get tooltipBinding;
+
+  /// No description provided for @tooltipUnique.
+  ///
+  /// In en, this message translates to:
+  /// **'Unique'**
+  String get tooltipUnique;
+
+  /// No description provided for @tooltipWeapon.
+  ///
+  /// In en, this message translates to:
+  /// **'Weapon'**
+  String get tooltipWeapon;
+
+  /// No description provided for @tooltipArmor.
+  ///
+  /// In en, this message translates to:
+  /// **'Armor'**
+  String get tooltipArmor;
+
+  /// No description provided for @tooltipSockets.
+  ///
+  /// In en, this message translates to:
+  /// **'Sockets'**
+  String get tooltipSockets;
+
+  /// No description provided for @tooltipEffects.
+  ///
+  /// In en, this message translates to:
+  /// **'Effects'**
+  String get tooltipEffects;
+
+  /// No description provided for @tooltipRequirements.
+  ///
+  /// In en, this message translates to:
+  /// **'Requirements'**
+  String get tooltipRequirements;
+
+  /// No description provided for @tooltipSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get tooltipSource;
+
+  /// No description provided for @tooltipContextEnchantments.
+  ///
+  /// In en, this message translates to:
+  /// **'Enchantments'**
+  String get tooltipContextEnchantments;
+
+  /// No description provided for @tooltipContextGems.
+  ///
+  /// In en, this message translates to:
+  /// **'Gems'**
+  String get tooltipContextGems;
+
+  /// No description provided for @tooltipLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading tooltip...'**
+  String get tooltipLoading;
+
+  /// No description provided for @tooltipUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed tooltip unavailable.'**
+  String get tooltipUnavailable;
+
   /// No description provided for @wowSlotHead.
   ///
   /// In en, this message translates to:

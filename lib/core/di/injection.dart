@@ -16,8 +16,11 @@ import 'package:wow_companion/features/character/domain/entities/character.dart'
 import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/features/items/data/datasources/blizzard_items_datasource.dart';
 import 'package:wow_companion/features/items/data/repositories/items_repository_impl.dart';
+import 'package:wow_companion/features/items/data/repositories/tooltip_repository_impl.dart';
 import 'package:wow_companion/features/items/domain/repositories/items_repository.dart';
+import 'package:wow_companion/features/items/domain/repositories/tooltip_repository.dart';
 import 'package:wow_companion/features/items/domain/usecases/search_items.dart';
+import 'package:wow_companion/features/items/domain/usecases/get_tooltip_detail.dart';
 import 'package:wow_companion/features/items/presentation/cubit/items_cubit.dart';
 import 'package:wow_companion/features/builds/data/repositories/builds_repository_impl.dart';
 import 'package:wow_companion/features/builds/domain/repositories/builds_repository.dart';
@@ -28,6 +31,7 @@ import 'package:wow_companion/features/builds/data/repositories/spells_repositor
 import 'package:wow_companion/features/builds/domain/repositories/spells_repository.dart';
 import 'package:wow_companion/features/builds/domain/usecases/search_spells.dart';
 import 'package:wow_companion/features/items/domain/usecases/get_item_detail.dart';
+import 'package:wow_companion/features/items/data/datasources/tooltip_remote_datasource.dart';
 import 'package:wow_companion/features/builds/data/datasources/character_media_datasource.dart';
 import 'package:wow_companion/features/builds/data/datasources/build_gap_analysis_datasource.dart';
 
@@ -75,9 +79,16 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<ItemsRepository>(
     () => ItemsRepositoryImpl(remoteDataSource: sl()),
   );
+  sl.registerLazySingleton<TooltipRemoteDataSource>(
+    () => TooltipRemoteDataSource(sl()),
+  );
+  sl.registerLazySingleton<TooltipRepository>(
+    () => TooltipRepositoryImpl(remoteDataSource: sl()),
+  );
   sl.registerLazySingleton(() => SearchItems(sl()));
   sl.registerFactory(() => ItemsCubit(sl()));
   sl.registerLazySingleton(() => GetItemDetail(sl()));
+  sl.registerLazySingleton(() => GetTooltipDetail(sl()));
 
   // ── Builds Feature ────────────────────────────────────────────────────────
   sl.registerLazySingleton<BuildsRepository>(() => BuildsRepositoryImpl());

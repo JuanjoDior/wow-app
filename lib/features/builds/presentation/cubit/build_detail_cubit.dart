@@ -595,7 +595,9 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
     required String languageCode,
     required Future<Item?> Function(int id, String locale) fetchDetail,
   }) async {
-    if (item.id <= 0) return item;
+    if (item.id <= 0 || item.lookupKind == TooltipEntityKind.spell) {
+      return item;
+    }
 
     final needsEnglish = _isBlank(item.canonicalNameEn);
     final needsLocalized = languageCode == 'es' && _isBlank(item.localizedName);
@@ -647,6 +649,7 @@ class BuildDetailCubit extends Cubit<BuildDetailState> {
       id: base.id,
       name: canonicalName ?? base.name,
       quality: base.quality,
+      lookupKind: base.lookupKind,
       level: base.level ?? englishDetail?.level ?? localizedDetail?.level,
       requiredLevel:
           base.requiredLevel ??

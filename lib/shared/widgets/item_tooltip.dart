@@ -11,7 +11,7 @@ class ItemTooltipOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = ItemTooltipDisplayData.fromSources(equippedItem: item);
-    return ItemTooltipOverlayCard(data: data);
+    return ItemTooltipOverlayCard(fallbackData: data);
   }
 }
 

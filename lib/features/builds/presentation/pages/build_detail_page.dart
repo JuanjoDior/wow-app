@@ -12,6 +12,7 @@ import 'package:wow_companion/features/builds/presentation/cubit/build_detail_st
 import 'package:wow_companion/features/builds/presentation/widgets/item_search_dialog.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
 import 'package:wow_companion/features/items/domain/entities/item_search_mode.dart';
+import 'package:wow_companion/features/items/domain/entities/tooltip_detail.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
 import 'package:wow_companion/shared/widgets/item_tooltip_trigger.dart';
 import 'package:wow_companion/features/builds/presentation/widgets/build_guide_section.dart';
@@ -2001,6 +2002,9 @@ class _SlotSheetContent extends StatelessWidget {
                 Expanded(
                   child: ItemTooltipTrigger.forItemId(
                     itemId: slot.item!.id,
+                    entityKind: slot.item!.lookupKind,
+                    fallbackItem: slot.item,
+                    contextAttachment: _slotTooltipContext(),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -2071,11 +2075,16 @@ class _SlotSheetContent extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      _formatItemName(context, slot.enchantment!),
-                      style: const TextStyle(
-                        color: WowTheme.accentBlue,
-                        fontSize: 13,
+                    child: ItemTooltipTrigger.forItemId(
+                      itemId: slot.enchantment!.id,
+                      entityKind: slot.enchantment!.lookupKind,
+                      fallbackItem: slot.enchantment,
+                      child: Text(
+                        _formatItemName(context, slot.enchantment!),
+                        style: const TextStyle(
+                          color: WowTheme.accentBlue,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ),
@@ -2108,11 +2117,16 @@ class _SlotSheetContent extends StatelessWidget {
                 ...slot.gems.asMap().entries.map(
                   (e) => Chip(
                     backgroundColor: WowTheme.border,
-                    label: Text(
-                      _formatItemName(context, e.value),
-                      style: const TextStyle(
-                        color: WowTheme.textPrimary,
-                        fontSize: 11,
+                    label: ItemTooltipTrigger.forItemId(
+                      itemId: e.value.id,
+                      entityKind: e.value.lookupKind,
+                      fallbackItem: e.value,
+                      child: Text(
+                        _formatItemName(context, e.value),
+                        style: const TextStyle(
+                          color: WowTheme.textPrimary,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
                     deleteIcon: const Icon(
@@ -2223,6 +2237,17 @@ class _SlotSheetContent extends StatelessWidget {
   String _formatItemName(BuildContext context, Item item) {
     return item.primaryNameForLanguage(
       Localizations.localeOf(context).languageCode,
+    );
+  }
+
+  TooltipContextAttachment _slotTooltipContext() {
+    return TooltipContextAttachment(
+      appliedEnchantments: slot.enchantment != null
+          ? [TooltipContextEntry.fromItem(slot.enchantment!)]
+          : const [],
+      appliedGems: [
+        for (final gem in slot.gems) TooltipContextEntry.fromItem(gem),
+      ],
     );
   }
 }

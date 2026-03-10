@@ -5,6 +5,7 @@ class ItemModel extends Item {
     required super.id,
     required super.name,
     required super.quality,
+    super.lookupKind,
     super.level,
     super.requiredLevel,
     super.itemClass,
@@ -21,6 +22,9 @@ class ItemModel extends Item {
       id: json['id'] as int,
       name: json['name'] as String? ?? 'Unknown',
       quality: json['quality'] as String? ?? 'COMMON',
+      lookupKind: TooltipEntityKind.fromJsonValue(
+        json['lookupKind'] ?? json['lookup_kind'] ?? json['kind'],
+      ),
       level: json['level'] as int?,
       requiredLevel: json['requiredLevel'] as int?,
       itemClass: json['itemClass'] as String?,

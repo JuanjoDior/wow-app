@@ -3,6 +3,7 @@ import 'package:wow_companion/core/error/exceptions.dart';
 import 'package:wow_companion/core/network/api_client.dart';
 import 'package:wow_companion/features/items/data/models/item_model.dart';
 import 'package:wow_companion/core/cache/memory_cache.dart';
+import 'package:wow_companion/features/items/domain/entities/item.dart';
 import 'package:wow_companion/features/items/domain/entities/item_search_mode.dart';
 
 class BlizzardItemsDataSource {
@@ -195,6 +196,7 @@ class BlizzardItemsDataSource {
       id: id,
       name: storedName,
       quality: quality,
+      lookupKind: TooltipEntityKind.fromJsonValue(raw['kind']),
       level: (raw['level'] as num?)?.toInt(),
       itemClass: _asTrimmedString(raw['item_class']),
       itemSubclass: _asTrimmedString(raw['item_subclass']),

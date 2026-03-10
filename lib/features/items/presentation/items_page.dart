@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:wow_companion/core/di/injection.dart';
 import 'package:wow_companion/core/l10n/failure_localizer.dart';
+import 'package:wow_companion/core/l10n/item_name_localizer.dart';
 import 'package:wow_companion/core/l10n/locale_notifier.dart';
 import 'package:wow_companion/core/theme/wow_theme.dart';
 import 'package:wow_companion/features/items/domain/entities/item.dart';
@@ -220,6 +221,9 @@ class _ItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = S.of(context)!;
     final qualityColor = WowTheme.getQualityColor(item.quality);
+    final localeCode = Localizations.localeOf(context).languageCode;
+    final primaryName = item.primaryNameForLanguage(localeCode);
+    final secondaryName = item.secondaryNameForLanguage(localeCode);
     return Card(
       color: WowTheme.surfaceDark,
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -229,6 +233,8 @@ class _ItemCard extends StatelessWidget {
       ),
       child: ItemTooltipTrigger.forItemId(
         itemId: item.id,
+        entityKind: item.lookupKind,
+        fallbackItem: item,
         child: Padding(
           padding: const EdgeInsets.all(10),
           child: Row(
@@ -271,7 +277,7 @@ class _ItemCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.name,
+                      primaryName,
                       style: TextStyle(
                         color: qualityColor,
                         fontWeight: FontWeight.bold,
@@ -280,6 +286,18 @@ class _ItemCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (secondaryName != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        secondaryName,
+                        style: const TextStyle(
+                          color: WowTheme.textSecondary,
+                          fontSize: 11,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                     const SizedBox(height: 2),
                     Text(
                       [

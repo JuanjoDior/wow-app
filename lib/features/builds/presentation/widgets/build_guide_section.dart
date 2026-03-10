@@ -9,6 +9,7 @@ import 'package:wow_companion/features/builds/presentation/widgets/spell_search_
 import 'package:wow_companion/features/items/domain/entities/item.dart';
 import 'package:wow_companion/features/items/domain/entities/item_search_mode.dart';
 import 'package:wow_companion/l10n/generated/app_localizations.dart';
+import 'package:wow_companion/shared/widgets/item_tooltip_trigger.dart';
 
 class BuildGuideSection extends StatefulWidget {
   final BuildGuide guide;
@@ -602,8 +603,9 @@ class _ConsumableRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasItem = item != null;
     final localeCode = Localizations.localeOf(context).languageCode;
-    return GestureDetector(
-      onTap: onPick,
+    return InkWell(
+      onTap: hasItem ? null : onPick,
+      borderRadius: BorderRadius.circular(6),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
@@ -634,54 +636,69 @@ class _ConsumableRow extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: hasItem
-                  ? Row(
-                      children: [
-                        if (item!.iconUrl != null)
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(3),
-                            child: Image.network(
-                              item!.iconUrl!,
-                              width: 18,
-                              height: 18,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) =>
-                                  const SizedBox.shrink(),
+                  ? ItemTooltipTrigger.forItemId(
+                      itemId: item!.id,
+                      entityKind: item!.lookupKind,
+                      fallbackItem: item,
+                      child: Row(
+                        children: [
+                          if (item!.iconUrl != null)
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(3),
+                              child: Image.network(
+                                item!.iconUrl!,
+                                width: 18,
+                                height: 18,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) =>
+                                    const SizedBox.shrink(),
+                              ),
+                            ),
+                          if (item!.iconUrl != null) const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              item!.primaryNameForLanguage(localeCode),
+                              style: const TextStyle(
+                                color: WowTheme.textPrimary,
+                                fontSize: 12,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            item!.primaryNameForLanguage(localeCode),
-                            style: const TextStyle(
-                              color: WowTheme.textPrimary,
-                              fontSize: 12,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     )
-                  : Text(
+                  : const Text(
                       '—',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: WowTheme.textSecondary,
                         fontSize: 12,
                       ),
                     ),
             ),
-            if (hasItem)
-              GestureDetector(
-                onTap: onClear,
-                child: const Padding(
-                  padding: EdgeInsets.only(left: 6),
-                  child: Icon(
-                    Icons.close,
-                    size: 14,
-                    color: WowTheme.textSecondary,
-                  ),
+            if (hasItem) ...[
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                splashRadius: 18,
+                onPressed: onPick,
+                icon: const Icon(
+                  Icons.swap_horiz,
+                  size: 16,
+                  color: WowTheme.textSecondary,
                 ),
               ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                splashRadius: 18,
+                onPressed: onClear,
+                icon: const Icon(
+                  Icons.close,
+                  size: 14,
+                  color: WowTheme.textSecondary,
+                ),
+              ),
+            ],
           ],
         ),
       ),

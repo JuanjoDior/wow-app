@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:wow_companion/core/network/api_client.dart';
 import 'package:wow_companion/features/items/data/datasources/blizzard_items_datasource.dart';
+import 'package:wow_companion/features/items/domain/entities/item.dart';
 import 'package:wow_companion/features/items/domain/entities/item_search_mode.dart';
 
 class _MockApiClient extends Mock implements ApiClient {}
@@ -163,6 +164,7 @@ void main() {
     expect(items.first.name, 'Culminating Blasphemite');
     expect(items.first.localizedName, 'Blasfemita culminante');
     expect(items.first.canonicalNameEn, 'Culminating Blasphemite');
+    expect(items.first.lookupKind, TooltipEntityKind.item);
 
     final capturedQuery =
         verify(
@@ -178,6 +180,56 @@ void main() {
     expect(capturedQuery['mode'], 'gem');
     expect(capturedQuery['slot'], 'finger1');
     expect(capturedQuery['region'], 'eu');
+  });
+
+  test('maps catalog V2 spell results to spell lookup kind', () async {
+    datasource = BlizzardItemsDataSource(apiClient, catalogV2Enabled: true);
+
+    when(
+      () => apiClient.get(
+        catalogHealthUrl,
+        queryParameters: any(named: 'queryParameters'),
+        expectedErrorStatusCodes: any(named: 'expectedErrorStatusCodes'),
+      ),
+    ).thenAnswer(
+      (_) async => <String, dynamic>{
+        'capabilities': {'catalog_search_v2': true},
+      },
+    );
+
+    when(
+      () => apiClient.get(
+        catalogSearchUrl,
+        queryParameters: any(named: 'queryParameters'),
+        expectedErrorStatusCodes: any(named: 'expectedErrorStatusCodes'),
+      ),
+    ).thenAnswer(
+      (_) async => <String, dynamic>{
+        'results': [
+          {
+            'id': 445566,
+            'kind': 'spell',
+            'name_localized': 'Autoridad de resolución ígnea',
+            'name_en_us': 'Authority of Fiery Resolve',
+            'display_name': 'Autoridad de resolución ígnea',
+            'quality': 'EPIC',
+            'item_class': 'Consumable',
+            'item_subclass': 'Enchantment',
+            'inventory_type': 'NON_EQUIP',
+            'inventory_name': 'Non-equippable',
+          },
+        ],
+      },
+    );
+
+    final items = await datasource.searchItems(
+      'authority',
+      mode: ItemSearchMode.enchant,
+      locale: 'es_ES',
+    );
+
+    expect(items, hasLength(1));
+    expect(items.first.lookupKind, TooltipEntityKind.spell);
   });
 
   test('falls back to legacy search when catalog V2 returns 404', () async {

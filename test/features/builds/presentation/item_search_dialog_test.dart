@@ -92,6 +92,7 @@ void main() {
           id: 3001,
           name: 'Authority of Fiery Resolve',
           quality: 'EPIC',
+          lookupKind: TooltipEntityKind.spell,
           inventoryType: 'NON_EQUIP',
           inventoryName: 'No equipable',
           localizedName: 'Autoridad de resolución ígnea',
@@ -199,6 +200,7 @@ void main() {
           id: 3001,
           name: 'Authority of Fiery Resolve',
           quality: 'EPIC',
+          lookupKind: TooltipEntityKind.spell,
           localizedName: 'Autoridad de resolución ígnea',
           canonicalNameEn: 'Authority of Fiery Resolve',
         ),
@@ -245,5 +247,6 @@ void main() {
     expect(selected!.name, 'Authority of Fiery Resolve');
     expect(selected!.localizedName, 'Autoridad de resolución ígnea');
     expect(selected!.canonicalNameEn, 'Authority of Fiery Resolve');
+    expect(selected!.lookupKind, TooltipEntityKind.spell);
   });
 }

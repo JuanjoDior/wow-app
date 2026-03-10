@@ -469,6 +469,51 @@ class SEs extends S {
   String get tooltipType => 'Tipo';
 
   @override
+  String get tooltipDroppedBy => 'Soltado por';
+
+  @override
+  String get tooltipSellPrice => 'Precio de venta';
+
+  @override
+  String get tooltipDurability => 'Durabilidad';
+
+  @override
+  String get tooltipBinding => 'Vinculación';
+
+  @override
+  String get tooltipUnique => 'Único';
+
+  @override
+  String get tooltipWeapon => 'Arma';
+
+  @override
+  String get tooltipArmor => 'Armadura';
+
+  @override
+  String get tooltipSockets => 'Sockets';
+
+  @override
+  String get tooltipEffects => 'Efectos';
+
+  @override
+  String get tooltipRequirements => 'Requisitos';
+
+  @override
+  String get tooltipSource => 'Fuente';
+
+  @override
+  String get tooltipContextEnchantments => 'Encantamientos';
+
+  @override
+  String get tooltipContextGems => 'Gemas';
+
+  @override
+  String get tooltipLoading => 'Cargando tooltip...';
+
+  @override
+  String get tooltipUnavailable => 'Tooltip detallado no disponible.';
+
+  @override
   String get wowSlotHead => 'Casco';
 
   @override

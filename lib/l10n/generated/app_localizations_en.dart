@@ -467,6 +467,51 @@ class SEn extends S {
   String get tooltipType => 'Type';
 
   @override
+  String get tooltipDroppedBy => 'Dropped by';
+
+  @override
+  String get tooltipSellPrice => 'Sell Price';
+
+  @override
+  String get tooltipDurability => 'Durability';
+
+  @override
+  String get tooltipBinding => 'Binding';
+
+  @override
+  String get tooltipUnique => 'Unique';
+
+  @override
+  String get tooltipWeapon => 'Weapon';
+
+  @override
+  String get tooltipArmor => 'Armor';
+
+  @override
+  String get tooltipSockets => 'Sockets';
+
+  @override
+  String get tooltipEffects => 'Effects';
+
+  @override
+  String get tooltipRequirements => 'Requirements';
+
+  @override
+  String get tooltipSource => 'Source';
+
+  @override
+  String get tooltipContextEnchantments => 'Enchantments';
+
+  @override
+  String get tooltipContextGems => 'Gems';
+
+  @override
+  String get tooltipLoading => 'Loading tooltip...';
+
+  @override
+  String get tooltipUnavailable => 'Detailed tooltip unavailable.';
+
+  @override
   String get wowSlotHead => 'Helm';
 
   @override

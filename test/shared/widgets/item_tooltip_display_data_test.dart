@@ -100,5 +100,19 @@ void main() {
       expect(data.gems, ['Culminating Blasphemite']);
       expect(data.wowheadUrl, 'https://www.wowhead.com/item=1234');
     });
+
+    test('builds Wowhead spell url for spell-based tooltip entities', () {
+      final item = Item(
+        id: 778899,
+        name: 'Authority of Fiery Resolve',
+        quality: 'EPIC',
+        lookupKind: TooltipEntityKind.spell,
+      );
+
+      final data = ItemTooltipDisplayData.fromSources(itemDetail: item);
+
+      expect(data.entityKind, TooltipEntityKind.spell);
+      expect(data.wowheadUrl, 'https://www.wowhead.com/spell=778899');
+    });
   });
 }

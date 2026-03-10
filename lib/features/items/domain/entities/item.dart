@@ -1,9 +1,28 @@
 import 'package:equatable/equatable.dart';
 
+enum TooltipEntityKind {
+  item,
+  spell;
+
+  String get apiValue => switch (this) {
+    TooltipEntityKind.item => 'item',
+    TooltipEntityKind.spell => 'spell',
+  };
+
+  static TooltipEntityKind fromJsonValue(Object? raw) {
+    final normalized = raw?.toString().trim().toLowerCase();
+    return switch (normalized) {
+      'spell' => TooltipEntityKind.spell,
+      _ => TooltipEntityKind.item,
+    };
+  }
+}
+
 class Item extends Equatable {
   final int id;
   final String name;
   final String quality;
+  final TooltipEntityKind lookupKind;
   final int? level;
   final int? requiredLevel;
   final String? itemClass;
@@ -18,6 +37,7 @@ class Item extends Equatable {
     required this.id,
     required this.name,
     required this.quality,
+    this.lookupKind = TooltipEntityKind.item,
     this.level,
     this.requiredLevel,
     this.itemClass,
@@ -34,6 +54,7 @@ class Item extends Equatable {
     'id': id,
     'name': name,
     'quality': quality,
+    'lookupKind': lookupKind.apiValue,
     'level': level,
     'iconUrl': iconUrl,
     'inventoryType': inventoryType,
@@ -46,6 +67,9 @@ class Item extends Equatable {
     id: json['id'] as int,
     name: json['name'] as String,
     quality: json['quality'] as String? ?? 'COMMON',
+    lookupKind: TooltipEntityKind.fromJsonValue(
+      json['lookupKind'] ?? json['lookup_kind'],
+    ),
     level: json['level'] as int?,
     iconUrl: json['iconUrl'] as String?,
     inventoryType: json['inventoryType'] as String?,
@@ -59,6 +83,7 @@ class Item extends Equatable {
     id,
     name,
     quality,
+    lookupKind,
     level,
     inventoryType,
     localizedName,
