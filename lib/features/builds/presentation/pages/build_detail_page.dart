@@ -1645,7 +1645,7 @@ class _SlotButtonState extends State<_SlotButton> {
           obtained: gemObtained,
           onToggle: () => cubit.toggleGemObtained(slot.slot, index),
           density: density,
-          child: const Text('\u25c6'),
+          child: const Icon(Icons.diamond),
         );
       }),
     ];
